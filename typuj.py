@@ -54,13 +54,16 @@ def _rezerwa(zrodlo, kandydat):
 
 
 def _zaw_nazwy(a, b):
-    """Zawieranie jednej nazwy w drugiej, ale tylko gdy to naprawde ta sama druzyna.
-    21.09.2026: samo "a in b" bralo tez przypadkowe podciagi — "USC" zawiera sie
-    w "virtUSCiseranobergamo", a "Nova" w "CucineLubeCivitaNOVA". Wymagamy >=5 znakow
-    i by krotsza nazwa stanowila >=45% dluzszej."""
+    """Zawieranie jednej nazwy w drugiej — ale tylko na POCZATKU albo na KONCU.
+    21.09.2026, druga proba. Pierwsza wersja porownywala dlugosci (krotsza >=45% dluzszej)
+    i byla zla w obie strony: przepuszczala "Legia" -> "COLEGIAles" (klub argentynski,
+    5/10 = 50%), a blokowala poprawne "Pogon" -> "PogonSzczecin" (5/13 = 38%).
+    Dopasowanie na brzegu nazwy rozstrzyga to jednoznacznie: skroty klubow ucina sie
+    z poczatku albo z konca ("MHK Nitra" -> "Nitra", "Montpellier Handball" -> "Montpellier"),
+    nigdy ze srodka. Prog 5 znakow zostaje — bez niego "USC" wpada w "virtUSCiseranobergamo"."""
     if len(a) < 5 or len(b) < 5: return False
-    if min(len(a), len(b)) / max(len(a), len(b)) < 0.45: return False
-    return a in b or b in a
+    d, k = (a, b) if len(a) >= len(b) else (b, a)
+    return d.startswith(k) or d.endswith(k)
 
 
 def resolve(name, pool):

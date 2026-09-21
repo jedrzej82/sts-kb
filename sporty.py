@@ -205,12 +205,16 @@ def elo(d, sport, pre=None, info=None):
 
 
 def _zaw_nazwy(a, b):
-    """Zawieranie jednej nazwy w drugiej, ale tylko gdy to naprawde ta sama druzyna.
-    Bez progow "USC" zawiera sie w "virtUSCiseranobergamo", a "Nova" w "CucineLubeCivitaNOVA".
-    Wymagamy wiec >=5 znakow i by krotszy stanowil >=45% dluzszego — tak samo jak w dopasuj_seed()."""
+    """Zawieranie jednej nazwy w drugiej — ale tylko na POCZATKU albo na KONCU.
+    21.09.2026, druga proba. Pierwsza wersja porownywala dlugosci (krotsza >=45% dluzszej)
+    i byla zla w obie strony: przepuszczala "Legia" -> "COLEGIAles" (klub argentynski,
+    5/10 = 50%), a blokowala poprawne "Pogon" -> "PogonSzczecin" (5/13 = 38%).
+    Dopasowanie na brzegu nazwy rozstrzyga to jednoznacznie: skroty klubow ucina sie
+    z poczatku albo z konca ("MHK Nitra" -> "Nitra", "Montpellier Handball" -> "Montpellier"),
+    nigdy ze srodka. Prog 5 znakow zostaje — bez niego "USC" wpada w "virtUSCiseranobergamo"."""
     if len(a) < 5 or len(b) < 5: return False
-    if min(len(a), len(b)) / max(len(a), len(b)) < 0.45: return False
-    return a in b or b in a
+    d, k = (a, b) if len(a) >= len(b) else (b, a)
+    return d.startswith(k) or d.endswith(k)
 
 
 def resolve(name, pool):
