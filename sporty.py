@@ -74,10 +74,73 @@ def load():
     return d.sort_values('data', kind='stable')
 
 
+# --- dopasowanie nazw z tabel ligowych do nazw z bazy meczow (21.09.2026) ---
+# Tabele (tabele_eu.csv) maja nazwy oficjalne/wikipediowe, a baza meczow nazwy skrocone z 365scores:
+# "Montpellier Handball" vs "Montpellier", "Ademar Leon" vs "ABANCA Ademar Leon", "Nitra" vs "MHK Nitra".
+# Bez tego seed nie przypina sie do zadnej druzyny i sila startowa z tabeli przepada.
+SEED_POMIN = {'hc', 'bc', 'bm', 'sc', 'sg', 'tv', 'tsv', 'vfb', 'vfl', 'hbc', 'cb', 'kk', 'mhk', 'hk', 'ehc', 'erc',
+              'ev', 'sv', 'if', 'ik', 'bk', 'fc', 'cf', 'ac', 'as', 'us', 'club', 'de', 'la', 'el', 'del',
+              'handball', 'hand', 'basket', 'basketball', 'volley', 'volleyball', 'pallacanestro', 'pallavolo',
+              'team', 'the', 'sk', 'hkm', 'khl', 'ks', 'mks', 'gks', 'kh'}
+
+
+def _tok_seed(s):
+    t = re.findall(r'[a-z0-9]+', unicodedata.normalize('NFKD', str(s)).encode('ascii', 'ignore').decode().lower())
+    return [x for x in t if x not in SEED_POMIN and len(x) > 1]
+
+
+REZERWY = re.compile(r'(^|[\s.\-])(b|ii|2|c|iii|3|u\s?1[6-9]|u\s?2[0-3]|jun|junior|juniors|res|reserve|reserves|'
+                     r'young|academy|akademia|w|women|kobiety|damen|femenino|feminin|fem)([\s.\-]|$)', re.I)
+
+
+def _rezerwa_a_nie_pierwsza(zrodlo, kandydat):
+    """Blokuje 'Lvi Praha' -> 'Lvi Praha B' i pierwsza druzyne -> zespol kobiecy/mlodziezowy."""
+    return bool(REZERWY.search(' ' + str(kandydat) + ' ')) and not REZERWY.search(' ' + str(zrodlo) + ' ')
+
+
+def dopasuj_seed(nazwa, pula):
+    """pula: dict {norm(nazwa_z_bazy): nazwa_z_bazy}. Zwraca nazwe z bazy albo None.
+    Dopasowuje TYLKO gdy kandydat jest jednoznaczny — przy dwoch i wiecej woli nie przypiac nic."""
+    k = norm(nazwa)
+    if not k: return None
+    if k in pula: return pula[k]
+    pula = {kb: v for kb, v in pula.items() if not _rezerwa_a_nie_pierwsza(nazwa, v)}
+    if not pula: return None
+    # zawieranie: krotszy ciag musi stanowic >=45% dluzszego i miec >=5 znakow,
+    # inaczej "CucineLubeCivitaNOVA" zlapie sie na "Nova"
+    def _zawiera(a, b):
+        if len(a) < 5 or len(b) < 5: return False
+        if min(len(a), len(b)) / max(len(a), len(b)) < 0.45: return False
+        return a.startswith(b) or b.startswith(a) or b.endswith(a) or a.endswith(b)
+    kand = {v for kb, v in pula.items() if _zawiera(k, kb)}
+    if len(kand) == 1: return kand.pop()
+    tn = set(_tok_seed(nazwa))
+    if tn:
+        eq = [v for v in pula.values() if set(_tok_seed(v)) == tn]
+        if len(eq) == 1: return eq[0]
+        sub = [v for v in pula.values() if _tok_seed(v) and (set(_tok_seed(v)) <= tn or tn <= set(_tok_seed(v)))]
+        if len(sub) == 1: return sub[0]
+    mm = difflib.get_close_matches(k, list(pula), n=2, cutoff=0.86)
+    if len(mm) == 1: return pula[mm[0]]
+    return None
+
+
 def elo(d, sport, pre=None, info=None):
     hfa, draws = SPORT.get(sport, (40, False))
     R, N, last, draw_n, tot = {}, {}, {}, 0, 0
     S = seeds(sport); si = 0; seeded = {}
+    # przypnij nazwy z tabel do nazw wystepujacych w bazie meczow tego sportu
+    _pula = {}
+    for _r in d[d.sport == sport].itertuples():
+        for _t in (_r.gosp, _r.gosc): _pula.setdefault(norm(_t), _t)
+    if _pula and S:
+        _S2, _zm = [], 0
+        for _dd, _t, _rt, _gp, _lg in S:
+            _c = _pula.get(norm(_t)) or dopasuj_seed(_t, _pula)
+            if _c and _c != _t: _zm += 1
+            _S2.append((_dd, _c or _t, _rt, _gp, _lg))
+        S = sorted(_S2)
+        if info is not None: info['seed_dopasowane'] = _zm
 
     def apply_seeds(until):
         nonlocal si

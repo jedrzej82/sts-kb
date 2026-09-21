@@ -1,7 +1,7 @@
 # --- generowane lokalnie przy kazdym uruchomieniu ---
 kb.sqlite
 raw/
-zewn/
+# zewn/ — OD 21.09.2026 SLEDZONE: wyniki 365scores leza w repo, zewn.py czyta je z kb/zewn/
 *.pyc
 __pycache__/
 
