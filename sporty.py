@@ -11,6 +11,7 @@ codziennie do sporty_delta.csv. Model uczy się od zera — im więcej wyników,
   python3 sporty.py backtest                                        — kalibracja z historii (sporty_hist.csv) → sporty_kalibracja_hist.csv
 Baza = sporty_hist.csv (NBA/WNBA/NHL/NFL/MLB z GitHub, hist_import.py) + sporty_delta.csv (wyniki dopisywane codziennie)."""
 import os, sys, re, difflib, unicodedata, numpy as np, pandas as pd
+import functools
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DB, LOG, CAL = (os.path.join(HERE, f) for f in ('sporty_delta.csv', 'sporty_typy.csv', 'sporty_kalibracja.csv'))
@@ -57,7 +58,15 @@ MAPOWE = {'esport_lol'}
 K = 24
 
 
-def norm(s): return re.sub(r'[^a-z0-9]', '', unicodedata.normalize('NFKD', str(s)).encode('ascii', 'ignore').decode().lower())
+# Litery, ktorych NFKD NIE rozklada — encode('ascii','ignore') po prostu je KASUJE.
+# 21.09.2026: przez to norm("Wisla Plock" z polskimi znakami) dawalo "wisapock" zamiast
+# "wislaplock" i klub w ogole nie pasowal do bazy; ratowalo to tylko dopasowanie rozmyte,
+# czyli przypadek. Dotyczy wszystkich nazw z l z kreska, d z kreska, o z kreska itd.
+_LITERY = str.maketrans({'ł':'l','Ł':'L','đ':'d','Đ':'D','ø':'o','Ø':'O','ß':'ss',
+                         'æ':'ae','Æ':'AE','œ':'oe','Œ':'OE','þ':'th','Þ':'TH',
+                         'ð':'d','Ð':'D','ı':'i','ŋ':'n','ħ':'h','ŧ':'t'})
+
+def norm(s): return re.sub(r'[^a-z0-9]', '', unicodedata.normalize('NFKD', str(s).translate(_LITERY)).encode('ascii', 'ignore').decode().lower())
 
 
 def scal_warianty(d, cicho=False):
@@ -110,7 +119,7 @@ SEED_POMIN = {'hc', 'bc', 'bm', 'sc', 'sg', 'tv', 'tsv', 'vfb', 'vfl', 'hbc', 'c
 
 
 def _tok_seed(s):
-    t = re.findall(r'[a-z0-9]+', unicodedata.normalize('NFKD', str(s)).encode('ascii', 'ignore').decode().lower())
+    t = re.findall(r'[a-z0-9]+', unicodedata.normalize('NFKD', str(s).translate(_LITERY)).encode('ascii', 'ignore').decode().lower())
     return [x for x in t if x not in SEED_POMIN and len(x) > 1]
 
 
@@ -204,17 +213,25 @@ def elo(d, sport, pre=None, info=None):
     return R, N, hfa, draws, (draw_n + 50 * pr) / (tot + 50)
 
 
+@functools.lru_cache(maxsize=None)
+def _tokeny(s):
+    return tuple(re.findall(r'[a-z0-9]+', unicodedata.normalize('NFKD', str(s).translate(_LITERY)).encode('ascii', 'ignore').decode().lower()))
+
+
 def _zaw_nazwy(a, b):
-    """Zawieranie jednej nazwy w drugiej — ale tylko na POCZATKU albo na KONCU.
-    21.09.2026, druga proba. Pierwsza wersja porownywala dlugosci (krotsza >=45% dluzszej)
-    i byla zla w obie strony: przepuszczala "Legia" -> "COLEGIAles" (klub argentynski,
-    5/10 = 50%), a blokowala poprawne "Pogon" -> "PogonSzczecin" (5/13 = 38%).
-    Dopasowanie na brzegu nazwy rozstrzyga to jednoznacznie: skroty klubow ucina sie
-    z poczatku albo z konca ("MHK Nitra" -> "Nitra", "Montpellier Handball" -> "Montpellier"),
-    nigdy ze srodka. Prog 5 znakow zostaje — bez niego "USC" wpada w "virtUSCiseranobergamo"."""
-    if len(a) < 5 or len(b) < 5: return False
-    d, k = (a, b) if len(a) >= len(b) else (b, a)
-    return d.startswith(k) or d.endswith(k)
+    """Czy jedna nazwa jest skrotem drugiej. Porownujemy CZLONY nazwy, nie litery.
+    21.09.2026, trzecia proba — dwie poprzednie mylily druzyny:
+      wersja 1 (udzial dlugosci >=45%): "Legia" wpadalo w "coLEGIAles",
+      wersja 2 (prefiks/sufiks na literach): "Inter" wpadalo w "INTERnational Pacific University",
+        "Magda" w "MAGDAlena Frech", "South" w "SOUTHern Connecticut State", "Basket" w "BASKETball Lowen".
+    Skrot klubu ucina cale czlony z poczatku albo z konca ("MHK Nitra" -> "Nitra",
+    "Montpellier Handball" -> "Montpellier"), nigdy polowe slowa. Dlatego czlony musza
+    zgadzac sie w calosci i lezec na brzegu nazwy."""
+    ta, tb = _tokeny(a), _tokeny(b)
+    if not ta or not tb: return False
+    d, k = (ta, tb) if len(ta) >= len(tb) else (tb, ta)
+    if len(''.join(k)) < 4: return False        # "US", "AC", "Tre" — za malo, zeby cokolwiek rozstrzygac
+    return d[:len(k)] == k or d[-len(k):] == k
 
 
 def resolve(name, pool):
@@ -228,9 +245,21 @@ def resolve(name, pool):
     dostawalo dopasowanie. Dlatego ponizej odrzucamy z puli wszystkie klucze puste."""
     k_ = norm(name)
     if not k_: return None
-    by = {norm(p): p for p in pool if norm(p) and not _rezerwa_a_nie_pierwsza(name, p)}
+    # sorted(): pool to zbior, a kolejnosc iteracji zbioru zalezy od losowego ziarna
+    # hasha w danym procesie. Bez tego przy dwoch nazwach o tym samym kluczu wynik
+    # bywal RAZ jeden, RAZ drugi — ta sama nazwa z oferty dawala rozne druzyny.
+    by = {norm(p): p for p in sorted(pool) if norm(p) and not _rezerwa_a_nie_pierwsza(name, p)}
+    # dwie ROZNE nazwy moga uproscic sie do tego samego klucza ("Andreeva" i "Andreev A.",
+    # "Rangers" i "Ranger's") — slownik zostawia wtedy jedna z nich po cichu. Ostrzegamy.
+    _kol = {}
+    for _p in sorted(pool):
+        _k = norm(_p)
+        if _k: _kol.setdefault(_k, set()).add(_p)
+    if k_ in _kol and len(_kol[k_]) > 1:
+        print(f'  UWAGA: "{name}" pasuje do {len(_kol[k_])} roznych wpisow w bazie '
+              f'({", ".join(sorted(_kol[k_]))}) — sprawdz, ktory to.')
     if k_ in by: return by[k_]
-    c = [p for kk, p in by.items() if _zaw_nazwy(k_, kk)]
+    c = [p for p in by.values() if _zaw_nazwy(name, p)]
     if len(c) == 1: return c[0]
     if c:   # pierwszy czlon nazwy jest niemal zawsze wlasciwym klubem
         pref = [p for p in c if k_.startswith(norm(p)) or norm(p).startswith(k_)]
@@ -238,7 +267,15 @@ def resolve(name, pool):
         if pref: return max(pref, key=lambda p: len(norm(p)))
         return min(c, key=lambda p: abs(len(norm(p)) - len(k_)))
     # prog 0.7 byl za luzny i milczacy; 0.80 jak w typuj.py, z ostrzezeniem dla czlowieka
-    m = difflib.get_close_matches(k_, list(by), n=1, cutoff=0.80)
+    # rozmyte tylko dla dluzszych nazw i z wysokim progiem (0,87 zamiast 0,80:
+    # przy 0,80 "Argentinos"->"Argentino MM", "Champions"->"Campion", "Karlstad"->"Harstad") — przy 3-5 znakach prog 0,80 osiaga sie trywialnie
+    # i dawal "Nart"->"Lenart", "Amal"->"Samail", "Pro"->"Paro", "Cuba"->"Cuiaba"
+    m = difflib.get_close_matches(k_, list(by), n=1, cutoff=0.90) if len(k_) >= 8 else []
+    # dodatkowo pierwsze trzy znaki musza sie zgadzac: przy samym progu 0,90
+    # przechodzilo jeszcze "Champions"->"Campion" i "Academico"->"Academica" (dwa rozne kluby).
+    # Brak dopasowania to noga MNIEJ na kuponie, pomylona druzyna to kupon przegrany —
+    # ta asymetria kaze wybrac ostroznosc.
+    m = [x for x in m if x[:3] == k_[:3]]
     if m:
         print(f'  UWAGA: "{name}" dopasowane ROZMYTO do "{by[m[0]]}" — upewnij sie, ze to ta sama druzyna.')
         return by[m[0]]
