@@ -1,0 +1,249 @@
+#!/usr/bin/env python3
+"""Wszystkie sporty z oferty STS poza piłką i tenisem (hokej, koszykówka, siatkówka, piłka ręczna, futsal, esport, baseball,
+futbol amerykański, rugby, snooker, dart, MMA/boks …): Elo z przewagą gospodarza per sport, budowane z wyników dopisywanych
+codziennie do sporty_delta.csv. Model uczy się od zera — im więcej wyników, tym pewniejszy; kalibracja z własnych prognoz.
+  python3 sporty.py wynik RRRR-MM-DD SPORT LIGA "Gosp" "Gość" PKT_G PKT_A [dogrywka:0/1]
+  python3 sporty.py typuj SPORT "Gosp" "Gość" [--neutral]
+  python3 sporty.py typ RRRR-MM-DD SPORT "Gosp" "Gość" RYNEK P     — zapis prognozy (RYNEK: 1 / 2 / X / 1_60min …)
+  python3 sporty.py rozlicz                                         — rozliczenie + kalibracja per sport
+  python3 sporty.py stan                                            — ile meczów/drużyn w bazie per sport
+  python3 sporty.py druzyny SPORT FRAGMENT                           — nazwy drużyn w bazie (Elo, liczba meczów)
+  python3 sporty.py backtest                                        — kalibracja z historii (sporty_hist.csv) → sporty_kalibracja_hist.csv
+Baza = sporty_hist.csv (NBA/WNBA/NHL/NFL/MLB z GitHub, hist_import.py) + sporty_delta.csv (wyniki dopisywane codziennie)."""
+import os, sys, re, difflib, unicodedata, numpy as np, pandas as pd
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+DB, LOG, CAL = (os.path.join(HERE, f) for f in ('sporty_delta.csv', 'sporty_typy.csv', 'sporty_kalibracja.csv'))
+HIST, CALH = os.path.join(HERE, 'sporty_hist.csv'), os.path.join(HERE, 'sporty_kalibracja_hist.csv')  # cache historyczny (hist_import.py)
+TAB = os.path.join(HERE, 'tabele_eu.csv')  # tabele lig europejskich (sport, liga, sezon, data, drużyna, gp, w, d, l, otw, otl, gf, ga)
+PYTH = {'hokej': 2.0, 'koszykówka': 13.9, 'piłka ręczna': 7.5, 'siatkówka': 2.5, 'futsal': 2.0, 'unihokej': 2.0, 'piłka wodna': 4.0}
+
+
+def seeds(sport):
+    """Startowe Elo z tabeli ligowej: udział zwycięstw (dogrywki = wygrane, remis = ½) + Pitagoras z bramek/punktów/setów,
+    ściągnięte do średniej (6 meczów). Elo = 1500 + 400·log10(w/(1−w)) — siła względem średniej ligi."""
+    if not os.path.exists(TAB): return []
+    t = pd.read_csv(TAB); t = t[(t.sport == sport) & (t.gp > 0)]
+    out = []
+    for r in t.itertuples():
+        wp = (r.w + r.otw + 0.5 * r.d) / r.gp
+        k = PYTH.get(sport, 2.0)
+        c = 0.5 * wp + 0.5 * (r.gf ** k / (r.gf ** k + r.ga ** k)) if r.gf + r.ga > 0 else wp
+        c = (c * r.gp + 0.5 * 6) / (r.gp + 6); c = min(max(c, 0.03), 0.97)
+        out.append((pd.Timestamp(r.data), r.druzyna, 1500 + 400 * np.log10(c / (1 - c)), int(r.gp), r.liga))
+    return sorted(out)
+NFL = dict(ARI='Arizona Cardinals', ATL='Atlanta Falcons', BAL='Baltimore Ravens', BUF='Buffalo Bills', CAR='Carolina Panthers', CHI='Chicago Bears',
+           CIN='Cincinnati Bengals', CLE='Cleveland Browns', DAL='Dallas Cowboys', DEN='Denver Broncos', DET='Detroit Lions', GB='Green Bay Packers',
+           HOU='Houston Texans', IND='Indianapolis Colts', JAX='Jacksonville Jaguars', KC='Kansas City Chiefs', LV='Las Vegas Raiders', OAK='Las Vegas Raiders',
+           LAC='Los Angeles Chargers', SD='Los Angeles Chargers', LA='Los Angeles Rams', STL='Los Angeles Rams', MIA='Miami Dolphins', MIN='Minnesota Vikings',
+           NE='New England Patriots', NO='New Orleans Saints', NYG='New York Giants', NYJ='New York Jets', PHI='Philadelphia Eagles', PIT='Pittsburgh Steelers',
+           SF='San Francisco 49ers', SEA='Seattle Seahawks', TB='Tampa Bay Buccaneers', TEN='Tennessee Titans', WAS='Washington Commanders')
+MLB = dict(ANA='Los Angeles Angels', ARI='Arizona Diamondbacks', ATL='Atlanta Braves', BAL='Baltimore Orioles', BOS='Boston Red Sox', CHA='Chicago White Sox',
+           CHN='Chicago Cubs', CIN='Cincinnati Reds', CLE='Cleveland Guardians', COL='Colorado Rockies', DET='Detroit Tigers', HOU='Houston Astros',
+           KCA='Kansas City Royals', LAN='Los Angeles Dodgers', MIA='Miami Marlins', FLO='Miami Marlins', MIL='Milwaukee Brewers', MIN='Minnesota Twins',
+           NYA='New York Yankees', NYN='New York Mets', OAK='Athletics', ATH='Athletics', PHI='Philadelphia Phillies', PIT='Pittsburgh Pirates',
+           SDN='San Diego Padres', SEA='Seattle Mariners', SFN='San Francisco Giants', SLN='St. Louis Cardinals', TBA='Tampa Bay Rays',
+           TEX='Texas Rangers', TOR='Toronto Blue Jays', WAS='Washington Nationals', MON='Washington Nationals')
+# przewaga gospodarza (pkt Elo) i czy możliwy remis w regulaminowym czasie
+DRAW_PRIOR = {'hokej': 0.22, 'piłka ręczna': 0.08, 'futsal': 0.20, 'rugby': 0.03, 'żużel': 0.05, 'unihokej': 0.18, 'piłka wodna': 0.12}
+SPORT = {'hokej': (50, True), 'koszykówka': (70, False), 'siatkówka': (40, False), 'piłka ręczna': (60, True),
+         'futsal': (50, True), 'baseball': (25, False), 'futbol amerykański': (55, False), 'rugby': (60, True),
+         'esport': (0, False), 'snooker': (0, False), 'dart': (0, False), 'mma': (0, False), 'boks': (0, False),
+         'żużel': (60, True), 'unihokej': (50, True), 'piłka wodna': (40, True),
+         'esport_cs2': (0, False), 'esport_lol': (0, False), 'esport_val': (0, False), 'esport_dota': (0, False),
+         'tenis stołowy': (0, False), 'krykiet': (20, False), 'badminton': (0, False), 'siatkówka plażowa': (0, False), 'futbol australijski': (30, False)}
+# LoL w bazie = pojedyncze mapy → P serii liczone z P mapy (--bo3/--bo5); CS2/Valorant w bazie = całe serie
+MAPOWE = {'esport_lol'}
+K = 24
+
+
+def norm(s): return re.sub(r'[^a-z0-9]', '', unicodedata.normalize('NFKD', str(s)).encode('ascii', 'ignore').decode().lower())
+
+
+def load():
+    cols = ['data', 'sport', 'liga', 'gosp', 'gosc', 'pg', 'pa', 'dogrywka']
+    h = pd.read_csv(HIST) if os.path.exists(HIST) else pd.DataFrame(columns=cols)
+    x = pd.read_csv(DB) if os.path.exists(DB) else pd.DataFrame(columns=cols)
+    if len(x):  # wynik dopisany ręcznie wygrywa z historią; w samym delta — ostatni zapis wygrywa
+        x = x.drop_duplicates(['data', 'sport', 'gosp', 'gosc'], keep='last')
+        k = lambda z: z.data.astype(str).str[:10] + '|' + z.sport + '|' + z.gosp.astype(str) + '|' + z.gosc.astype(str)
+        h = h[~k(h).isin(set(k(x)))]
+    d = pd.concat([h, x], ignore_index=True); d['data'] = pd.to_datetime(d.data)
+    for liga, m in (('NFL', NFL), ('MLB', MLB)):
+        i = d.liga == liga; d.loc[i, 'gosp'] = d.loc[i, 'gosp'].replace(m); d.loc[i, 'gosc'] = d.loc[i, 'gosc'].replace(m)
+    return d.sort_values('data', kind='stable')
+
+
+def elo(d, sport, pre=None, info=None):
+    hfa, draws = SPORT.get(sport, (40, False))
+    R, N, last, draw_n, tot = {}, {}, {}, 0, 0
+    S = seeds(sport); si = 0; seeded = {}
+
+    def apply_seeds(until):
+        nonlocal si
+        while si < len(S) and (until is None or S[si][0] <= until):
+            dd, t, rt, gp, liga = S[si]; si += 1
+            if t in last and (dd - last[t]).days > 90: R[t] = 1500 + (R[t] - 1500) * 0.67
+            R[t] = rt if t not in R else (R[t] * 20 + rt * gp) / (20 + gp)
+            N[t] = max(N.get(t, 0), gp); last[t] = dd; seeded[t] = liga
+
+    for r in d[d.sport == sport].itertuples():
+        apply_seeds(r.data)
+        for t in (r.gosp, r.gosc):  # przerwa > 90 dni = nowy sezon → regresja 1/3 do średniej
+            if t in last and (r.data - last[t]).days > 90: R[t] = 1500 + (R[t] - 1500) * 0.67
+            last[t] = r.data
+        a, b = R.get(r.gosp, 1500.), R.get(r.gosc, 1500.)
+        if pre is not None: pre.append((a, b, N.get(r.gosp, 0), N.get(r.gosc, 0)))
+        e = 1 / (1 + 10 ** ((b - a - hfa) / 400))
+        reg_draw = getattr(r, 'dogrywka', 0) == 1 and draws
+        s = 0.5 if (r.pg == r.pa or reg_draw) and draws else (1.0 if r.pg > r.pa else 0.0)
+        margin = np.log1p(abs(r.pg - r.pa)) if r.pg != r.pa else 1
+        kk = K * min(margin, 2.5) * (1.5 if N.get(r.gosp, 0) < 10 or N.get(r.gosc, 0) < 10 else 1.0)
+        R[r.gosp] = a + kk * (s - e); R[r.gosc] = b - kk * (s - e)
+        N[r.gosp] = N.get(r.gosp, 0) + 1; N[r.gosc] = N.get(r.gosc, 0) + 1
+        if getattr(r, 'dogrywka', 0) != -1: tot += 1; draw_n += int(reg_draw or r.pg == r.pa)
+    apply_seeds(None)
+    if info is not None: info.update(last=last, seeded=seeded)
+    pr = DRAW_PRIOR.get(sport, 0.0)
+    return R, N, hfa, draws, (draw_n + 50 * pr) / (tot + 50)
+
+
+def resolve(name, pool):
+    k_ = norm(name); by = {norm(p): p for p in pool}
+    if k_ in by: return by[k_]
+    c = [p for kk, p in by.items() if k_ and (k_ in kk or kk in k_)]
+    if len(c) == 1: return c[0]
+    m = difflib.get_close_matches(k_, list(by), n=1, cutoff=0.7)
+    return by[m[0]] if m else None
+
+
+def calibrate(sport, p):
+    """Najpierw własne rozliczone prognozy (n≥150), potem backtest historyczny (dotyczy P faworyta/zwycięzcy, bez remisu)."""
+    for path, lab in ((CAL, 'własne prognozy'), (CALH, 'backtest historyczny')):
+        if not os.path.exists(path): continue
+        c = pd.read_csv(path); c = c[c.sport == sport]
+        if c.n.sum() < 150: continue
+        q = max(p, 1 - p); pc = float(np.interp(q, c.p_model, c.p_kalibr))
+        return (pc if p >= 0.5 else 1 - pc), f'skalibrowane ({lab}, n={int(c.n.sum())})'
+    return p, 'BRAK KALIBRACJI dla tego sportu — P traktuj jak „szacunek” (max 1 na kupon), dopóki sporty.py rozlicz nie zbierze ≥150 prognoz'
+
+
+PARAM = os.path.join(HERE, 'sporty_param.json')   # v5n: model marży punktowej + zespół z Elo (sporty_bt.py)
+
+
+def marza(d, sport, k):
+    """Rating w punktach (oczekiwana różnica punktów), aktualizowany po każdym meczu; nowy sezon (>90 dni) → ściągnięcie o 25%."""
+    R, last = {}, {}
+    x = d[(d.sport == sport)].dropna(subset=['pg', 'pa'])
+    for r in x.itertuples():
+        for t in (r.gosp, r.gosc):
+            if t in last and (r.data - last[t]).days > 90: R[t] = R[t] * 0.75
+            last[t] = r.data
+        a_, b_ = R.get(r.gosp, 0.), R.get(r.gosc, 0.)
+        err = float(np.clip((r.pg - r.pa) - (a_ - b_ + k['hfa']), -30, 30))
+        R[r.gosp] = a_ + k['k'] * err; R[r.gosc] = b_ - k['k'] * err
+    today = pd.Timestamp.today().normalize()
+    for t in list(R):
+        if (today - last[t]).days > 90: R[t] *= 0.75
+    return R
+
+
+def backtest(d, sport, od='2015-01-01'):
+    pre = []; hfa = elo(d, sport, pre)[2]
+    t = d[d.sport == sport].assign(ra=[x[0] for x in pre], rb=[x[1] for x in pre], na=[x[2] for x in pre], nb=[x[3] for x in pre])
+    t = t[(t.data >= od) & (t.na >= 20) & (t.nb >= 20) & (t.pg != t.pa)]
+    if len(t) < 300: return None
+    e = 1 / (1 + 10 ** ((t.rb - t.ra - hfa) / 400)); win = (t.pg > t.pa).astype(float)
+    pf = np.maximum(e, 1 - e); hit = np.where(e >= 0.5, win, 1 - win)
+    c = pd.DataFrame({'p': pf, 'h': hit}).sort_values('p'); q = np.array_split(np.arange(len(c)), 12)
+    cal = pd.DataFrame([(sport, c.p.values[i].mean(), c.h.values[i].mean(), len(i)) for i in q], columns=['sport', 'p_model', 'p_kalibr', 'n'])
+    cal['p_kalibr'] = np.maximum.accumulate(cal.p_kalibr.values)
+    home = win.mean()
+    print(f'{sport}: test {len(t)} m. od {od}, trafność faworyta {hit.mean():.1%}, Brier {((e - win) ** 2).mean():.4f}, gospodarz wygrywa {home:.1%}')
+    print(cal[['p_model', 'p_kalibr', 'n']].to_string(index=False, float_format=lambda x: f'{x:.3f}'))
+    return cal
+
+
+def main(a):
+    if a[0] == 'wynik':
+        row = dict(data=a[1], sport=a[2].lower(), liga=a[3], gosp=a[4], gosc=a[5], pg=float(a[6]), pa=float(a[7]),
+                   dogrywka=int(a[8]) if len(a) > 8 else 0)
+        pd.DataFrame([row]).to_csv(DB, mode='a', header=not os.path.exists(DB), index=False); print('dopisano', row)
+    elif a[0] == 'backtest':
+        d = load(); cals = [c for sp in sorted(d.sport.unique()) for c in [backtest(d, sp)] if c is not None]
+        if cals: pd.concat(cals).to_csv(CALH, index=False, float_format='%.4f'); print('zapisano', CALH)
+    elif a[0] == 'druzyny':  # lista drużyn w bazie pasujących do fragmentu nazwy
+        sport = a[1].lower(); inf = {}; R, N, *_ = elo(load(), sport, info=inf); q = norm(a[2]) if len(a) > 2 else ''
+        for t in sorted(R, key=lambda t: -R[t]):
+            if q in norm(t): print(f'{t:<40} Elo {R[t]:6.0f}  meczów {N.get(t, 0):5d}  {inf["seeded"].get(t, "")}')
+    elif a[0] == 'stan':
+        d = load(); print(d.groupby('sport').agg(mecze=('gosp', 'size'), od=('data', 'min'), do=('data', 'max')).to_string() if len(d) else 'baza pusta')
+        if os.path.exists(TAB):
+            t = pd.read_csv(TAB); print('\nTabele lig (siła startowa):'); print(t.groupby(['sport', 'liga']).agg(druzyn=('druzyna', 'size'), sezon=('sezon', 'max')).to_string())
+    elif a[0] == 'typuj':
+        sport = a[1].lower(); d = load(); inf = {}; R, N, hfa, draws, pdraw = elo(d, sport, info=inf); L_ = inf['last']
+        pool = set(R); h, g = resolve(a[2], pool) or a[2], resolve(a[3], pool) or a[3]
+        n = min(N.get(h, 0), N.get(g, 0))
+        hf = 0 if '--neutral' in a else hfa
+        today = pd.Timestamp.today().normalize()
+        for t in (h, g):  # ostatnie dane > 90 dni temu = nowy sezon → regresja 1/3 do średniej (jak w pętli Elo)
+            if t in R and t in L_ and (today - L_[t]).days > 90: R[t] = 1500 + (R[t] - 1500) * 0.67
+        e = 1 / (1 + 10 ** ((R.get(g, 1500) - R.get(h, 1500) - hf) / 400))
+        print(f'{sport}: {h} (Elo {R.get(h, 1500):.0f}, {N.get(h, 0)} m.) – {g} (Elo {R.get(g, 1500):.0f}, {N.get(g, 0)} m.)')
+        for t in (h, g):
+            if t in inf['seeded']: print(f'  {t}: siła startowa z tabeli ligi {inf["seeded"][t]} (+ wyniki dopisane później)')
+            if t not in R: print(f'  UWAGA: {t} — brak w bazie (sprawdź nazwę: python3 sporty.py druzyny {sport} FRAGMENT)')
+        ec, note = calibrate(sport, e)
+        prm = (__import__('json').load(open(PARAM)) if os.path.exists(PARAM) else {}).get(sport)
+        if prm and not draws:
+            from scipy.stats import norm as _nd
+            M = marza(d, sport, prm); pm_ = M.get(h, 0.) - M.get(g, 0.) + (0 if '--neutral' in a else prm['hfa'])
+            p_m = float(_nd.cdf(pm_ / prm['sd'])); lg_ = lambda p: np.log(min(max(p, 1e-6), 1 - 1e-6) / (1 - min(max(p, 1e-6), 1 - 1e-6)))
+            z = prm['w_elo'] * lg_(e) + (1 - prm['w_elo']) * lg_(p_m); z = prm['platt'][0] * z + prm['platt'][1]
+            ec = float(1 / (1 + np.exp(-z)))
+            print(f'  v5n: przewidywana różnica punktów {pm_:+.1f} (odch. std {prm["sd"]:.1f}); P Elo {e:.1%}, P marży {p_m:.1%}')
+            note = (f'v5n: zespół Elo + marża punktowa, kalibracja Platta (test od {prm["test_od"]}: logloss '
+                    f'{prm["logloss_obecny"]:.4f} → {prm["logloss_nowy"]:.4f})')
+        if draws:
+            for k_, p in (('1 (60 min / regulaminowy czas)', ec * (1 - pdraw)), ('X', pdraw), ('2', (1 - ec) * (1 - pdraw)),
+                          ('1 z dogrywką', ec), ('2 z dogrywką', 1 - ec)):
+                print(f'  {k_:<32} {p:6.1%}')
+        else:
+            for k_, p in (('1', ec), ('2', 1 - ec)): print(f'  {k_:<32} {p:6.1%}' + ('  (pojedyncza mapa)' if sport in MAPOWE else ''))
+            if sport in MAPOWE:
+                bo3 = ec ** 2 * (3 - 2 * ec); bo5 = ec ** 3 * (10 - 15 * ec + 6 * ec ** 2)
+                print(f'  {"1 seria Bo3":<32} {bo3:6.1%}\n  {"2 seria Bo3":<32} {1 - bo3:6.1%}\n  {"1 seria Bo5":<32} {bo5:6.1%}\n  {"2 seria Bo5":<32} {1 - bo5:6.1%}')
+        stale = [t for t in (h, g) if t in L_ and (pd.Timestamp.today() - L_[t]).days > 150]
+        if stale: print('  OSTRZEŻENIE: ostatni mecz w bazie >150 dni temu dla:', ', '.join(stale), '— sprawdź transfery/formę w sieci, korekta maks. ±6 pp.')
+        print(f'  {note}')
+        if n < 10: print(f'  UWAGA: mało meczów w bazie ({n}) — P to szacunek; opieraj się na statystykach z sieci (MASTER PROMPT część B).')
+    elif a[0] == 'typ':
+        row = dict(data=a[1], sport=a[2].lower(), gosp=a[3], gosc=a[4], rynek=a[5], p=float(a[6]), trafiony=None)
+        pd.DataFrame([row]).to_csv(LOG, mode='a', header=not os.path.exists(LOG), index=False); print('zapisano', row)
+    elif a[0] == 'rozlicz':
+        if not os.path.exists(LOG): sys.exit('brak prognoz')
+        L = pd.read_csv(LOG); d = load()
+        key = {(str(r.data.date()), r.sport, norm(r.gosp), norm(r.gosc)): r for r in d.itertuples()}
+        for i, r in L[L.trafiony.isna()].iterrows():
+            x = key.get((str(r.data)[:10], r.sport, norm(r.gosp), norm(r['gosc'])))
+            if x is None: continue
+            reg_draw = bool(x.dogrywka) or x.pg == x.pa
+            m = str(r.rynek)
+            hit = {'1': x.pg > x.pa, '2': x.pa > x.pg, 'X': reg_draw, '1_60min': (x.pg > x.pa) and not reg_draw,
+                   '2_60min': (x.pa > x.pg) and not reg_draw}.get(m)
+            if hit is not None: L.loc[i, 'trafiony'] = int(hit)
+        L.to_csv(LOG, index=False)
+        done = L.dropna(subset=['trafiony'])
+        if done.empty: print('brak rozliczonych'); return
+        rows = []
+        for sp, g in done.groupby('sport'):
+            g = g.sort_values('p'); q = np.array_split(np.arange(len(g)), max(1, min(10, len(g) // 40)))
+            for i in q: rows.append((sp, g.p.values[i].mean(), g.trafiony.values[i].mean(), len(i)))
+            print(f'{sp}: {len(g)} prognoz, średnie P {g.p.mean():.1%}, trafność {g.trafiony.mean():.1%}')
+        c = pd.DataFrame(rows, columns=['sport', 'p_model', 'p_kalibr', 'n'])
+        c['p_kalibr'] = c.groupby('sport').p_kalibr.transform(lambda s: np.maximum.accumulate(s.values))
+        c.to_csv(CAL, index=False, float_format='%.4f')
+
+
+if __name__ == '__main__':
+    main(sys.argv[1:] or ['stan'])

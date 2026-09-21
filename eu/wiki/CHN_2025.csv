@@ -1,0 +1,241 @@
+div,season,phase,date,home,away,fh,fa
+CHN,2025,regular,,Beijing Guoan,Changchun Yatai,2,1
+CHN,2025,regular,,Beijing Guoan,Chengdu Rongcheng,1,1
+CHN,2025,regular,,Beijing Guoan,Dalian Yingbo,4,2
+CHN,2025,regular,,Beijing Guoan,Henan,1,0
+CHN,2025,regular,,Beijing Guoan,Meizhou Hakka,5,1
+CHN,2025,regular,,Beijing Guoan,Qingdao Hainiu,2,4
+CHN,2025,regular,,Beijing Guoan,Qingdao West Coast,1,0
+CHN,2025,regular,,Beijing Guoan,Shandong Taishan,6,1
+CHN,2025,regular,,Beijing Guoan,Shanghai Port,2,3
+CHN,2025,regular,,Beijing Guoan,Shanghai Shenhua,1,3
+CHN,2025,regular,,Beijing Guoan,Shenzhen Peng City,3,1
+CHN,2025,regular,,Beijing Guoan,Tianjin Jinmen Tiger,2,2
+CHN,2025,regular,,Beijing Guoan,Wuhan Three Towns,4,0
+CHN,2025,regular,,Beijing Guoan,Yunnan Yukun,2,1
+CHN,2025,regular,,Beijing Guoan,Zhejiang,2,0
+CHN,2025,regular,,Changchun Yatai,Beijing Guoan,0,4
+CHN,2025,regular,,Changchun Yatai,Chengdu Rongcheng,1,2
+CHN,2025,regular,,Changchun Yatai,Dalian Yingbo,0,2
+CHN,2025,regular,,Changchun Yatai,Henan,0,1
+CHN,2025,regular,,Changchun Yatai,Meizhou Hakka,1,0
+CHN,2025,regular,,Changchun Yatai,Qingdao Hainiu,2,2
+CHN,2025,regular,,Changchun Yatai,Qingdao West Coast,1,0
+CHN,2025,regular,,Changchun Yatai,Shandong Taishan,1,2
+CHN,2025,regular,,Changchun Yatai,Shanghai Port,1,3
+CHN,2025,regular,,Changchun Yatai,Shanghai Shenhua,1,2
+CHN,2025,regular,,Changchun Yatai,Shenzhen Peng City,1,0
+CHN,2025,regular,,Changchun Yatai,Tianjin Jinmen Tiger,1,2
+CHN,2025,regular,,Changchun Yatai,Wuhan Three Towns,1,1
+CHN,2025,regular,,Changchun Yatai,Yunnan Yukun,0,0
+CHN,2025,regular,,Changchun Yatai,Zhejiang,3,3
+CHN,2025,regular,,Chengdu Rongcheng,Beijing Guoan,2,0
+CHN,2025,regular,,Chengdu Rongcheng,Changchun Yatai,1,0
+CHN,2025,regular,,Chengdu Rongcheng,Dalian Yingbo,2,0
+CHN,2025,regular,,Chengdu Rongcheng,Henan,1,2
+CHN,2025,regular,,Chengdu Rongcheng,Meizhou Hakka,3,1
+CHN,2025,regular,,Chengdu Rongcheng,Qingdao Hainiu,0,0
+CHN,2025,regular,,Chengdu Rongcheng,Qingdao West Coast,1,1
+CHN,2025,regular,,Chengdu Rongcheng,Shandong Taishan,2,1
+CHN,2025,regular,,Chengdu Rongcheng,Shanghai Port,4,1
+CHN,2025,regular,,Chengdu Rongcheng,Shanghai Shenhua,1,0
+CHN,2025,regular,,Chengdu Rongcheng,Shenzhen Peng City,5,0
+CHN,2025,regular,,Chengdu Rongcheng,Tianjin Jinmen Tiger,1,2
+CHN,2025,regular,,Chengdu Rongcheng,Wuhan Three Towns,1,0
+CHN,2025,regular,,Chengdu Rongcheng,Yunnan Yukun,1,1
+CHN,2025,regular,,Chengdu Rongcheng,Zhejiang,2,1
+CHN,2025,regular,,Dalian Yingbo,Beijing Guoan,0,2
+CHN,2025,regular,,Dalian Yingbo,Changchun Yatai,2,0
+CHN,2025,regular,,Dalian Yingbo,Chengdu Rongcheng,0,2
+CHN,2025,regular,,Dalian Yingbo,Henan,1,0
+CHN,2025,regular,,Dalian Yingbo,Meizhou Hakka,1,0
+CHN,2025,regular,,Dalian Yingbo,Qingdao Hainiu,2,0
+CHN,2025,regular,,Dalian Yingbo,Qingdao West Coast,0,2
+CHN,2025,regular,,Dalian Yingbo,Shandong Taishan,2,0
+CHN,2025,regular,,Dalian Yingbo,Shanghai Port,0,1
+CHN,2025,regular,,Dalian Yingbo,Shanghai Shenhua,0,3
+CHN,2025,regular,,Dalian Yingbo,Shenzhen Peng City,2,1
+CHN,2025,regular,,Dalian Yingbo,Tianjin Jinmen Tiger,1,1
+CHN,2025,regular,,Dalian Yingbo,Wuhan Three Towns,0,0
+CHN,2025,regular,,Dalian Yingbo,Yunnan Yukun,3,2
+CHN,2025,regular,,Dalian Yingbo,Zhejiang,1,0
+CHN,2025,regular,,Henan,Beijing Guoan,2,0
+CHN,2025,regular,,Henan,Changchun Yatai,2,0
+CHN,2025,regular,,Henan,Chengdu Rongcheng,3,2
+CHN,2025,regular,,Henan,Dalian Yingbo,4,0
+CHN,2025,regular,,Henan,Meizhou Hakka,1,1
+CHN,2025,regular,,Henan,Qingdao Hainiu,3,1
+CHN,2025,regular,,Henan,Qingdao West Coast,2,3
+CHN,2025,regular,,Henan,Shandong Taishan,2,2
+CHN,2025,regular,,Henan,Shanghai Port,1,3
+CHN,2025,regular,,Henan,Shanghai Shenhua,1,3
+CHN,2025,regular,,Henan,Shenzhen Peng City,4,1
+CHN,2025,regular,,Henan,Tianjin Jinmen Tiger,3,4
+CHN,2025,regular,,Henan,Wuhan Three Towns,1,2
+CHN,2025,regular,,Henan,Yunnan Yukun,1,1
+CHN,2025,regular,,Henan,Zhejiang,2,2
+CHN,2025,regular,,Meizhou Hakka,Beijing Guoan,0,4
+CHN,2025,regular,,Meizhou Hakka,Changchun Yatai,1,3
+CHN,2025,regular,,Meizhou Hakka,Chengdu Rongcheng,0,4
+CHN,2025,regular,,Meizhou Hakka,Dalian Yingbo,2,2
+CHN,2025,regular,,Meizhou Hakka,Henan,2,1
+CHN,2025,regular,,Meizhou Hakka,Qingdao Hainiu,1,0
+CHN,2025,regular,,Meizhou Hakka,Qingdao West Coast,1,2
+CHN,2025,regular,,Meizhou Hakka,Shandong Taishan,3,4
+CHN,2025,regular,,Meizhou Hakka,Shanghai Port,2,4
+CHN,2025,regular,,Meizhou Hakka,Shanghai Shenhua,1,3
+CHN,2025,regular,,Meizhou Hakka,Shenzhen Peng City,3,0
+CHN,2025,regular,,Meizhou Hakka,Tianjin Jinmen Tiger,1,2
+CHN,2025,regular,,Meizhou Hakka,Wuhan Three Towns,3,1
+CHN,2025,regular,,Meizhou Hakka,Yunnan Yukun,1,4
+CHN,2025,regular,,Meizhou Hakka,Zhejiang,2,2
+CHN,2025,regular,,Qingdao Hainiu,Beijing Guoan,1,1
+CHN,2025,regular,,Qingdao Hainiu,Changchun Yatai,3,0
+CHN,2025,regular,,Qingdao Hainiu,Chengdu Rongcheng,0,1
+CHN,2025,regular,,Qingdao Hainiu,Dalian Yingbo,1,1
+CHN,2025,regular,,Qingdao Hainiu,Henan,1,1
+CHN,2025,regular,,Qingdao Hainiu,Meizhou Hakka,1,1
+CHN,2025,regular,,Qingdao Hainiu,Qingdao West Coast,2,2
+CHN,2025,regular,,Qingdao Hainiu,Shandong Taishan,2,2
+CHN,2025,regular,,Qingdao Hainiu,Shanghai Port,3,4
+CHN,2025,regular,,Qingdao Hainiu,Shanghai Shenhua,0,2
+CHN,2025,regular,,Qingdao Hainiu,Shenzhen Peng City,0,1
+CHN,2025,regular,,Qingdao Hainiu,Tianjin Jinmen Tiger,2,0
+CHN,2025,regular,,Qingdao Hainiu,Wuhan Three Towns,1,0
+CHN,2025,regular,,Qingdao Hainiu,Yunnan Yukun,5,1
+CHN,2025,regular,,Qingdao Hainiu,Zhejiang,0,3
+CHN,2025,regular,,Qingdao West Coast,Beijing Guoan,1,3
+CHN,2025,regular,,Qingdao West Coast,Changchun Yatai,1,0
+CHN,2025,regular,,Qingdao West Coast,Chengdu Rongcheng,2,2
+CHN,2025,regular,,Qingdao West Coast,Dalian Yingbo,2,0
+CHN,2025,regular,,Qingdao West Coast,Henan,2,1
+CHN,2025,regular,,Qingdao West Coast,Meizhou Hakka,3,1
+CHN,2025,regular,,Qingdao West Coast,Qingdao Hainiu,1,0
+CHN,2025,regular,,Qingdao West Coast,Shandong Taishan,1,5
+CHN,2025,regular,,Qingdao West Coast,Shanghai Port,3,3
+CHN,2025,regular,,Qingdao West Coast,Shanghai Shenhua,1,2
+CHN,2025,regular,,Qingdao West Coast,Shenzhen Peng City,0,0
+CHN,2025,regular,,Qingdao West Coast,Tianjin Jinmen Tiger,2,2
+CHN,2025,regular,,Qingdao West Coast,Wuhan Three Towns,2,0
+CHN,2025,regular,,Qingdao West Coast,Yunnan Yukun,0,0
+CHN,2025,regular,,Qingdao West Coast,Zhejiang,0,2
+CHN,2025,regular,,Shandong Taishan,Beijing Guoan,6,0
+CHN,2025,regular,,Shandong Taishan,Changchun Yatai,2,1
+CHN,2025,regular,,Shandong Taishan,Chengdu Rongcheng,0,3
+CHN,2025,regular,,Shandong Taishan,Dalian Yingbo,4,1
+CHN,2025,regular,,Shandong Taishan,Henan,0,0
+CHN,2025,regular,,Shandong Taishan,Meizhou Hakka,3,0
+CHN,2025,regular,,Shandong Taishan,Qingdao Hainiu,1,1
+CHN,2025,regular,,Shandong Taishan,Qingdao West Coast,3,2
+CHN,2025,regular,,Shandong Taishan,Shanghai Port,3,1
+CHN,2025,regular,,Shandong Taishan,Shanghai Shenhua,0,1
+CHN,2025,regular,,Shandong Taishan,Shenzhen Peng City,4,0
+CHN,2025,regular,,Shandong Taishan,Tianjin Jinmen Tiger,2,1
+CHN,2025,regular,,Shandong Taishan,Wuhan Three Towns,3,1
+CHN,2025,regular,,Shandong Taishan,Yunnan Yukun,1,1
+CHN,2025,regular,,Shandong Taishan,Zhejiang,4,2
+CHN,2025,regular,,Shanghai Port,Beijing Guoan,1,2
+CHN,2025,regular,,Shanghai Port,Changchun Yatai,2,0
+CHN,2025,regular,,Shanghai Port,Chengdu Rongcheng,1,3
+CHN,2025,regular,,Shanghai Port,Dalian Yingbo,3,0
+CHN,2025,regular,,Shanghai Port,Henan,4,1
+CHN,2025,regular,,Shanghai Port,Meizhou Hakka,2,1
+CHN,2025,regular,,Shanghai Port,Qingdao Hainiu,3,1
+CHN,2025,regular,,Shanghai Port,Qingdao West Coast,2,2
+CHN,2025,regular,,Shanghai Port,Shandong Taishan,1,1
+CHN,2025,regular,,Shanghai Port,Shanghai Shenhua,1,1
+CHN,2025,regular,,Shanghai Port,Shenzhen Peng City,3,1
+CHN,2025,regular,,Shanghai Port,Tianjin Jinmen Tiger,1,1
+CHN,2025,regular,,Shanghai Port,Wuhan Three Towns,3,2
+CHN,2025,regular,,Shanghai Port,Yunnan Yukun,4,2
+CHN,2025,regular,,Shanghai Port,Zhejiang,3,0
+CHN,2025,regular,,Shanghai Shenhua,Beijing Guoan,2,2
+CHN,2025,regular,,Shanghai Shenhua,Changchun Yatai,2,1
+CHN,2025,regular,,Shanghai Shenhua,Chengdu Rongcheng,1,1
+CHN,2025,regular,,Shanghai Shenhua,Dalian Yingbo,2,2
+CHN,2025,regular,,Shanghai Shenhua,Henan,3,2
+CHN,2025,regular,,Shanghai Shenhua,Meizhou Hakka,6,1
+CHN,2025,regular,,Shanghai Shenhua,Qingdao Hainiu,3,2
+CHN,2025,regular,,Shanghai Shenhua,Qingdao West Coast,4,0
+CHN,2025,regular,,Shanghai Shenhua,Shandong Taishan,3,3
+CHN,2025,regular,,Shanghai Shenhua,Shanghai Port,1,2
+CHN,2025,regular,,Shanghai Shenhua,Shenzhen Peng City,1,0
+CHN,2025,regular,,Shanghai Shenhua,Tianjin Jinmen Tiger,3,0
+CHN,2025,regular,,Shanghai Shenhua,Wuhan Three Towns,2,0
+CHN,2025,regular,,Shanghai Shenhua,Yunnan Yukun,3,1
+CHN,2025,regular,,Shanghai Shenhua,Zhejiang,3,2
+CHN,2025,regular,,Shenzhen Peng City,Beijing Guoan,2,1
+CHN,2025,regular,,Shenzhen Peng City,Changchun Yatai,3,1
+CHN,2025,regular,,Shenzhen Peng City,Chengdu Rongcheng,1,1
+CHN,2025,regular,,Shenzhen Peng City,Dalian Yingbo,1,1
+CHN,2025,regular,,Shenzhen Peng City,Henan,1,3
+CHN,2025,regular,,Shenzhen Peng City,Meizhou Hakka,2,0
+CHN,2025,regular,,Shenzhen Peng City,Qingdao Hainiu,4,0
+CHN,2025,regular,,Shenzhen Peng City,Qingdao West Coast,1,2
+CHN,2025,regular,,Shenzhen Peng City,Shandong Taishan,1,3
+CHN,2025,regular,,Shenzhen Peng City,Shanghai Port,1,2
+CHN,2025,regular,,Shenzhen Peng City,Shanghai Shenhua,3,1
+CHN,2025,regular,,Shenzhen Peng City,Tianjin Jinmen Tiger,1,0
+CHN,2025,regular,,Shenzhen Peng City,Wuhan Three Towns,1,2
+CHN,2025,regular,,Shenzhen Peng City,Yunnan Yukun,3,4
+CHN,2025,regular,,Shenzhen Peng City,Zhejiang,2,4
+CHN,2025,regular,,Tianjin Jinmen Tiger,Beijing Guoan,2,2
+CHN,2025,regular,,Tianjin Jinmen Tiger,Changchun Yatai,2,2
+CHN,2025,regular,,Tianjin Jinmen Tiger,Chengdu Rongcheng,2,1
+CHN,2025,regular,,Tianjin Jinmen Tiger,Dalian Yingbo,2,0
+CHN,2025,regular,,Tianjin Jinmen Tiger,Henan,1,0
+CHN,2025,regular,,Tianjin Jinmen Tiger,Meizhou Hakka,2,2
+CHN,2025,regular,,Tianjin Jinmen Tiger,Qingdao Hainiu,1,0
+CHN,2025,regular,,Tianjin Jinmen Tiger,Qingdao West Coast,0,0
+CHN,2025,regular,,Tianjin Jinmen Tiger,Shandong Taishan,1,0
+CHN,2025,regular,,Tianjin Jinmen Tiger,Shanghai Port,1,4
+CHN,2025,regular,,Tianjin Jinmen Tiger,Shanghai Shenhua,1,3
+CHN,2025,regular,,Tianjin Jinmen Tiger,Shenzhen Peng City,1,0
+CHN,2025,regular,,Tianjin Jinmen Tiger,Wuhan Three Towns,4,0
+CHN,2025,regular,,Tianjin Jinmen Tiger,Yunnan Yukun,0,1
+CHN,2025,regular,,Tianjin Jinmen Tiger,Zhejiang,2,0
+CHN,2025,regular,,Wuhan Three Towns,Beijing Guoan,4,4
+CHN,2025,regular,,Wuhan Three Towns,Changchun Yatai,0,0
+CHN,2025,regular,,Wuhan Three Towns,Chengdu Rongcheng,2,2
+CHN,2025,regular,,Wuhan Three Towns,Dalian Yingbo,2,2
+CHN,2025,regular,,Wuhan Three Towns,Henan,2,5
+CHN,2025,regular,,Wuhan Three Towns,Meizhou Hakka,1,2
+CHN,2025,regular,,Wuhan Three Towns,Qingdao Hainiu,2,0
+CHN,2025,regular,,Wuhan Three Towns,Qingdao West Coast,1,1
+CHN,2025,regular,,Wuhan Three Towns,Shandong Taishan,1,5
+CHN,2025,regular,,Wuhan Three Towns,Shanghai Port,0,2
+CHN,2025,regular,,Wuhan Three Towns,Shanghai Shenhua,1,0
+CHN,2025,regular,,Wuhan Three Towns,Shenzhen Peng City,1,2
+CHN,2025,regular,,Wuhan Three Towns,Tianjin Jinmen Tiger,2,1
+CHN,2025,regular,,Wuhan Three Towns,Yunnan Yukun,3,1
+CHN,2025,regular,,Wuhan Three Towns,Zhejiang,0,4
+CHN,2025,regular,,Yunnan Yukun,Beijing Guoan,0,2
+CHN,2025,regular,,Yunnan Yukun,Changchun Yatai,1,1
+CHN,2025,regular,,Yunnan Yukun,Chengdu Rongcheng,1,5
+CHN,2025,regular,,Yunnan Yukun,Dalian Yingbo,1,1
+CHN,2025,regular,,Yunnan Yukun,Henan,2,1
+CHN,2025,regular,,Yunnan Yukun,Meizhou Hakka,2,0
+CHN,2025,regular,,Yunnan Yukun,Qingdao Hainiu,1,0
+CHN,2025,regular,,Yunnan Yukun,Qingdao West Coast,1,0
+CHN,2025,regular,,Yunnan Yukun,Shandong Taishan,3,2
+CHN,2025,regular,,Yunnan Yukun,Shanghai Port,2,3
+CHN,2025,regular,,Yunnan Yukun,Shanghai Shenhua,4,4
+CHN,2025,regular,,Yunnan Yukun,Shenzhen Peng City,3,1
+CHN,2025,regular,,Yunnan Yukun,Tianjin Jinmen Tiger,2,0
+CHN,2025,regular,,Yunnan Yukun,Wuhan Three Towns,2,1
+CHN,2025,regular,,Yunnan Yukun,Zhejiang,1,1
+CHN,2025,regular,,Zhejiang,Beijing Guoan,3,4
+CHN,2025,regular,,Zhejiang,Changchun Yatai,4,2
+CHN,2025,regular,,Zhejiang,Chengdu Rongcheng,3,3
+CHN,2025,regular,,Zhejiang,Dalian Yingbo,1,1
+CHN,2025,regular,,Zhejiang,Henan,2,2
+CHN,2025,regular,,Zhejiang,Meizhou Hakka,2,2
+CHN,2025,regular,,Zhejiang,Qingdao Hainiu,2,2
+CHN,2025,regular,,Zhejiang,Qingdao West Coast,2,1
+CHN,2025,regular,,Zhejiang,Shandong Taishan,2,2
+CHN,2025,regular,,Zhejiang,Shanghai Port,2,2
+CHN,2025,regular,,Zhejiang,Shanghai Shenhua,0,0
+CHN,2025,regular,,Zhejiang,Shenzhen Peng City,3,0
+CHN,2025,regular,,Zhejiang,Tianjin Jinmen Tiger,2,0
+CHN,2025,regular,,Zhejiang,Wuhan Three Towns,3,2
+CHN,2025,regular,,Zhejiang,Yunnan Yukun,3,1

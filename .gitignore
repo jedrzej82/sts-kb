@@ -1,0 +1,28 @@
+# --- generowane lokalnie przy kazdym uruchomieniu ---
+kb.sqlite
+raw/
+zewn/
+*.pyc
+__pycache__/
+
+# --- duze cache historyczne (ciagniete przez hist_import.py z GitHuba) ---
+tenis_hist.csv
+sporty_hist.csv
+tenis_kalibracja.csv
+
+# --- dane z arkuszy Apps Script, odswiezane co godzine (zrodlo: Drive) ---
+statystyki_*.csv
+absencje.csv
+
+# --- dane osobiste / historia zakladow (zostaja na Dysku) ---
+typy_log*.csv
+sporty_typy*.csv
+ako_log*.csv
+delta*.csv
+tenis_delta.csv
+sporty_delta.csv
+Bilans*.csv
+korekta_wlasna*.csv
+kursy*.csv
+sklady_kursy*.csv
+porownanie_zrodel*.csv

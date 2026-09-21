@@ -1,0 +1,1 @@
+DODATEK v5p (20.09.2026): typuj.py odrzuca składnik modelu z nierealną sumą goli (<1,2 lub >5,5 — błąd danych ligi; przypadek Chacarita–Quilmes 0,68–0,16) i ostrzega, gdy został tylko jeden model (P = szacunek, nie do K1).

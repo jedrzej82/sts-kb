@@ -1,0 +1,127 @@
+div,season,phase,date,home,away,fh,fa
+FIN,2026,regular,,IF Gnistan,HJK,0,3
+FIN,2026,regular,,IF Gnistan,Ilves,3,2
+FIN,2026,regular,,IF Gnistan,Inter Turku,2,0
+FIN,2026,regular,,IF Gnistan,FF Jaro,5,0
+FIN,2026,regular,,IF Gnistan,KuPS,0,1
+FIN,2026,regular,,IF Gnistan,FC Lahti,1,0
+FIN,2026,regular,,IF Gnistan,IFK Mariehamn,4,2
+FIN,2026,regular,,IF Gnistan,AC Oulu,1,5
+FIN,2026,regular,,IF Gnistan,SJK,3,2
+FIN,2026,regular,,IF Gnistan,VPS,1,1
+FIN,2026,regular,,HJK,IF Gnistan,2,3
+FIN,2026,regular,,HJK,Ilves,2,2
+FIN,2026,regular,,HJK,Inter Turku,3,3
+FIN,2026,regular,,HJK,FF Jaro,3,0
+FIN,2026,regular,,HJK,KuPS,0,4
+FIN,2026,regular,,HJK,FC Lahti,1,0
+FIN,2026,regular,,HJK,IFK Mariehamn,1,0
+FIN,2026,regular,,HJK,AC Oulu,0,1
+FIN,2026,regular,,HJK,SJK,3,0
+FIN,2026,regular,,HJK,TPS,1,0
+FIN,2026,regular,,HJK,VPS,2,1
+FIN,2026,regular,,Ilves,IF Gnistan,2,0
+FIN,2026,regular,,Ilves,Inter Turku,1,3
+FIN,2026,regular,,Ilves,FF Jaro,5,0
+FIN,2026,regular,,Ilves,KuPS,1,3
+FIN,2026,regular,,Ilves,FC Lahti,1,0
+FIN,2026,regular,,Ilves,IFK Mariehamn,2,0
+FIN,2026,regular,,Ilves,AC Oulu,1,0
+FIN,2026,regular,,Ilves,SJK,2,2
+FIN,2026,regular,,Ilves,TPS,1,0
+FIN,2026,regular,,Ilves,VPS,0,1
+FIN,2026,regular,,Inter Turku,IF Gnistan,1,2
+FIN,2026,regular,,Inter Turku,HJK,1,1
+FIN,2026,regular,,Inter Turku,Ilves,2,1
+FIN,2026,regular,,Inter Turku,FF Jaro,2,0
+FIN,2026,regular,,Inter Turku,FC Lahti,0,0
+FIN,2026,regular,,Inter Turku,IFK Mariehamn,1,0
+FIN,2026,regular,,Inter Turku,AC Oulu,0,0
+FIN,2026,regular,,Inter Turku,SJK,1,1
+FIN,2026,regular,,Inter Turku,TPS,2,1
+FIN,2026,regular,,Inter Turku,VPS,0,0
+FIN,2026,regular,,FF Jaro,IF Gnistan,1,1
+FIN,2026,regular,,FF Jaro,HJK,2,5
+FIN,2026,regular,,FF Jaro,Ilves,2,1
+FIN,2026,regular,,FF Jaro,Inter Turku,0,0
+FIN,2026,regular,,FF Jaro,KuPS,1,1
+FIN,2026,regular,,FF Jaro,FC Lahti,0,1
+FIN,2026,regular,,FF Jaro,IFK Mariehamn,3,0
+FIN,2026,regular,,FF Jaro,AC Oulu,0,1
+FIN,2026,regular,,FF Jaro,SJK,2,1
+FIN,2026,regular,,FF Jaro,TPS,2,2
+FIN,2026,regular,,FF Jaro,VPS,1,3
+FIN,2026,regular,,KuPS,IF Gnistan,1,0
+FIN,2026,regular,,KuPS,HJK,1,1
+FIN,2026,regular,,KuPS,Ilves,4,3
+FIN,2026,regular,,KuPS,Inter Turku,1,1
+FIN,2026,regular,,KuPS,FF Jaro,3,0
+FIN,2026,regular,,KuPS,FC Lahti,2,1
+FIN,2026,regular,,KuPS,IFK Mariehamn,2,4
+FIN,2026,regular,,KuPS,AC Oulu,3,2
+FIN,2026,regular,,KuPS,SJK,0,0
+FIN,2026,regular,,KuPS,TPS,1,1
+FIN,2026,regular,,KuPS,VPS,3,1
+FIN,2026,regular,,FC Lahti,IF Gnistan,1,0
+FIN,2026,regular,,FC Lahti,HJK,2,0
+FIN,2026,regular,,FC Lahti,Ilves,5,0
+FIN,2026,regular,,FC Lahti,Inter Turku,0,2
+FIN,2026,regular,,FC Lahti,FF Jaro,2,0
+FIN,2026,regular,,FC Lahti,KuPS,1,2
+FIN,2026,regular,,FC Lahti,IFK Mariehamn,1,1
+FIN,2026,regular,,FC Lahti,AC Oulu,2,1
+FIN,2026,regular,,FC Lahti,SJK,2,3
+FIN,2026,regular,,FC Lahti,TPS,0,0
+FIN,2026,regular,,FC Lahti,VPS,1,1
+FIN,2026,regular,,IFK Mariehamn,IF Gnistan,0,3
+FIN,2026,regular,,IFK Mariehamn,HJK,0,4
+FIN,2026,regular,,IFK Mariehamn,Ilves,2,2
+FIN,2026,regular,,IFK Mariehamn,Inter Turku,0,2
+FIN,2026,regular,,IFK Mariehamn,KuPS,1,1
+FIN,2026,regular,,IFK Mariehamn,FC Lahti,0,2
+FIN,2026,regular,,IFK Mariehamn,AC Oulu,1,1
+FIN,2026,regular,,IFK Mariehamn,SJK,2,0
+FIN,2026,regular,,IFK Mariehamn,TPS,1,1
+FIN,2026,regular,,IFK Mariehamn,VPS,0,1
+FIN,2026,regular,,AC Oulu,IF Gnistan,0,2
+FIN,2026,regular,,AC Oulu,HJK,0,1
+FIN,2026,regular,,AC Oulu,Ilves,1,0
+FIN,2026,regular,,AC Oulu,Inter Turku,2,3
+FIN,2026,regular,,AC Oulu,FF Jaro,2,1
+FIN,2026,regular,,AC Oulu,KuPS,2,0
+FIN,2026,regular,,AC Oulu,FC Lahti,1,1
+FIN,2026,regular,,AC Oulu,IFK Mariehamn,2,1
+FIN,2026,regular,,AC Oulu,TPS,1,0
+FIN,2026,regular,,AC Oulu,VPS,1,0
+FIN,2026,regular,,SJK,IF Gnistan,2,2
+FIN,2026,regular,,SJK,HJK,3,0
+FIN,2026,regular,,SJK,Ilves,1,1
+FIN,2026,regular,,SJK,Inter Turku,1,3
+FIN,2026,regular,,SJK,FF Jaro,1,1
+FIN,2026,regular,,SJK,KuPS,0,2
+FIN,2026,regular,,SJK,FC Lahti,1,2
+FIN,2026,regular,,SJK,IFK Mariehamn,3,0
+FIN,2026,regular,,SJK,AC Oulu,0,1
+FIN,2026,regular,,SJK,TPS,3,1
+FIN,2026,regular,,SJK,VPS,1,2
+FIN,2026,regular,,TPS,IF Gnistan,1,1
+FIN,2026,regular,,TPS,HJK,1,0
+FIN,2026,regular,,TPS,Ilves,1,3
+FIN,2026,regular,,TPS,Inter Turku,0,0
+FIN,2026,regular,,TPS,FF Jaro,3,2
+FIN,2026,regular,,TPS,KuPS,1,2
+FIN,2026,regular,,TPS,FC Lahti,2,1
+FIN,2026,regular,,TPS,IFK Mariehamn,3,0
+FIN,2026,regular,,TPS,AC Oulu,3,0
+FIN,2026,regular,,TPS,SJK,2,0
+FIN,2026,regular,,TPS,VPS,1,0
+FIN,2026,regular,,VPS,IF Gnistan,1,1
+FIN,2026,regular,,VPS,HJK,2,1
+FIN,2026,regular,,VPS,Ilves,3,2
+FIN,2026,regular,,VPS,Inter Turku,0,1
+FIN,2026,regular,,VPS,FF Jaro,0,0
+FIN,2026,regular,,VPS,KuPS,1,1
+FIN,2026,regular,,VPS,IFK Mariehamn,4,0
+FIN,2026,regular,,VPS,AC Oulu,5,1
+FIN,2026,regular,,VPS,SJK,1,0
+FIN,2026,regular,,VPS,TPS,1,3

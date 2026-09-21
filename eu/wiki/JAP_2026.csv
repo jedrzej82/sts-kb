@@ -1,0 +1,201 @@
+div,season,phase,date,home,away,fh,fa
+JAP,2026,regional-east,,JEF United Chiba,Kashima Antlers,0,2
+JAP,2026,regional-east,,JEF United Chiba,Kawasaki Frontale,0,0
+JAP,2026,regional-east,,JEF United Chiba,Kashiwa Reysol,2,1
+JAP,2026,regional-east,,JEF United Chiba,Machida Zelvia,0,2
+JAP,2026,regional-east,,JEF United Chiba,Mito HollyHock,1,1
+JAP,2026,regional-east,,JEF United Chiba,FC Tokyo,1,2
+JAP,2026,regional-east,,JEF United Chiba,Tokyo Verdy,3,2
+JAP,2026,regional-east,,JEF United Chiba,Urawa Red Diamonds,0,2
+JAP,2026,regional-east,,JEF United Chiba,Yokohama F. Marinos,2,3
+JAP,2026,regional-east,,Kashima Antlers,JEF United Chiba,2,1
+JAP,2026,regional-east,,Kashima Antlers,Kawasaki Frontale,1,0
+JAP,2026,regional-east,,Kashima Antlers,Kashiwa Reysol,2,0
+JAP,2026,regional-east,,Kashima Antlers,Machida Zelvia,1,1
+JAP,2026,regional-east,,Kashima Antlers,Mito HollyHock,3,0
+JAP,2026,regional-east,,Kashima Antlers,FC Tokyo,1,0
+JAP,2026,regional-east,,Kashima Antlers,Tokyo Verdy,2,0
+JAP,2026,regional-east,,Kashima Antlers,Urawa Red Diamonds,1,0
+JAP,2026,regional-east,,Kashima Antlers,Yokohama F. Marinos,1,0
+JAP,2026,regional-east,,Kawasaki Frontale,JEF United Chiba,2,1
+JAP,2026,regional-east,,Kawasaki Frontale,Kashima Antlers,0,2
+JAP,2026,regional-east,,Kawasaki Frontale,Kashiwa Reysol,5,3
+JAP,2026,regional-east,,Kawasaki Frontale,Machida Zelvia,1,1
+JAP,2026,regional-east,,Kawasaki Frontale,Mito HollyHock,2,2
+JAP,2026,regional-east,,Kawasaki Frontale,FC Tokyo,1,2
+JAP,2026,regional-east,,Kawasaki Frontale,Tokyo Verdy,1,0
+JAP,2026,regional-east,,Kawasaki Frontale,Urawa Red Diamonds,3,2
+JAP,2026,regional-east,,Kawasaki Frontale,Yokohama F. Marinos,0,5
+JAP,2026,regional-east,,Kashiwa Reysol,JEF United Chiba,4,2
+JAP,2026,regional-east,,Kashiwa Reysol,Kashima Antlers,0,1
+JAP,2026,regional-east,,Kashiwa Reysol,Kawasaki Frontale,1,0
+JAP,2026,regional-east,,Kashiwa Reysol,Machida Zelvia,0,1
+JAP,2026,regional-east,,Kashiwa Reysol,Mito HollyHock,3,0
+JAP,2026,regional-east,,Kashiwa Reysol,FC Tokyo,1,3
+JAP,2026,regional-east,,Kashiwa Reysol,Tokyo Verdy,1,2
+JAP,2026,regional-east,,Kashiwa Reysol,Urawa Red Diamonds,0,1
+JAP,2026,regional-east,,Kashiwa Reysol,Yokohama F. Marinos,3,0
+JAP,2026,regional-east,,Machida Zelvia,JEF United Chiba,2,1
+JAP,2026,regional-east,,Machida Zelvia,Kashima Antlers,0,3
+JAP,2026,regional-east,,Machida Zelvia,Kawasaki Frontale,1,1
+JAP,2026,regional-east,,Machida Zelvia,Kashiwa Reysol,1,0
+JAP,2026,regional-east,,Machida Zelvia,Mito HollyHock,2,2
+JAP,2026,regional-east,,Machida Zelvia,FC Tokyo,0,3
+JAP,2026,regional-east,,Machida Zelvia,Tokyo Verdy,0,0
+JAP,2026,regional-east,,Machida Zelvia,Urawa Red Diamonds,1,0
+JAP,2026,regional-east,,Machida Zelvia,Yokohama F. Marinos,2,0
+JAP,2026,regional-east,,Mito HollyHock,JEF United Chiba,1,1
+JAP,2026,regional-east,,Mito HollyHock,Kashima Antlers,1,1
+JAP,2026,regional-east,,Mito HollyHock,Kawasaki Frontale,1,3
+JAP,2026,regional-east,,Mito HollyHock,Kashiwa Reysol,2,0
+JAP,2026,regional-east,,Mito HollyHock,Machida Zelvia,2,2
+JAP,2026,regional-east,,Mito HollyHock,FC Tokyo,1,1
+JAP,2026,regional-east,,Mito HollyHock,Tokyo Verdy,0,1
+JAP,2026,regional-east,,Mito HollyHock,Urawa Red Diamonds,1,4
+JAP,2026,regional-east,,Mito HollyHock,Yokohama F. Marinos,1,0
+JAP,2026,regional-east,,FC Tokyo,JEF United Chiba,0,3
+JAP,2026,regional-east,,FC Tokyo,Kashima Antlers,1,1
+JAP,2026,regional-east,,FC Tokyo,Kawasaki Frontale,2,0
+JAP,2026,regional-east,,FC Tokyo,Kashiwa Reysol,0,2
+JAP,2026,regional-east,,FC Tokyo,Machida Zelvia,0,0
+JAP,2026,regional-east,,FC Tokyo,Mito HollyHock,5,2
+JAP,2026,regional-east,,FC Tokyo,Tokyo Verdy,2,1
+JAP,2026,regional-east,,FC Tokyo,Urawa Red Diamonds,1,1
+JAP,2026,regional-east,,FC Tokyo,Yokohama F. Marinos,3,0
+JAP,2026,regional-east,,Tokyo Verdy,JEF United Chiba,1,0
+JAP,2026,regional-east,,Tokyo Verdy,Kashima Antlers,2,1
+JAP,2026,regional-east,,Tokyo Verdy,Kawasaki Frontale,0,2
+JAP,2026,regional-east,,Tokyo Verdy,Kashiwa Reysol,1,0
+JAP,2026,regional-east,,Tokyo Verdy,Machida Zelvia,2,2
+JAP,2026,regional-east,,Tokyo Verdy,Mito HollyHock,3,1
+JAP,2026,regional-east,,Tokyo Verdy,FC Tokyo,0,0
+JAP,2026,regional-east,,Tokyo Verdy,Urawa Red Diamonds,1,0
+JAP,2026,regional-east,,Tokyo Verdy,Yokohama F. Marinos,0,6
+JAP,2026,regional-east,,Urawa Red Diamonds,JEF United Chiba,2,0
+JAP,2026,regional-east,,Urawa Red Diamonds,Kashima Antlers,2,3
+JAP,2026,regional-east,,Urawa Red Diamonds,Kawasaki Frontale,2,0
+JAP,2026,regional-east,,Urawa Red Diamonds,Kashiwa Reysol,1,1
+JAP,2026,regional-east,,Urawa Red Diamonds,Machida Zelvia,1,2
+JAP,2026,regional-east,,Urawa Red Diamonds,Mito HollyHock,2,0
+JAP,2026,regional-east,,Urawa Red Diamonds,FC Tokyo,0,0
+JAP,2026,regional-east,,Urawa Red Diamonds,Tokyo Verdy,1,1
+JAP,2026,regional-east,,Urawa Red Diamonds,Yokohama F. Marinos,2,3
+JAP,2026,regional-east,,Yokohama F. Marinos,JEF United Chiba,2,0
+JAP,2026,regional-east,,Yokohama F. Marinos,Kashima Antlers,1,1
+JAP,2026,regional-east,,Yokohama F. Marinos,Kawasaki Frontale,1,2
+JAP,2026,regional-east,,Yokohama F. Marinos,Kashiwa Reysol,0,1
+JAP,2026,regional-east,,Yokohama F. Marinos,Machida Zelvia,2,3
+JAP,2026,regional-east,,Yokohama F. Marinos,Mito HollyHock,1,1
+JAP,2026,regional-east,,Yokohama F. Marinos,FC Tokyo,1,3
+JAP,2026,regional-east,,Yokohama F. Marinos,Tokyo Verdy,3,2
+JAP,2026,regional-east,,Yokohama F. Marinos,Urawa Red Diamonds,0,2
+JAP,2026,regional-west,,Avispa Fukuoka,Cerezo Osaka,0,2
+JAP,2026,regional-west,,Avispa Fukuoka,Fagiano Okayama,1,1
+JAP,2026,regional-west,,Avispa Fukuoka,Gamba Osaka,2,2
+JAP,2026,regional-west,,Avispa Fukuoka,Kyoto Sanga,1,1
+JAP,2026,regional-west,,Avispa Fukuoka,Nagoya Grampus,1,5
+JAP,2026,regional-west,,Avispa Fukuoka,Sanfrecce Hiroshima,2,2
+JAP,2026,regional-west,,Avispa Fukuoka,Shimizu S-Pulse,1,1
+JAP,2026,regional-west,,Avispa Fukuoka,V-Varen Nagasaki,1,0
+JAP,2026,regional-west,,Avispa Fukuoka,Vissel Kobe,0,1
+JAP,2026,regional-west,,Cerezo Osaka,Avispa Fukuoka,1,1
+JAP,2026,regional-west,,Cerezo Osaka,Fagiano Okayama,1,2
+JAP,2026,regional-west,,Cerezo Osaka,Gamba Osaka,0,0
+JAP,2026,regional-west,,Cerezo Osaka,Kyoto Sanga,3,0
+JAP,2026,regional-west,,Cerezo Osaka,Nagoya Grampus,6,1
+JAP,2026,regional-west,,Cerezo Osaka,Sanfrecce Hiroshima,1,2
+JAP,2026,regional-west,,Cerezo Osaka,Shimizu S-Pulse,0,0
+JAP,2026,regional-west,,Cerezo Osaka,V-Varen Nagasaki,3,2
+JAP,2026,regional-west,,Cerezo Osaka,Vissel Kobe,1,1
+JAP,2026,regional-west,,Fagiano Okayama,Avispa Fukuoka,2,0
+JAP,2026,regional-west,,Fagiano Okayama,Cerezo Osaka,2,3
+JAP,2026,regional-west,,Fagiano Okayama,Gamba Osaka,1,2
+JAP,2026,regional-west,,Fagiano Okayama,Kyoto Sanga,1,0
+JAP,2026,regional-west,,Fagiano Okayama,Nagoya Grampus,1,1
+JAP,2026,regional-west,,Fagiano Okayama,Sanfrecce Hiroshima,1,0
+JAP,2026,regional-west,,Fagiano Okayama,Shimizu S-Pulse,2,0
+JAP,2026,regional-west,,Fagiano Okayama,V-Varen Nagasaki,0,1
+JAP,2026,regional-west,,Fagiano Okayama,Vissel Kobe,1,4
+JAP,2026,regional-west,,Gamba Osaka,Avispa Fukuoka,1,2
+JAP,2026,regional-west,,Gamba Osaka,Cerezo Osaka,0,1
+JAP,2026,regional-west,,Gamba Osaka,Fagiano Okayama,2,2
+JAP,2026,regional-west,,Gamba Osaka,Kyoto Sanga,2,0
+JAP,2026,regional-west,,Gamba Osaka,Nagoya Grampus,0,0
+JAP,2026,regional-west,,Gamba Osaka,Sanfrecce Hiroshima,0,1
+JAP,2026,regional-west,,Gamba Osaka,Shimizu S-Pulse,2,2
+JAP,2026,regional-west,,Gamba Osaka,V-Varen Nagasaki,3,2
+JAP,2026,regional-west,,Gamba Osaka,Vissel Kobe,5,0
+JAP,2026,regional-west,,Kyoto Sanga,Avispa Fukuoka,2,0
+JAP,2026,regional-west,,Kyoto Sanga,Cerezo Osaka,1,2
+JAP,2026,regional-west,,Kyoto Sanga,Fagiano Okayama,5,1
+JAP,2026,regional-west,,Kyoto Sanga,Gamba Osaka,1,1
+JAP,2026,regional-west,,Kyoto Sanga,Nagoya Grampus,1,1
+JAP,2026,regional-west,,Kyoto Sanga,Sanfrecce Hiroshima,0,4
+JAP,2026,regional-west,,Kyoto Sanga,Shimizu S-Pulse,1,2
+JAP,2026,regional-west,,Kyoto Sanga,V-Varen Nagasaki,1,0
+JAP,2026,regional-west,,Kyoto Sanga,Vissel Kobe,1,1
+JAP,2026,regional-west,,Nagoya Grampus,Avispa Fukuoka,2,2
+JAP,2026,regional-west,,Nagoya Grampus,Cerezo Osaka,3,0
+JAP,2026,regional-west,,Nagoya Grampus,Fagiano Okayama,1,1
+JAP,2026,regional-west,,Nagoya Grampus,Gamba Osaka,2,1
+JAP,2026,regional-west,,Nagoya Grampus,Kyoto Sanga,3,0
+JAP,2026,regional-west,,Nagoya Grampus,Sanfrecce Hiroshima,2,1
+JAP,2026,regional-west,,Nagoya Grampus,Shimizu S-Pulse,1,0
+JAP,2026,regional-west,,Nagoya Grampus,V-Varen Nagasaki,1,3
+JAP,2026,regional-west,,Nagoya Grampus,Vissel Kobe,0,3
+JAP,2026,regional-west,,Sanfrecce Hiroshima,Avispa Fukuoka,0,1
+JAP,2026,regional-west,,Sanfrecce Hiroshima,Cerezo Osaka,2,1
+JAP,2026,regional-west,,Sanfrecce Hiroshima,Fagiano Okayama,1,1
+JAP,2026,regional-west,,Sanfrecce Hiroshima,Gamba Osaka,2,0
+JAP,2026,regional-west,,Sanfrecce Hiroshima,Kyoto Sanga,1,2
+JAP,2026,regional-west,,Sanfrecce Hiroshima,Nagoya Grampus,4,2
+JAP,2026,regional-west,,Sanfrecce Hiroshima,Shimizu S-Pulse,1,1
+JAP,2026,regional-west,,Sanfrecce Hiroshima,V-Varen Nagasaki,2,0
+JAP,2026,regional-west,,Sanfrecce Hiroshima,Vissel Kobe,1,1
+JAP,2026,regional-west,,Shimizu S-Pulse,Avispa Fukuoka,1,1
+JAP,2026,regional-west,,Shimizu S-Pulse,Cerezo Osaka,1,1
+JAP,2026,regional-west,,Shimizu S-Pulse,Fagiano Okayama,1,1
+JAP,2026,regional-west,,Shimizu S-Pulse,Gamba Osaka,1,2
+JAP,2026,regional-west,,Shimizu S-Pulse,Kyoto Sanga,1,1
+JAP,2026,regional-west,,Shimizu S-Pulse,Nagoya Grampus,0,2
+JAP,2026,regional-west,,Shimizu S-Pulse,Sanfrecce Hiroshima,3,1
+JAP,2026,regional-west,,Shimizu S-Pulse,V-Varen Nagasaki,1,2
+JAP,2026,regional-west,,Shimizu S-Pulse,Vissel Kobe,1,0
+JAP,2026,regional-west,,V-Varen Nagasaki,Avispa Fukuoka,1,0
+JAP,2026,regional-west,,V-Varen Nagasaki,Cerezo Osaka,1,0
+JAP,2026,regional-west,,V-Varen Nagasaki,Fagiano Okayama,2,1
+JAP,2026,regional-west,,V-Varen Nagasaki,Gamba Osaka,1,1
+JAP,2026,regional-west,,V-Varen Nagasaki,Kyoto Sanga,1,2
+JAP,2026,regional-west,,V-Varen Nagasaki,Nagoya Grampus,1,2
+JAP,2026,regional-west,,V-Varen Nagasaki,Sanfrecce Hiroshima,1,3
+JAP,2026,regional-west,,V-Varen Nagasaki,Shimizu S-Pulse,0,3
+JAP,2026,regional-west,,V-Varen Nagasaki,Vissel Kobe,2,2
+JAP,2026,regional-west,,Vissel Kobe,Avispa Fukuoka,2,1
+JAP,2026,regional-west,,Vissel Kobe,Cerezo Osaka,0,0
+JAP,2026,regional-west,,Vissel Kobe,Fagiano Okayama,0,3
+JAP,2026,regional-west,,Vissel Kobe,Gamba Osaka,2,2
+JAP,2026,regional-west,,Vissel Kobe,Kyoto Sanga,1,0
+JAP,2026,regional-west,,Vissel Kobe,Nagoya Grampus,3,2
+JAP,2026,regional-west,,Vissel Kobe,Sanfrecce Hiroshima,2,1
+JAP,2026,regional-west,,Vissel Kobe,Shimizu S-Pulse,2,0
+JAP,2026,regional-west,,Vissel Kobe,V-Varen Nagasaki,2,0
+JAP,2026,playoff,2026-05-30,Vissel Kobe,Kashima Antlers,5,0
+JAP,2026,playoff,,Kashima Antlers,Vissel Kobe,2,0
+JAP,2026,playoff,,Cerezo Osaka,FC Tokyo,2,2
+JAP,2026,playoff,,FC Tokyo,Cerezo Osaka,1,3
+JAP,2026,playoff,,Nagoya Grampus,Machida Zelvia,2,2
+JAP,2026,playoff,,Machida Zelvia,Nagoya Grampus,2,1
+JAP,2026,playoff,,Sanfrecce Hiroshima,Kawasaki Frontale,2,1
+JAP,2026,playoff,,Kawasaki Frontale,Sanfrecce Hiroshima,0,1
+JAP,2026,playoff,,Gamba Osaka,Tokyo Verdy,1,1
+JAP,2026,playoff,,Tokyo Verdy,Gamba Osaka,2,4
+JAP,2026,playoff,,Fagiano Okayama,Urawa Red Diamonds,1,1
+JAP,2026,playoff,,Urawa Red Diamonds,Fagiano Okayama,0,2
+JAP,2026,playoff,,Shimizu S-Pulse,Yokohama F. Marinos,1,1
+JAP,2026,playoff,,Yokohama F. Marinos,Shimizu S-Pulse,3,0
+JAP,2026,playoff,,Kyoto Sanga,Kashiwa Reysol,2,6
+JAP,2026,playoff,,Kashiwa Reysol,Kyoto Sanga,0,1
+JAP,2026,playoff,,V-Varen Nagasaki,Mito HollyHock,1,0
+JAP,2026,playoff,,Mito HollyHock,V-Varen Nagasaki,0,1
+JAP,2026,playoff,,Avispa Fukuoka,JEF United Chiba,2,2
+JAP,2026,playoff,,JEF United Chiba,Avispa Fukuoka,1,2

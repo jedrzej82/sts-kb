@@ -1,0 +1,178 @@
+div,season,phase,date,home,away,fh,fa
+FIN,2025,regular,,Gnistan,Haka,2,0
+FIN,2025,regular,,Gnistan,HJK,2,4
+FIN,2025,regular,,Gnistan,Ilves,0,2
+FIN,2025,regular,,Gnistan,Inter Turku,2,2
+FIN,2025,regular,,Gnistan,Jaro,1,2
+FIN,2025,regular,,Gnistan,KTP,2,1
+FIN,2025,regular,,Gnistan,KuPS,1,2
+FIN,2025,regular,,Gnistan,IFK Mariehamn,2,0
+FIN,2025,regular,,Gnistan,AC Oulu,3,2
+FIN,2025,regular,,Gnistan,SJK,2,2
+FIN,2025,regular,,Gnistan,VPS,0,0
+FIN,2025,regular,,Haka,Gnistan,3,2
+FIN,2025,regular,,Haka,HJK,1,2
+FIN,2025,regular,,Haka,Ilves,0,4
+FIN,2025,regular,,Haka,Inter Turku,0,1
+FIN,2025,regular,,Haka,Jaro,0,1
+FIN,2025,regular,,Haka,KTP,2,3
+FIN,2025,regular,,Haka,KuPS,1,3
+FIN,2025,regular,,Haka,IFK Mariehamn,0,1
+FIN,2025,regular,,Haka,AC Oulu,2,1
+FIN,2025,regular,,Haka,SJK,2,3
+FIN,2025,regular,,Haka,VPS,2,1
+FIN,2025,regular,,HJK,Gnistan,0,1
+FIN,2025,regular,,HJK,Haka,3,1
+FIN,2025,regular,,HJK,Ilves,5,1
+FIN,2025,regular,,HJK,Inter Turku,1,4
+FIN,2025,regular,,HJK,Jaro,2,3
+FIN,2025,regular,,HJK,KTP,4,1
+FIN,2025,regular,,HJK,KuPS,0,0
+FIN,2025,regular,,HJK,IFK Mariehamn,8,2
+FIN,2025,regular,,HJK,AC Oulu,3,1
+FIN,2025,regular,,HJK,SJK,4,2
+FIN,2025,regular,,HJK,VPS,3,1
+FIN,2025,regular,,Ilves,Gnistan,2,2
+FIN,2025,regular,,Ilves,Haka,3,2
+FIN,2025,regular,,Ilves,HJK,3,2
+FIN,2025,regular,,Ilves,Inter Turku,1,0
+FIN,2025,regular,,Ilves,Jaro,2,1
+FIN,2025,regular,,Ilves,KTP,2,1
+FIN,2025,regular,,Ilves,KuPS,3,0
+FIN,2025,regular,,Ilves,IFK Mariehamn,2,1
+FIN,2025,regular,,Ilves,AC Oulu,0,0
+FIN,2025,regular,,Ilves,SJK,2,3
+FIN,2025,regular,,Ilves,VPS,3,2
+FIN,2025,regular,,Inter Turku,Gnistan,3,0
+FIN,2025,regular,,Inter Turku,Haka,1,1
+FIN,2025,regular,,Inter Turku,HJK,1,1
+FIN,2025,regular,,Inter Turku,Ilves,3,1
+FIN,2025,regular,,Inter Turku,Jaro,3,1
+FIN,2025,regular,,Inter Turku,KTP,5,0
+FIN,2025,regular,,Inter Turku,KuPS,1,1
+FIN,2025,regular,,Inter Turku,IFK Mariehamn,0,0
+FIN,2025,regular,,Inter Turku,AC Oulu,3,2
+FIN,2025,regular,,Inter Turku,SJK,4,1
+FIN,2025,regular,,Inter Turku,VPS,2,1
+FIN,2025,regular,,Jaro,Gnistan,1,1
+FIN,2025,regular,,Jaro,Haka,2,1
+FIN,2025,regular,,Jaro,HJK,0,3
+FIN,2025,regular,,Jaro,Ilves,0,1
+FIN,2025,regular,,Jaro,Inter Turku,0,1
+FIN,2025,regular,,Jaro,KTP,2,3
+FIN,2025,regular,,Jaro,KuPS,1,3
+FIN,2025,regular,,Jaro,IFK Mariehamn,1,1
+FIN,2025,regular,,Jaro,AC Oulu,2,1
+FIN,2025,regular,,Jaro,SJK,0,4
+FIN,2025,regular,,Jaro,VPS,2,2
+FIN,2025,regular,,KTP,Gnistan,0,0
+FIN,2025,regular,,KTP,Haka,0,0
+FIN,2025,regular,,KTP,HJK,1,4
+FIN,2025,regular,,KTP,Ilves,0,5
+FIN,2025,regular,,KTP,Inter Turku,2,2
+FIN,2025,regular,,KTP,Jaro,3,2
+FIN,2025,regular,,KTP,KuPS,0,2
+FIN,2025,regular,,KTP,IFK Mariehamn,2,2
+FIN,2025,regular,,KTP,AC Oulu,1,3
+FIN,2025,regular,,KTP,SJK,0,1
+FIN,2025,regular,,KTP,VPS,2,2
+FIN,2025,regular,,KuPS,Gnistan,6,2
+FIN,2025,regular,,KuPS,Haka,3,2
+FIN,2025,regular,,KuPS,HJK,3,0
+FIN,2025,regular,,KuPS,Ilves,0,3
+FIN,2025,regular,,KuPS,Inter Turku,2,1
+FIN,2025,regular,,KuPS,Jaro,1,0
+FIN,2025,regular,,KuPS,KTP,3,0
+FIN,2025,regular,,KuPS,IFK Mariehamn,4,1
+FIN,2025,regular,,KuPS,AC Oulu,1,0
+FIN,2025,regular,,KuPS,SJK,1,0
+FIN,2025,regular,,KuPS,VPS,0,2
+FIN,2025,regular,,IFK Mariehamn,Gnistan,2,5
+FIN,2025,regular,,IFK Mariehamn,Haka,1,1
+FIN,2025,regular,,IFK Mariehamn,HJK,0,4
+FIN,2025,regular,,IFK Mariehamn,Ilves,3,2
+FIN,2025,regular,,IFK Mariehamn,Inter Turku,2,2
+FIN,2025,regular,,IFK Mariehamn,Jaro,0,2
+FIN,2025,regular,,IFK Mariehamn,KTP,3,0
+FIN,2025,regular,,IFK Mariehamn,KuPS,1,0
+FIN,2025,regular,,IFK Mariehamn,AC Oulu,0,1
+FIN,2025,regular,,IFK Mariehamn,SJK,1,2
+FIN,2025,regular,,IFK Mariehamn,VPS,1,5
+FIN,2025,regular,,AC Oulu,Gnistan,2,3
+FIN,2025,regular,,AC Oulu,Haka,3,2
+FIN,2025,regular,,AC Oulu,HJK,0,4
+FIN,2025,regular,,AC Oulu,Ilves,0,4
+FIN,2025,regular,,AC Oulu,Inter Turku,1,4
+FIN,2025,regular,,AC Oulu,Jaro,0,1
+FIN,2025,regular,,AC Oulu,KTP,3,2
+FIN,2025,regular,,AC Oulu,KuPS,2,2
+FIN,2025,regular,,AC Oulu,IFK Mariehamn,0,1
+FIN,2025,regular,,AC Oulu,SJK,2,2
+FIN,2025,regular,,AC Oulu,VPS,2,1
+FIN,2025,regular,,SJK,Gnistan,3,1
+FIN,2025,regular,,SJK,Haka,2,2
+FIN,2025,regular,,SJK,HJK,1,0
+FIN,2025,regular,,SJK,Ilves,1,1
+FIN,2025,regular,,SJK,Inter Turku,0,1
+FIN,2025,regular,,SJK,Jaro,3,1
+FIN,2025,regular,,SJK,KTP,3,0
+FIN,2025,regular,,SJK,KuPS,1,1
+FIN,2025,regular,,SJK,IFK Mariehamn,4,1
+FIN,2025,regular,,SJK,AC Oulu,3,1
+FIN,2025,regular,,SJK,VPS,2,3
+FIN,2025,regular,,VPS,Gnistan,0,0
+FIN,2025,regular,,VPS,Haka,1,2
+FIN,2025,regular,,VPS,HJK,0,2
+FIN,2025,regular,,VPS,Ilves,1,0
+FIN,2025,regular,,VPS,Inter Turku,0,2
+FIN,2025,regular,,VPS,Jaro,0,0
+FIN,2025,regular,,VPS,KTP,3,2
+FIN,2025,regular,,VPS,KuPS,1,1
+FIN,2025,regular,,VPS,IFK Mariehamn,1,1
+FIN,2025,regular,,VPS,AC Oulu,4,3
+FIN,2025,regular,,VPS,SJK,1,2
+FIN,2025,championship,,Gnistan,HJK,2,2
+FIN,2025,championship,,Gnistan,Ilves,1,3
+FIN,2025,championship,,Gnistan,Inter Turku,0,2
+FIN,2025,championship,,Gnistan,KuPS,0,4
+FIN,2025,championship,,Gnistan,SJK,3,4
+FIN,2025,championship,,HJK,Gnistan,2,3
+FIN,2025,championship,,HJK,Ilves,2,2
+FIN,2025,championship,,HJK,Inter Turku,1,1
+FIN,2025,championship,,HJK,KuPS,0,2
+FIN,2025,championship,,HJK,SJK,3,4
+FIN,2025,championship,,Ilves,Gnistan,3,2
+FIN,2025,championship,,Ilves,HJK,3,1
+FIN,2025,championship,,Ilves,Inter Turku,1,2
+FIN,2025,championship,,Ilves,KuPS,1,1
+FIN,2025,championship,,Ilves,SJK,3,3
+FIN,2025,championship,,Inter Turku,Gnistan,2,1
+FIN,2025,championship,,Inter Turku,HJK,0,0
+FIN,2025,championship,,Inter Turku,Ilves,2,0
+FIN,2025,championship,,Inter Turku,KuPS,0,3
+FIN,2025,championship,,Inter Turku,SJK,2,2
+FIN,2025,championship,,KuPS,Gnistan,1,1
+FIN,2025,championship,,KuPS,HJK,3,1
+FIN,2025,championship,,KuPS,Ilves,2,4
+FIN,2025,championship,,KuPS,Inter Turku,3,2
+FIN,2025,championship,,KuPS,SJK,3,2
+FIN,2025,championship,,SJK,Gnistan,3,0
+FIN,2025,championship,,SJK,HJK,3,3
+FIN,2025,championship,,SJK,Ilves,2,1
+FIN,2025,championship,,SJK,Inter Turku,2,1
+FIN,2025,championship,,SJK,KuPS,0,1
+FIN,2025,challenger,,Haka,KTP,1,2
+FIN,2025,challenger,,Haka,AC Oulu,0,1
+FIN,2025,challenger,,Jaro,Haka,2,1
+FIN,2025,challenger,,Jaro,IFK Mariehamn,2,3
+FIN,2025,challenger,,Jaro,AC Oulu,1,2
+FIN,2025,challenger,,KTP,Jaro,1,2
+FIN,2025,challenger,,KTP,IFK Mariehamn,1,1
+FIN,2025,challenger,,IFK Mariehamn,Haka,1,1
+FIN,2025,challenger,,IFK Mariehamn,AC Oulu,2,0
+FIN,2025,challenger,,IFK Mariehamn,VPS,2,1
+FIN,2025,challenger,,AC Oulu,KTP,0,2
+FIN,2025,challenger,,AC Oulu,VPS,2,0
+FIN,2025,challenger,,VPS,Haka,1,0
+FIN,2025,challenger,,VPS,Jaro,1,3
+FIN,2025,challenger,,VPS,KTP,2,1

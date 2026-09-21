@@ -1,0 +1,241 @@
+div,season,phase,date,home,away,fh,fa
+SWE,2025,regular,,AIK,BK Häcken,2,2
+SWE,2025,regular,,AIK,Degerfors IF,3,0
+SWE,2025,regular,,AIK,Djurgårdens IF,0,0
+SWE,2025,regular,,AIK,GAIS,1,1
+SWE,2025,regular,,AIK,Halmstads BK,0,2
+SWE,2025,regular,,AIK,Hammarby IF,0,0
+SWE,2025,regular,,AIK,IF Brommapojkarna,2,1
+SWE,2025,regular,,AIK,IF Elfsborg,2,0
+SWE,2025,regular,,AIK,IFK Göteborg,3,0
+SWE,2025,regular,,AIK,IFK Norrköping,4,3
+SWE,2025,regular,,AIK,IFK Värnamo,2,3
+SWE,2025,regular,,AIK,IK Sirius,2,1
+SWE,2025,regular,,AIK,Malmö FF,0,0
+SWE,2025,regular,,AIK,Mjällby AIF,2,1
+SWE,2025,regular,,AIK,Östers IF,0,0
+SWE,2025,regular,,BK Häcken,AIK,3,3
+SWE,2025,regular,,BK Häcken,Degerfors IF,3,4
+SWE,2025,regular,,BK Häcken,Djurgårdens IF,1,6
+SWE,2025,regular,,BK Häcken,GAIS,1,3
+SWE,2025,regular,,BK Häcken,Halmstads BK,4,1
+SWE,2025,regular,,BK Häcken,Hammarby IF,1,1
+SWE,2025,regular,,BK Häcken,IF Brommapojkarna,2,0
+SWE,2025,regular,,BK Häcken,IF Elfsborg,1,2
+SWE,2025,regular,,BK Häcken,IFK Göteborg,1,2
+SWE,2025,regular,,BK Häcken,IFK Norrköping,2,0
+SWE,2025,regular,,BK Häcken,IFK Värnamo,2,0
+SWE,2025,regular,,BK Häcken,IK Sirius,1,1
+SWE,2025,regular,,BK Häcken,Malmö FF,1,1
+SWE,2025,regular,,BK Häcken,Mjällby AIF,0,3
+SWE,2025,regular,,BK Häcken,Östers IF,0,2
+SWE,2025,regular,,Degerfors IF,AIK,0,1
+SWE,2025,regular,,Degerfors IF,BK Häcken,0,0
+SWE,2025,regular,,Degerfors IF,Djurgårdens IF,1,1
+SWE,2025,regular,,Degerfors IF,GAIS,0,3
+SWE,2025,regular,,Degerfors IF,Halmstads BK,0,1
+SWE,2025,regular,,Degerfors IF,Hammarby IF,1,1
+SWE,2025,regular,,Degerfors IF,IF Brommapojkarna,0,3
+SWE,2025,regular,,Degerfors IF,IF Elfsborg,0,1
+SWE,2025,regular,,Degerfors IF,IFK Göteborg,1,3
+SWE,2025,regular,,Degerfors IF,IFK Norrköping,0,0
+SWE,2025,regular,,Degerfors IF,IFK Värnamo,1,0
+SWE,2025,regular,,Degerfors IF,IK Sirius,1,1
+SWE,2025,regular,,Degerfors IF,Malmö FF,1,4
+SWE,2025,regular,,Degerfors IF,Mjällby AIF,0,1
+SWE,2025,regular,,Degerfors IF,Östers IF,1,2
+SWE,2025,regular,,Djurgårdens IF,AIK,1,1
+SWE,2025,regular,,Djurgårdens IF,BK Häcken,1,1
+SWE,2025,regular,,Djurgårdens IF,Degerfors IF,5,1
+SWE,2025,regular,,Djurgårdens IF,GAIS,0,0
+SWE,2025,regular,,Djurgårdens IF,Halmstads BK,1,1
+SWE,2025,regular,,Djurgårdens IF,Hammarby IF,3,3
+SWE,2025,regular,,Djurgårdens IF,IF Brommapojkarna,1,0
+SWE,2025,regular,,Djurgårdens IF,IF Elfsborg,1,0
+SWE,2025,regular,,Djurgårdens IF,IFK Göteborg,0,0
+SWE,2025,regular,,Djurgårdens IF,IFK Norrköping,1,1
+SWE,2025,regular,,Djurgårdens IF,IFK Värnamo,6,2
+SWE,2025,regular,,Djurgårdens IF,IK Sirius,8,2
+SWE,2025,regular,,Djurgårdens IF,Malmö FF,0,1
+SWE,2025,regular,,Djurgårdens IF,Mjällby AIF,1,3
+SWE,2025,regular,,Djurgårdens IF,Östers IF,1,0
+SWE,2025,regular,,GAIS,AIK,0,1
+SWE,2025,regular,,GAIS,BK Häcken,2,1
+SWE,2025,regular,,GAIS,Degerfors IF,2,0
+SWE,2025,regular,,GAIS,Djurgårdens IF,3,2
+SWE,2025,regular,,GAIS,Halmstads BK,3,0
+SWE,2025,regular,,GAIS,Hammarby IF,3,2
+SWE,2025,regular,,GAIS,IF Brommapojkarna,1,1
+SWE,2025,regular,,GAIS,IF Elfsborg,2,0
+SWE,2025,regular,,GAIS,IFK Göteborg,0,1
+SWE,2025,regular,,GAIS,IFK Norrköping,2,1
+SWE,2025,regular,,GAIS,IFK Värnamo,1,1
+SWE,2025,regular,,GAIS,IK Sirius,2,1
+SWE,2025,regular,,GAIS,Malmö FF,0,0
+SWE,2025,regular,,GAIS,Mjällby AIF,0,2
+SWE,2025,regular,,GAIS,Östers IF,1,1
+SWE,2025,regular,,Halmstads BK,AIK,2,0
+SWE,2025,regular,,Halmstads BK,BK Häcken,0,0
+SWE,2025,regular,,Halmstads BK,Degerfors IF,0,5
+SWE,2025,regular,,Halmstads BK,Djurgårdens IF,1,0
+SWE,2025,regular,,Halmstads BK,GAIS,1,3
+SWE,2025,regular,,Halmstads BK,Hammarby IF,1,0
+SWE,2025,regular,,Halmstads BK,IF Brommapojkarna,0,0
+SWE,2025,regular,,Halmstads BK,IF Elfsborg,1,4
+SWE,2025,regular,,Halmstads BK,IFK Göteborg,0,3
+SWE,2025,regular,,Halmstads BK,IFK Norrköping,1,1
+SWE,2025,regular,,Halmstads BK,IFK Värnamo,4,2
+SWE,2025,regular,,Halmstads BK,IK Sirius,0,1
+SWE,2025,regular,,Halmstads BK,Malmö FF,0,4
+SWE,2025,regular,,Halmstads BK,Mjällby AIF,1,3
+SWE,2025,regular,,Halmstads BK,Östers IF,1,0
+SWE,2025,regular,,Hammarby IF,AIK,2,1
+SWE,2025,regular,,Hammarby IF,BK Häcken,4,0
+SWE,2025,regular,,Hammarby IF,Degerfors IF,1,0
+SWE,2025,regular,,Hammarby IF,Djurgårdens IF,2,0
+SWE,2025,regular,,Hammarby IF,GAIS,1,2
+SWE,2025,regular,,Hammarby IF,Halmstads BK,2,0
+SWE,2025,regular,,Hammarby IF,IF Brommapojkarna,3,2
+SWE,2025,regular,,Hammarby IF,IF Elfsborg,3,0
+SWE,2025,regular,,Hammarby IF,IFK Göteborg,4,0
+SWE,2025,regular,,Hammarby IF,IFK Norrköping,1,1
+SWE,2025,regular,,Hammarby IF,IFK Värnamo,1,0
+SWE,2025,regular,,Hammarby IF,IK Sirius,3,2
+SWE,2025,regular,,Hammarby IF,Malmö FF,2,0
+SWE,2025,regular,,Hammarby IF,Mjällby AIF,1,2
+SWE,2025,regular,,Hammarby IF,Östers IF,4,0
+SWE,2025,regular,,IF Brommapojkarna,AIK,0,1
+SWE,2025,regular,,IF Brommapojkarna,BK Häcken,1,3
+SWE,2025,regular,,IF Brommapojkarna,Degerfors IF,1,3
+SWE,2025,regular,,IF Brommapojkarna,Djurgårdens IF,0,1
+SWE,2025,regular,,IF Brommapojkarna,GAIS,0,2
+SWE,2025,regular,,IF Brommapojkarna,Halmstads BK,0,1
+SWE,2025,regular,,IF Brommapojkarna,Hammarby IF,0,2
+SWE,2025,regular,,IF Brommapojkarna,IF Elfsborg,3,0
+SWE,2025,regular,,IF Brommapojkarna,IFK Göteborg,1,3
+SWE,2025,regular,,IF Brommapojkarna,IFK Norrköping,6,4
+SWE,2025,regular,,IF Brommapojkarna,IFK Värnamo,3,2
+SWE,2025,regular,,IF Brommapojkarna,IK Sirius,2,4
+SWE,2025,regular,,IF Brommapojkarna,Malmö FF,2,3
+SWE,2025,regular,,IF Brommapojkarna,Mjällby AIF,0,1
+SWE,2025,regular,,IF Brommapojkarna,Östers IF,2,0
+SWE,2025,regular,,IF Elfsborg,AIK,0,3
+SWE,2025,regular,,IF Elfsborg,BK Häcken,0,2
+SWE,2025,regular,,IF Elfsborg,Degerfors IF,1,2
+SWE,2025,regular,,IF Elfsborg,Djurgårdens IF,4,0
+SWE,2025,regular,,IF Elfsborg,GAIS,2,0
+SWE,2025,regular,,IF Elfsborg,Halmstads BK,1,2
+SWE,2025,regular,,IF Elfsborg,Hammarby IF,0,2
+SWE,2025,regular,,IF Elfsborg,IF Brommapojkarna,4,3
+SWE,2025,regular,,IF Elfsborg,IFK Göteborg,4,3
+SWE,2025,regular,,IF Elfsborg,IFK Norrköping,2,0
+SWE,2025,regular,,IF Elfsborg,IFK Värnamo,2,2
+SWE,2025,regular,,IF Elfsborg,IK Sirius,4,3
+SWE,2025,regular,,IF Elfsborg,Malmö FF,2,2
+SWE,2025,regular,,IF Elfsborg,Mjällby AIF,2,2
+SWE,2025,regular,,IF Elfsborg,Östers IF,5,1
+SWE,2025,regular,,IFK Göteborg,AIK,2,1
+SWE,2025,regular,,IFK Göteborg,BK Häcken,2,3
+SWE,2025,regular,,IFK Göteborg,Degerfors IF,3,0
+SWE,2025,regular,,IFK Göteborg,Djurgårdens IF,1,2
+SWE,2025,regular,,IFK Göteborg,GAIS,1,1
+SWE,2025,regular,,IFK Göteborg,Halmstads BK,1,0
+SWE,2025,regular,,IFK Göteborg,Hammarby IF,1,2
+SWE,2025,regular,,IFK Göteborg,IF Brommapojkarna,0,1
+SWE,2025,regular,,IFK Göteborg,IF Elfsborg,1,2
+SWE,2025,regular,,IFK Göteborg,IFK Norrköping,2,0
+SWE,2025,regular,,IFK Göteborg,IFK Värnamo,1,0
+SWE,2025,regular,,IFK Göteborg,IK Sirius,3,1
+SWE,2025,regular,,IFK Göteborg,Malmö FF,1,0
+SWE,2025,regular,,IFK Göteborg,Mjällby AIF,0,2
+SWE,2025,regular,,IFK Göteborg,Östers IF,0,1
+SWE,2025,regular,,IFK Norrköping,AIK,3,1
+SWE,2025,regular,,IFK Norrköping,BK Häcken,0,2
+SWE,2025,regular,,IFK Norrköping,Degerfors IF,1,2
+SWE,2025,regular,,IFK Norrköping,Djurgårdens IF,0,4
+SWE,2025,regular,,IFK Norrköping,GAIS,0,3
+SWE,2025,regular,,IFK Norrköping,Halmstads BK,3,0
+SWE,2025,regular,,IFK Norrköping,Hammarby IF,0,2
+SWE,2025,regular,,IFK Norrköping,IF Brommapojkarna,0,1
+SWE,2025,regular,,IFK Norrköping,IF Elfsborg,2,1
+SWE,2025,regular,,IFK Norrköping,IFK Göteborg,2,3
+SWE,2025,regular,,IFK Norrköping,IFK Värnamo,3,1
+SWE,2025,regular,,IFK Norrköping,IK Sirius,1,2
+SWE,2025,regular,,IFK Norrköping,Malmö FF,0,2
+SWE,2025,regular,,IFK Norrköping,Mjällby AIF,1,1
+SWE,2025,regular,,IFK Norrköping,Östers IF,4,3
+SWE,2025,regular,,IFK Värnamo,AIK,1,2
+SWE,2025,regular,,IFK Värnamo,BK Häcken,1,5
+SWE,2025,regular,,IFK Värnamo,Degerfors IF,3,2
+SWE,2025,regular,,IFK Värnamo,Djurgårdens IF,1,0
+SWE,2025,regular,,IFK Värnamo,GAIS,2,2
+SWE,2025,regular,,IFK Värnamo,Halmstads BK,1,2
+SWE,2025,regular,,IFK Värnamo,Hammarby IF,2,3
+SWE,2025,regular,,IFK Värnamo,IF Brommapojkarna,1,1
+SWE,2025,regular,,IFK Värnamo,IF Elfsborg,0,0
+SWE,2025,regular,,IFK Värnamo,IFK Göteborg,0,1
+SWE,2025,regular,,IFK Värnamo,IFK Norrköping,1,3
+SWE,2025,regular,,IFK Värnamo,IK Sirius,1,2
+SWE,2025,regular,,IFK Värnamo,Malmö FF,2,2
+SWE,2025,regular,,IFK Värnamo,Mjällby AIF,0,5
+SWE,2025,regular,,IFK Värnamo,Östers IF,1,1
+SWE,2025,regular,,IK Sirius,AIK,3,1
+SWE,2025,regular,,IK Sirius,BK Häcken,2,0
+SWE,2025,regular,,IK Sirius,Degerfors IF,1,3
+SWE,2025,regular,,IK Sirius,Djurgårdens IF,0,1
+SWE,2025,regular,,IK Sirius,GAIS,3,0
+SWE,2025,regular,,IK Sirius,Halmstads BK,1,1
+SWE,2025,regular,,IK Sirius,Hammarby IF,3,1
+SWE,2025,regular,,IK Sirius,IF Brommapojkarna,0,3
+SWE,2025,regular,,IK Sirius,IF Elfsborg,4,0
+SWE,2025,regular,,IK Sirius,IFK Göteborg,0,1
+SWE,2025,regular,,IK Sirius,IFK Norrköping,1,2
+SWE,2025,regular,,IK Sirius,IFK Värnamo,3,1
+SWE,2025,regular,,IK Sirius,Malmö FF,5,1
+SWE,2025,regular,,IK Sirius,Mjällby AIF,1,2
+SWE,2025,regular,,IK Sirius,Östers IF,1,1
+SWE,2025,regular,,Malmö FF,AIK,0,0
+SWE,2025,regular,,Malmö FF,BK Häcken,3,0
+SWE,2025,regular,,Malmö FF,Degerfors IF,1,1
+SWE,2025,regular,,Malmö FF,Djurgårdens IF,0,1
+SWE,2025,regular,,Malmö FF,GAIS,2,1
+SWE,2025,regular,,Malmö FF,Halmstads BK,3,0
+SWE,2025,regular,,Malmö FF,Hammarby IF,1,3
+SWE,2025,regular,,Malmö FF,IF Brommapojkarna,1,2
+SWE,2025,regular,,Malmö FF,IF Elfsborg,2,1
+SWE,2025,regular,,Malmö FF,IFK Göteborg,0,0
+SWE,2025,regular,,Malmö FF,IFK Norrköping,3,1
+SWE,2025,regular,,Malmö FF,IFK Värnamo,3,2
+SWE,2025,regular,,Malmö FF,IK Sirius,1,1
+SWE,2025,regular,,Malmö FF,Mjällby AIF,1,3
+SWE,2025,regular,,Malmö FF,Östers IF,2,0
+SWE,2025,regular,,Mjällby AIF,AIK,2,0
+SWE,2025,regular,,Mjällby AIF,BK Häcken,1,0
+SWE,2025,regular,,Mjällby AIF,Degerfors IF,4,1
+SWE,2025,regular,,Mjällby AIF,Djurgårdens IF,1,1
+SWE,2025,regular,,Mjällby AIF,GAIS,1,1
+SWE,2025,regular,,Mjällby AIF,Halmstads BK,1,0
+SWE,2025,regular,,Mjällby AIF,Hammarby IF,3,1
+SWE,2025,regular,,Mjällby AIF,IF Brommapojkarna,1,0
+SWE,2025,regular,,Mjällby AIF,IF Elfsborg,2,0
+SWE,2025,regular,,Mjällby AIF,IFK Göteborg,1,0
+SWE,2025,regular,,Mjällby AIF,IFK Norrköping,2,1
+SWE,2025,regular,,Mjällby AIF,IFK Värnamo,2,0
+SWE,2025,regular,,Mjällby AIF,IK Sirius,2,1
+SWE,2025,regular,,Mjällby AIF,Malmö FF,1,1
+SWE,2025,regular,,Mjällby AIF,Östers IF,1,1
+SWE,2025,regular,,Östers IF,AIK,0,1
+SWE,2025,regular,,Östers IF,BK Häcken,2,0
+SWE,2025,regular,,Östers IF,Degerfors IF,1,2
+SWE,2025,regular,,Östers IF,Djurgårdens IF,1,3
+SWE,2025,regular,,Östers IF,GAIS,1,1
+SWE,2025,regular,,Östers IF,Halmstads BK,3,0
+SWE,2025,regular,,Östers IF,Hammarby IF,0,3
+SWE,2025,regular,,Östers IF,IF Brommapojkarna,1,1
+SWE,2025,regular,,Östers IF,IF Elfsborg,0,1
+SWE,2025,regular,,Östers IF,IFK Göteborg,0,2
+SWE,2025,regular,,Östers IF,IFK Norrköping,1,2
+SWE,2025,regular,,Östers IF,IFK Värnamo,4,3
+SWE,2025,regular,,Östers IF,IK Sirius,2,2
+SWE,2025,regular,,Östers IF,Malmö FF,0,2
+SWE,2025,regular,,Östers IF,Mjällby AIF,0,1

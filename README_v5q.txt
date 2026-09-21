@@ -1,0 +1,1 @@
+DODATEK v5q (20.09.2026): sezon.py — drużyna grająca też w pucharach (np. Viking w Lidze Mistrzów, Lillestrøm w Lidze Europy) była brana z wiersza pucharowego (1 mecz) zamiast z ligi (20 meczów). Teraz wybierana jest wspólna liga obu drużyn z największą liczbą meczów.

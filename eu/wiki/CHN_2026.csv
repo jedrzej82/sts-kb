@@ -1,0 +1,204 @@
+div,season,phase,date,home,away,fh,fa
+CHN,2026,regular,,Beijing Guoan,Chengdu Rongcheng,1,2
+CHN,2026,regular,,Beijing Guoan,Dalian Yingbo,3,0
+CHN,2026,regular,,Beijing Guoan,Henan,1,2
+CHN,2026,regular,,Beijing Guoan,Liaoning Tieren,1,1
+CHN,2026,regular,,Beijing Guoan,Qingdao Hainiu,4,2
+CHN,2026,regular,,Beijing Guoan,Shandong Taishan,2,0
+CHN,2026,regular,,Beijing Guoan,Shanghai Port,2,2
+CHN,2026,regular,,Beijing Guoan,Shanghai Shenhua,1,1
+CHN,2026,regular,,Beijing Guoan,Shenzhen Peng City,4,0
+CHN,2026,regular,,Beijing Guoan,Tianjin Jinmen Tiger,2,4
+CHN,2026,regular,,Beijing Guoan,Wuhan Three Towns,1,0
+CHN,2026,regular,,Beijing Guoan,Yunnan Yukun,3,3
+CHN,2026,regular,,Beijing Guoan,Zhejiang,2,1
+CHN,2026,regular,,Chengdu Rongcheng,Beijing Guoan,2,2
+CHN,2026,regular,,Chengdu Rongcheng,Chongqing Tonglianglong,1,1
+CHN,2026,regular,,Chengdu Rongcheng,Henan,3,0
+CHN,2026,regular,,Chengdu Rongcheng,Liaoning Tieren,2,1
+CHN,2026,regular,,Chengdu Rongcheng,Qingdao Hainiu,1,0
+CHN,2026,regular,,Chengdu Rongcheng,Qingdao West Coast,5,1
+CHN,2026,regular,,Chengdu Rongcheng,Shandong Taishan,1,0
+CHN,2026,regular,,Chengdu Rongcheng,Shanghai Port,0,1
+CHN,2026,regular,,Chengdu Rongcheng,Shanghai Shenhua,4,5
+CHN,2026,regular,,Chengdu Rongcheng,Shenzhen Peng City,5,1
+CHN,2026,regular,,Chengdu Rongcheng,Wuhan Three Towns,1,1
+CHN,2026,regular,,Chengdu Rongcheng,Yunnan Yukun,2,1
+CHN,2026,regular,,Chengdu Rongcheng,Zhejiang,4,0
+CHN,2026,regular,,Chongqing Tonglianglong,Beijing Guoan,2,3
+CHN,2026,regular,,Chongqing Tonglianglong,Chengdu Rongcheng,3,3
+CHN,2026,regular,,Chongqing Tonglianglong,Dalian Yingbo,0,1
+CHN,2026,regular,,Chongqing Tonglianglong,Henan,1,1
+CHN,2026,regular,,Chongqing Tonglianglong,Liaoning Tieren,1,0
+CHN,2026,regular,,Chongqing Tonglianglong,Qingdao West Coast,1,1
+CHN,2026,regular,,Chongqing Tonglianglong,Shanghai Port,2,3
+CHN,2026,regular,,Chongqing Tonglianglong,Shanghai Shenhua,1,3
+CHN,2026,regular,,Chongqing Tonglianglong,Shenzhen Peng City,2,0
+CHN,2026,regular,,Chongqing Tonglianglong,Tianjin Jinmen Tiger,1,0
+CHN,2026,regular,,Chongqing Tonglianglong,Wuhan Three Towns,2,1
+CHN,2026,regular,,Chongqing Tonglianglong,Yunnan Yukun,0,0
+CHN,2026,regular,,Chongqing Tonglianglong,Zhejiang,1,1
+CHN,2026,regular,,Dalian Yingbo,Beijing Guoan,1,1
+CHN,2026,regular,,Dalian Yingbo,Chengdu Rongcheng,2,0
+CHN,2026,regular,,Dalian Yingbo,Chongqing Tonglianglong,1,0
+CHN,2026,regular,,Dalian Yingbo,Henan,2,1
+CHN,2026,regular,,Dalian Yingbo,Liaoning Tieren,1,0
+CHN,2026,regular,,Dalian Yingbo,Qingdao Hainiu,2,1
+CHN,2026,regular,,Dalian Yingbo,Qingdao West Coast,2,3
+CHN,2026,regular,,Dalian Yingbo,Shandong Taishan,3,1
+CHN,2026,regular,,Dalian Yingbo,Shanghai Port,1,0
+CHN,2026,regular,,Dalian Yingbo,Shanghai Shenhua,1,4
+CHN,2026,regular,,Dalian Yingbo,Wuhan Three Towns,3,2
+CHN,2026,regular,,Dalian Yingbo,Yunnan Yukun,1,3
+CHN,2026,regular,,Dalian Yingbo,Zhejiang,3,0
+CHN,2026,regular,,Henan,Chongqing Tonglianglong,1,1
+CHN,2026,regular,,Henan,Dalian Yingbo,1,1
+CHN,2026,regular,,Henan,Liaoning Tieren,4,0
+CHN,2026,regular,,Henan,Qingdao Hainiu,5,1
+CHN,2026,regular,,Henan,Qingdao West Coast,0,0
+CHN,2026,regular,,Henan,Shandong Taishan,0,1
+CHN,2026,regular,,Henan,Shanghai Port,1,2
+CHN,2026,regular,,Henan,Shanghai Shenhua,0,3
+CHN,2026,regular,,Henan,Shenzhen Peng City,1,0
+CHN,2026,regular,,Henan,Wuhan Three Towns,1,1
+CHN,2026,regular,,Henan,Yunnan Yukun,2,1
+CHN,2026,regular,,Henan,Zhejiang,0,2
+CHN,2026,regular,,Liaoning Tieren,Beijing Guoan,2,1
+CHN,2026,regular,,Liaoning Tieren,Chengdu Rongcheng,0,1
+CHN,2026,regular,,Liaoning Tieren,Chongqing Tonglianglong,3,1
+CHN,2026,regular,,Liaoning Tieren,Dalian Yingbo,0,1
+CHN,2026,regular,,Liaoning Tieren,Henan,4,4
+CHN,2026,regular,,Liaoning Tieren,Qingdao Hainiu,2,1
+CHN,2026,regular,,Liaoning Tieren,Qingdao West Coast,0,1
+CHN,2026,regular,,Liaoning Tieren,Shandong Taishan,1,5
+CHN,2026,regular,,Liaoning Tieren,Shanghai Port,3,2
+CHN,2026,regular,,Liaoning Tieren,Shanghai Shenhua,3,1
+CHN,2026,regular,,Liaoning Tieren,Shenzhen Peng City,1,2
+CHN,2026,regular,,Liaoning Tieren,Tianjin Jinmen Tiger,3,0
+CHN,2026,regular,,Liaoning Tieren,Yunnan Yukun,1,2
+CHN,2026,regular,,Qingdao Hainiu,Chengdu Rongcheng,1,1
+CHN,2026,regular,,Qingdao Hainiu,Chongqing Tonglianglong,0,1
+CHN,2026,regular,,Qingdao Hainiu,Dalian Yingbo,3,1
+CHN,2026,regular,,Qingdao Hainiu,Henan,1,0
+CHN,2026,regular,,Qingdao Hainiu,Qingdao West Coast,0,0
+CHN,2026,regular,,Qingdao Hainiu,Shandong Taishan,4,1
+CHN,2026,regular,,Qingdao Hainiu,Shanghai Port,3,1
+CHN,2026,regular,,Qingdao Hainiu,Shanghai Shenhua,0,1
+CHN,2026,regular,,Qingdao Hainiu,Tianjin Jinmen Tiger,0,2
+CHN,2026,regular,,Qingdao Hainiu,Wuhan Three Towns,1,5
+CHN,2026,regular,,Qingdao Hainiu,Yunnan Yukun,4,2
+CHN,2026,regular,,Qingdao Hainiu,Zhejiang,1,4
+CHN,2026,regular,,Qingdao West Coast,Beijing Guoan,1,1
+CHN,2026,regular,,Qingdao West Coast,Chengdu Rongcheng,1,1
+CHN,2026,regular,,Qingdao West Coast,Chongqing Tonglianglong,0,0
+CHN,2026,regular,,Qingdao West Coast,Henan,0,0
+CHN,2026,regular,,Qingdao West Coast,Liaoning Tieren,1,1
+CHN,2026,regular,,Qingdao West Coast,Qingdao Hainiu,2,0
+CHN,2026,regular,,Qingdao West Coast,Shandong Taishan,2,0
+CHN,2026,regular,,Qingdao West Coast,Shanghai Port,2,1
+CHN,2026,regular,,Qingdao West Coast,Shanghai Shenhua,2,2
+CHN,2026,regular,,Qingdao West Coast,Shenzhen Peng City,1,0
+CHN,2026,regular,,Qingdao West Coast,Tianjin Jinmen Tiger,1,1
+CHN,2026,regular,,Qingdao West Coast,Wuhan Three Towns,1,1
+CHN,2026,regular,,Qingdao West Coast,Zhejiang,3,1
+CHN,2026,regular,,Shandong Taishan,Beijing Guoan,2,1
+CHN,2026,regular,,Shandong Taishan,Chongqing Tonglianglong,3,1
+CHN,2026,regular,,Shandong Taishan,Dalian Yingbo,1,2
+CHN,2026,regular,,Shandong Taishan,Henan,1,2
+CHN,2026,regular,,Shandong Taishan,Liaoning Tieren,3,0
+CHN,2026,regular,,Shandong Taishan,Qingdao Hainiu,3,1
+CHN,2026,regular,,Shandong Taishan,Qingdao West Coast,1,1
+CHN,2026,regular,,Shandong Taishan,Shanghai Port,1,1
+CHN,2026,regular,,Shandong Taishan,Shanghai Shenhua,4,1
+CHN,2026,regular,,Shandong Taishan,Shenzhen Peng City,1,1
+CHN,2026,regular,,Shandong Taishan,Tianjin Jinmen Tiger,2,1
+CHN,2026,regular,,Shandong Taishan,Wuhan Three Towns,3,3
+CHN,2026,regular,,Shandong Taishan,Yunnan Yukun,4,3
+CHN,2026,regular,,Shanghai Port,Beijing Guoan,0,0
+CHN,2026,regular,,Shanghai Port,Chongqing Tonglianglong,1,2
+CHN,2026,regular,,Shanghai Port,Dalian Yingbo,1,1
+CHN,2026,regular,,Shanghai Port,Henan,1,2
+CHN,2026,regular,,Shanghai Port,Qingdao Hainiu,2,1
+CHN,2026,regular,,Shanghai Port,Qingdao West Coast,4,1
+CHN,2026,regular,,Shanghai Port,Shandong Taishan,0,1
+CHN,2026,regular,,Shanghai Port,Shanghai Shenhua,2,0
+CHN,2026,regular,,Shanghai Port,Shenzhen Peng City,1,1
+CHN,2026,regular,,Shanghai Port,Tianjin Jinmen Tiger,1,1
+CHN,2026,regular,,Shanghai Port,Wuhan Three Towns,4,0
+CHN,2026,regular,,Shanghai Port,Yunnan Yukun,2,1
+CHN,2026,regular,,Shanghai Port,Zhejiang,2,2
+CHN,2026,regular,,Shanghai Shenhua,Beijing Guoan,0,3
+CHN,2026,regular,,Shanghai Shenhua,Chengdu Rongcheng,2,3
+CHN,2026,regular,,Shanghai Shenhua,Chongqing Tonglianglong,2,2
+CHN,2026,regular,,Shanghai Shenhua,Dalian Yingbo,5,3
+CHN,2026,regular,,Shanghai Shenhua,Henan,4,1
+CHN,2026,regular,,Shanghai Shenhua,Liaoning Tieren,3,1
+CHN,2026,regular,,Shanghai Shenhua,Qingdao Hainiu,2,0
+CHN,2026,regular,,Shanghai Shenhua,Shandong Taishan,2,3
+CHN,2026,regular,,Shanghai Shenhua,Shanghai Port,1,0
+CHN,2026,regular,,Shanghai Shenhua,Shenzhen Peng City,1,2
+CHN,2026,regular,,Shanghai Shenhua,Tianjin Jinmen Tiger,0,2
+CHN,2026,regular,,Shanghai Shenhua,Wuhan Three Towns,2,2
+CHN,2026,regular,,Shanghai Shenhua,Zhejiang,3,2
+CHN,2026,regular,,Shenzhen Peng City,Beijing Guoan,0,1
+CHN,2026,regular,,Shenzhen Peng City,Chengdu Rongcheng,2,3
+CHN,2026,regular,,Shenzhen Peng City,Chongqing Tonglianglong,2,0
+CHN,2026,regular,,Shenzhen Peng City,Dalian Yingbo,1,1
+CHN,2026,regular,,Shenzhen Peng City,Liaoning Tieren,1,0
+CHN,2026,regular,,Shenzhen Peng City,Qingdao Hainiu,3,2
+CHN,2026,regular,,Shenzhen Peng City,Qingdao West Coast,3,0
+CHN,2026,regular,,Shenzhen Peng City,Shandong Taishan,1,2
+CHN,2026,regular,,Shenzhen Peng City,Shanghai Port,0,1
+CHN,2026,regular,,Shenzhen Peng City,Tianjin Jinmen Tiger,1,0
+CHN,2026,regular,,Shenzhen Peng City,Wuhan Three Towns,5,2
+CHN,2026,regular,,Shenzhen Peng City,Yunnan Yukun,3,4
+CHN,2026,regular,,Shenzhen Peng City,Zhejiang,1,1
+CHN,2026,regular,,Tianjin Jinmen Tiger,Beijing Guoan,2,4
+CHN,2026,regular,,Tianjin Jinmen Tiger,Chengdu Rongcheng,1,2
+CHN,2026,regular,,Tianjin Jinmen Tiger,Chongqing Tonglianglong,0,0
+CHN,2026,regular,,Tianjin Jinmen Tiger,Dalian Yingbo,1,0
+CHN,2026,regular,,Tianjin Jinmen Tiger,Henan,1,2
+CHN,2026,regular,,Tianjin Jinmen Tiger,Qingdao Hainiu,1,1
+CHN,2026,regular,,Tianjin Jinmen Tiger,Qingdao West Coast,1,1
+CHN,2026,regular,,Tianjin Jinmen Tiger,Shandong Taishan,1,2
+CHN,2026,regular,,Tianjin Jinmen Tiger,Shanghai Shenhua,2,3
+CHN,2026,regular,,Tianjin Jinmen Tiger,Shenzhen Peng City,3,0
+CHN,2026,regular,,Tianjin Jinmen Tiger,Wuhan Three Towns,2,2
+CHN,2026,regular,,Tianjin Jinmen Tiger,Yunnan Yukun,3,2
+CHN,2026,regular,,Wuhan Three Towns,Beijing Guoan,0,2
+CHN,2026,regular,,Wuhan Three Towns,Chengdu Rongcheng,0,1
+CHN,2026,regular,,Wuhan Three Towns,Chongqing Tonglianglong,1,0
+CHN,2026,regular,,Wuhan Three Towns,Dalian Yingbo,4,1
+CHN,2026,regular,,Wuhan Three Towns,Liaoning Tieren,2,2
+CHN,2026,regular,,Wuhan Three Towns,Qingdao Hainiu,1,3
+CHN,2026,regular,,Wuhan Three Towns,Qingdao West Coast,2,2
+CHN,2026,regular,,Wuhan Three Towns,Shanghai Port,2,3
+CHN,2026,regular,,Wuhan Three Towns,Shenzhen Peng City,2,0
+CHN,2026,regular,,Wuhan Three Towns,Tianjin Jinmen Tiger,0,0
+CHN,2026,regular,,Wuhan Three Towns,Yunnan Yukun,1,1
+CHN,2026,regular,,Wuhan Three Towns,Zhejiang,2,0
+CHN,2026,regular,,Yunnan Yukun,Beijing Guoan,3,3
+CHN,2026,regular,,Yunnan Yukun,Chengdu Rongcheng,1,0
+CHN,2026,regular,,Yunnan Yukun,Dalian Yingbo,3,1
+CHN,2026,regular,,Yunnan Yukun,Henan,2,1
+CHN,2026,regular,,Yunnan Yukun,Liaoning Tieren,5,0
+CHN,2026,regular,,Yunnan Yukun,Qingdao Hainiu,3,1
+CHN,2026,regular,,Yunnan Yukun,Qingdao West Coast,2,3
+CHN,2026,regular,,Yunnan Yukun,Shandong Taishan,4,0
+CHN,2026,regular,,Yunnan Yukun,Shanghai Port,2,2
+CHN,2026,regular,,Yunnan Yukun,Shanghai Shenhua,1,0
+CHN,2026,regular,,Yunnan Yukun,Shenzhen Peng City,4,3
+CHN,2026,regular,,Yunnan Yukun,Tianjin Jinmen Tiger,0,3
+CHN,2026,regular,,Yunnan Yukun,Zhejiang,1,2
+CHN,2026,regular,,Zhejiang,Beijing Guoan,0,0
+CHN,2026,regular,,Zhejiang,Chengdu Rongcheng,2,3
+CHN,2026,regular,,Zhejiang,Chongqing Tonglianglong,0,1
+CHN,2026,regular,,Zhejiang,Dalian Yingbo,3,2
+CHN,2026,regular,,Zhejiang,Liaoning Tieren,0,5
+CHN,2026,regular,,Zhejiang,Qingdao Hainiu,3,2
+CHN,2026,regular,,Zhejiang,Qingdao West Coast,2,0
+CHN,2026,regular,,Zhejiang,Shandong Taishan,4,1
+CHN,2026,regular,,Zhejiang,Shanghai Shenhua,1,1
+CHN,2026,regular,,Zhejiang,Shenzhen Peng City,2,1
+CHN,2026,regular,,Zhejiang,Tianjin Jinmen Tiger,1,1
+CHN,2026,regular,,Zhejiang,Yunnan Yukun,6,0

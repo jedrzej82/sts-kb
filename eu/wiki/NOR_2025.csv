@@ -1,0 +1,241 @@
+div,season,phase,date,home,away,fh,fa
+NOR,2025,regular,,Bodø/Glimt,Brann,3,0
+NOR,2025,regular,,Bodø/Glimt,Bryne,5,0
+NOR,2025,regular,,Bodø/Glimt,Fredrikstad,5,0
+NOR,2025,regular,,Bodø/Glimt,HamKam,3,0
+NOR,2025,regular,,Bodø/Glimt,Haugesund,2,0
+NOR,2025,regular,,Bodø/Glimt,KFUM Oslo,3,0
+NOR,2025,regular,,Bodø/Glimt,Kristiansund,7,1
+NOR,2025,regular,,Bodø/Glimt,Molde,4,1
+NOR,2025,regular,,Bodø/Glimt,Rosenborg,4,0
+NOR,2025,regular,,Bodø/Glimt,Sandefjord,2,0
+NOR,2025,regular,,Bodø/Glimt,Sarpsborg 08,1,2
+NOR,2025,regular,,Bodø/Glimt,Strømsgodset,1,0
+NOR,2025,regular,,Bodø/Glimt,Tromsø,1,1
+NOR,2025,regular,,Bodø/Glimt,Viking,2,4
+NOR,2025,regular,,Bodø/Glimt,Vålerenga,7,2
+NOR,2025,regular,,Brann,Bodø/Glimt,1,2
+NOR,2025,regular,,Brann,Bryne,3,2
+NOR,2025,regular,,Brann,Fredrikstad,1,0
+NOR,2025,regular,,Brann,HamKam,3,1
+NOR,2025,regular,,Brann,Haugesund,4,1
+NOR,2025,regular,,Brann,KFUM Oslo,1,1
+NOR,2025,regular,,Brann,Kristiansund,4,2
+NOR,2025,regular,,Brann,Molde,0,3
+NOR,2025,regular,,Brann,Rosenborg,0,0
+NOR,2025,regular,,Brann,Sandefjord,1,0
+NOR,2025,regular,,Brann,Sarpsborg 08,2,2
+NOR,2025,regular,,Brann,Strømsgodset,2,1
+NOR,2025,regular,,Brann,Tromsø,3,1
+NOR,2025,regular,,Brann,Viking,3,1
+NOR,2025,regular,,Brann,Vålerenga,3,2
+NOR,2025,regular,,Bryne,Bodø/Glimt,0,1
+NOR,2025,regular,,Bryne,Brann,2,1
+NOR,2025,regular,,Bryne,Fredrikstad,4,3
+NOR,2025,regular,,Bryne,HamKam,1,1
+NOR,2025,regular,,Bryne,Haugesund,3,1
+NOR,2025,regular,,Bryne,KFUM Oslo,0,0
+NOR,2025,regular,,Bryne,Kristiansund,2,0
+NOR,2025,regular,,Bryne,Molde,0,3
+NOR,2025,regular,,Bryne,Rosenborg,2,2
+NOR,2025,regular,,Bryne,Sandefjord,3,2
+NOR,2025,regular,,Bryne,Sarpsborg 08,0,3
+NOR,2025,regular,,Bryne,Strømsgodset,2,2
+NOR,2025,regular,,Bryne,Tromsø,0,2
+NOR,2025,regular,,Bryne,Viking,1,3
+NOR,2025,regular,,Bryne,Vålerenga,1,0
+NOR,2025,regular,,Fredrikstad,Bodø/Glimt,0,1
+NOR,2025,regular,,Fredrikstad,Brann,3,0
+NOR,2025,regular,,Fredrikstad,Bryne,1,1
+NOR,2025,regular,,Fredrikstad,HamKam,1,1
+NOR,2025,regular,,Fredrikstad,Haugesund,2,2
+NOR,2025,regular,,Fredrikstad,KFUM Oslo,1,0
+NOR,2025,regular,,Fredrikstad,Kristiansund,3,1
+NOR,2025,regular,,Fredrikstad,Molde,4,2
+NOR,2025,regular,,Fredrikstad,Rosenborg,0,2
+NOR,2025,regular,,Fredrikstad,Sandefjord,3,1
+NOR,2025,regular,,Fredrikstad,Sarpsborg 08,1,1
+NOR,2025,regular,,Fredrikstad,Strømsgodset,3,2
+NOR,2025,regular,,Fredrikstad,Tromsø,0,1
+NOR,2025,regular,,Fredrikstad,Viking,0,1
+NOR,2025,regular,,Fredrikstad,Vålerenga,2,0
+NOR,2025,regular,,HamKam,Bodø/Glimt,1,3
+NOR,2025,regular,,HamKam,Brann,1,1
+NOR,2025,regular,,HamKam,Bryne,1,0
+NOR,2025,regular,,HamKam,Fredrikstad,1,1
+NOR,2025,regular,,HamKam,Haugesund,5,0
+NOR,2025,regular,,HamKam,KFUM Oslo,0,0
+NOR,2025,regular,,HamKam,Kristiansund,2,1
+NOR,2025,regular,,HamKam,Molde,2,1
+NOR,2025,regular,,HamKam,Rosenborg,4,0
+NOR,2025,regular,,HamKam,Sandefjord,3,1
+NOR,2025,regular,,HamKam,Sarpsborg 08,1,3
+NOR,2025,regular,,HamKam,Strømsgodset,1,2
+NOR,2025,regular,,HamKam,Tromsø,1,3
+NOR,2025,regular,,HamKam,Viking,2,5
+NOR,2025,regular,,HamKam,Vålerenga,2,1
+NOR,2025,regular,,Haugesund,Bodø/Glimt,0,4
+NOR,2025,regular,,Haugesund,Brann,0,2
+NOR,2025,regular,,Haugesund,Bryne,1,4
+NOR,2025,regular,,Haugesund,Fredrikstad,0,0
+NOR,2025,regular,,Haugesund,HamKam,0,3
+NOR,2025,regular,,Haugesund,KFUM Oslo,0,2
+NOR,2025,regular,,Haugesund,Kristiansund,0,0
+NOR,2025,regular,,Haugesund,Molde,0,2
+NOR,2025,regular,,Haugesund,Rosenborg,0,3
+NOR,2025,regular,,Haugesund,Sandefjord,2,3
+NOR,2025,regular,,Haugesund,Sarpsborg 08,3,2
+NOR,2025,regular,,Haugesund,Strømsgodset,0,5
+NOR,2025,regular,,Haugesund,Tromsø,2,3
+NOR,2025,regular,,Haugesund,Viking,1,4
+NOR,2025,regular,,Haugesund,Vålerenga,2,3
+NOR,2025,regular,,KFUM Oslo,Bodø/Glimt,1,2
+NOR,2025,regular,,KFUM Oslo,Brann,2,0
+NOR,2025,regular,,KFUM Oslo,Bryne,1,1
+NOR,2025,regular,,KFUM Oslo,Fredrikstad,2,1
+NOR,2025,regular,,KFUM Oslo,HamKam,2,2
+NOR,2025,regular,,KFUM Oslo,Haugesund,1,4
+NOR,2025,regular,,KFUM Oslo,Kristiansund,1,1
+NOR,2025,regular,,KFUM Oslo,Molde,0,0
+NOR,2025,regular,,KFUM Oslo,Rosenborg,4,1
+NOR,2025,regular,,KFUM Oslo,Sandefjord,3,1
+NOR,2025,regular,,KFUM Oslo,Sarpsborg 08,1,3
+NOR,2025,regular,,KFUM Oslo,Strømsgodset,5,0
+NOR,2025,regular,,KFUM Oslo,Tromsø,1,3
+NOR,2025,regular,,KFUM Oslo,Viking,2,2
+NOR,2025,regular,,KFUM Oslo,Vålerenga,0,1
+NOR,2025,regular,,Kristiansund,Bodø/Glimt,1,1
+NOR,2025,regular,,Kristiansund,Brann,2,2
+NOR,2025,regular,,Kristiansund,Bryne,2,1
+NOR,2025,regular,,Kristiansund,Fredrikstad,0,1
+NOR,2025,regular,,Kristiansund,HamKam,1,3
+NOR,2025,regular,,Kristiansund,Haugesund,2,0
+NOR,2025,regular,,Kristiansund,KFUM Oslo,0,5
+NOR,2025,regular,,Kristiansund,Molde,2,1
+NOR,2025,regular,,Kristiansund,Rosenborg,4,1
+NOR,2025,regular,,Kristiansund,Sandefjord,2,2
+NOR,2025,regular,,Kristiansund,Sarpsborg 08,0,0
+NOR,2025,regular,,Kristiansund,Strømsgodset,2,1
+NOR,2025,regular,,Kristiansund,Tromsø,1,3
+NOR,2025,regular,,Kristiansund,Viking,0,1
+NOR,2025,regular,,Kristiansund,Vålerenga,0,2
+NOR,2025,regular,,Molde,Bodø/Glimt,2,2
+NOR,2025,regular,,Molde,Brann,4,0
+NOR,2025,regular,,Molde,Bryne,2,0
+NOR,2025,regular,,Molde,Fredrikstad,1,2
+NOR,2025,regular,,Molde,HamKam,1,0
+NOR,2025,regular,,Molde,Haugesund,2,1
+NOR,2025,regular,,Molde,KFUM Oslo,2,3
+NOR,2025,regular,,Molde,Kristiansund,0,1
+NOR,2025,regular,,Molde,Rosenborg,4,2
+NOR,2025,regular,,Molde,Sandefjord,1,3
+NOR,2025,regular,,Molde,Sarpsborg 08,0,2
+NOR,2025,regular,,Molde,Strømsgodset,4,1
+NOR,2025,regular,,Molde,Tromsø,2,0
+NOR,2025,regular,,Molde,Viking,0,1
+NOR,2025,regular,,Molde,Vålerenga,4,1
+NOR,2025,regular,,Rosenborg,Bodø/Glimt,1,1
+NOR,2025,regular,,Rosenborg,Brann,2,3
+NOR,2025,regular,,Rosenborg,Bryne,3,0
+NOR,2025,regular,,Rosenborg,Fredrikstad,1,0
+NOR,2025,regular,,Rosenborg,HamKam,2,0
+NOR,2025,regular,,Rosenborg,Haugesund,1,0
+NOR,2025,regular,,Rosenborg,KFUM Oslo,1,1
+NOR,2025,regular,,Rosenborg,Kristiansund,1,1
+NOR,2025,regular,,Rosenborg,Molde,0,0
+NOR,2025,regular,,Rosenborg,Sandefjord,1,1
+NOR,2025,regular,,Rosenborg,Sarpsborg 08,2,3
+NOR,2025,regular,,Rosenborg,Strømsgodset,6,0
+NOR,2025,regular,,Rosenborg,Tromsø,4,1
+NOR,2025,regular,,Rosenborg,Viking,1,1
+NOR,2025,regular,,Rosenborg,Vålerenga,1,0
+NOR,2025,regular,,Sandefjord,Bodø/Glimt,1,2
+NOR,2025,regular,,Sandefjord,Brann,0,3
+NOR,2025,regular,,Sandefjord,Bryne,1,0
+NOR,2025,regular,,Sandefjord,Fredrikstad,0,0
+NOR,2025,regular,,Sandefjord,HamKam,2,0
+NOR,2025,regular,,Sandefjord,Haugesund,4,0
+NOR,2025,regular,,Sandefjord,KFUM Oslo,2,0
+NOR,2025,regular,,Sandefjord,Kristiansund,6,0
+NOR,2025,regular,,Sandefjord,Molde,3,0
+NOR,2025,regular,,Sandefjord,Rosenborg,2,0
+NOR,2025,regular,,Sandefjord,Sarpsborg 08,3,2
+NOR,2025,regular,,Sandefjord,Strømsgodset,3,2
+NOR,2025,regular,,Sandefjord,Tromsø,1,0
+NOR,2025,regular,,Sandefjord,Viking,1,2
+NOR,2025,regular,,Sandefjord,Vålerenga,2,1
+NOR,2025,regular,,Sarpsborg 08,Bodø/Glimt,2,5
+NOR,2025,regular,,Sarpsborg 08,Brann,1,4
+NOR,2025,regular,,Sarpsborg 08,Bryne,1,1
+NOR,2025,regular,,Sarpsborg 08,Fredrikstad,0,2
+NOR,2025,regular,,Sarpsborg 08,HamKam,4,0
+NOR,2025,regular,,Sarpsborg 08,Haugesund,3,1
+NOR,2025,regular,,Sarpsborg 08,KFUM Oslo,2,1
+NOR,2025,regular,,Sarpsborg 08,Kristiansund,0,1
+NOR,2025,regular,,Sarpsborg 08,Molde,1,0
+NOR,2025,regular,,Sarpsborg 08,Rosenborg,2,2
+NOR,2025,regular,,Sarpsborg 08,Sandefjord,2,1
+NOR,2025,regular,,Sarpsborg 08,Strømsgodset,2,3
+NOR,2025,regular,,Sarpsborg 08,Tromsø,0,1
+NOR,2025,regular,,Sarpsborg 08,Viking,3,3
+NOR,2025,regular,,Sarpsborg 08,Vålerenga,1,1
+NOR,2025,regular,,Strømsgodset,Bodø/Glimt,0,5
+NOR,2025,regular,,Strømsgodset,Brann,1,2
+NOR,2025,regular,,Strømsgodset,Bryne,0,2
+NOR,2025,regular,,Strømsgodset,Fredrikstad,0,3
+NOR,2025,regular,,Strømsgodset,HamKam,0,3
+NOR,2025,regular,,Strømsgodset,Haugesund,2,0
+NOR,2025,regular,,Strømsgodset,KFUM Oslo,1,1
+NOR,2025,regular,,Strømsgodset,Kristiansund,1,2
+NOR,2025,regular,,Strømsgodset,Molde,3,1
+NOR,2025,regular,,Strømsgodset,Rosenborg,1,2
+NOR,2025,regular,,Strømsgodset,Sandefjord,2,6
+NOR,2025,regular,,Strømsgodset,Sarpsborg 08,2,1
+NOR,2025,regular,,Strømsgodset,Tromsø,2,3
+NOR,2025,regular,,Strømsgodset,Viking,1,2
+NOR,2025,regular,,Strømsgodset,Vålerenga,0,2
+NOR,2025,regular,,Tromsø,Bodø/Glimt,2,1
+NOR,2025,regular,,Tromsø,Brann,1,2
+NOR,2025,regular,,Tromsø,Bryne,3,1
+NOR,2025,regular,,Tromsø,Fredrikstad,0,0
+NOR,2025,regular,,Tromsø,HamKam,1,0
+NOR,2025,regular,,Tromsø,Haugesund,1,0
+NOR,2025,regular,,Tromsø,KFUM Oslo,2,0
+NOR,2025,regular,,Tromsø,Kristiansund,2,3
+NOR,2025,regular,,Tromsø,Molde,1,0
+NOR,2025,regular,,Tromsø,Rosenborg,1,0
+NOR,2025,regular,,Tromsø,Sandefjord,0,1
+NOR,2025,regular,,Tromsø,Sarpsborg 08,4,0
+NOR,2025,regular,,Tromsø,Strømsgodset,3,1
+NOR,2025,regular,,Tromsø,Viking,1,3
+NOR,2025,regular,,Tromsø,Vålerenga,2,1
+NOR,2025,regular,,Viking,Bodø/Glimt,2,4
+NOR,2025,regular,,Viking,Brann,3,0
+NOR,2025,regular,,Viking,Bryne,5,1
+NOR,2025,regular,,Viking,Fredrikstad,3,0
+NOR,2025,regular,,Viking,HamKam,3,0
+NOR,2025,regular,,Viking,Haugesund,5,1
+NOR,2025,regular,,Viking,KFUM Oslo,3,1
+NOR,2025,regular,,Viking,Kristiansund,3,1
+NOR,2025,regular,,Viking,Molde,1,0
+NOR,2025,regular,,Viking,Rosenborg,2,1
+NOR,2025,regular,,Viking,Sandefjord,3,1
+NOR,2025,regular,,Viking,Sarpsborg 08,0,0
+NOR,2025,regular,,Viking,Strømsgodset,1,0
+NOR,2025,regular,,Viking,Tromsø,4,4
+NOR,2025,regular,,Viking,Vålerenga,5,1
+NOR,2025,regular,,Vålerenga,Bodø/Glimt,3,1
+NOR,2025,regular,,Vålerenga,Brann,2,4
+NOR,2025,regular,,Vålerenga,Bryne,3,2
+NOR,2025,regular,,Vålerenga,Fredrikstad,1,1
+NOR,2025,regular,,Vålerenga,HamKam,1,1
+NOR,2025,regular,,Vålerenga,Haugesund,3,0
+NOR,2025,regular,,Vålerenga,KFUM Oslo,1,1
+NOR,2025,regular,,Vålerenga,Kristiansund,3,0
+NOR,2025,regular,,Vålerenga,Molde,2,3
+NOR,2025,regular,,Vålerenga,Rosenborg,0,2
+NOR,2025,regular,,Vålerenga,Sandefjord,2,1
+NOR,2025,regular,,Vålerenga,Sarpsborg 08,4,0
+NOR,2025,regular,,Vålerenga,Strømsgodset,2,1
+NOR,2025,regular,,Vålerenga,Tromsø,1,0
+NOR,2025,regular,,Vålerenga,Viking,3,1
