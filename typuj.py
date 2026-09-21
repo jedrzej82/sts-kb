@@ -36,16 +36,44 @@ ALIASES = {'lech': 'Lech Poznan', 'lechpoznan': 'Lech Poznan', 'legiawarszawa': 
            'nottinghamforest': "Nott'm Forest", 'newcastleunited': 'Newcastle', 'tottenhamhotspur': 'Tottenham'}
 
 
+REZERWY = re.compile(r'(^|[\s.\-])(ii|2|b|c|iii|3|u\s?1[6-9]|u\s?2[0-3]|jun|junior|res|reserve|reserves|'
+                     r'young|academy|akademia|w|women|kobiety|damen|femenino|fem)([\s.\-]|$)', re.I)
+
+
+def _rezerwa(zrodlo, kandydat):
+    """Blokuje "Inter Milan" -> "Inter Milan U23" i pierwsza druzyne -> zespol kobiecy/mlodziezowy."""
+    return bool(REZERWY.search(' ' + str(kandydat) + ' ')) and not REZERWY.search(' ' + str(zrodlo) + ' ')
+
+
 def resolve(name, pool):
+    """Zwraca nazwe z bazy albo None. None jest POPRAWNYM wynikiem — wolacz ma sie wtedy zatrzymac.
+    21.09.2026: naprawiony blad, przez ktory zwracalo ZAWSZE cos, takze dla nieznanych druzyn.
+    Przyczyna: w bazie jest druzyna "Pyx" zapisana cyrylica; norm() usuwa znaki spoza ASCII,
+    wiec jej klucz byl PUSTYM ciagiem, a pusty ciag zawiera sie w kazdym napisie ("kk in k").
+    Stawala sie przez to uniwersalnym jokerem: "Redditch United", "RC Warwick" i
+    "Virtus Ciserano Bergamo" dostawaly jej statystyki i pelna, wiarygodnie wygladajaca tabele P.
+    Dlatego ponizej odrzucamy z puli wszystkie nazwy, ktore po normalizacji sa puste."""
     k = norm(name)
+    if not k: return None
     if k in ALIASES and ALIASES[k] in pool: return ALIASES[k]
-    by = {norm(p): p for p in pool}
+    by = {norm(p): p for p in pool if norm(p) and not _rezerwa(name, p)}   # <-- bez tego filtra wraca blad z 21.09
     if k in by: return by[k]
-    c = [p for kk, p in by.items() if k and (k in kk or kk in k)]
+    c = [p for kk, p in by.items() if k in kk or kk in k]
     if len(c) == 1: return c[0]
-    if c: return min(c, key=lambda p: abs(len(norm(p)) - len(k)))
-    m = difflib.get_close_matches(k, list(by), n=1, cutoff=0.55)
-    return by[m[0]] if m else None
+    if c:
+        # "Chievo Verona" zawiera i "Chievo", i "Verona" — dawny wybor po dlugosci dawal Verone
+        # z Serie A. Pierwszy czlon nazwy jest niemal zawsze wlasciwym klubem, wiec ma pierwszenstwo.
+        pref = [p for p in c if k.startswith(norm(p)) or norm(p).startswith(k)]
+        if len(pref) == 1: return pref[0]
+        if pref: return max(pref, key=lambda p: len(norm(p)))
+        return min(c, key=lambda p: abs(len(norm(p)) - len(k)))
+    # prog 0.55 byl za luzny: "RC Warwick" trafialo na "RKC Waalwijk", a "Virtus Ciserano Bergamo"
+    # na "Virtus Lanciano". Lepiej zwrocic None i zatrzymac analize, niz policzyc nie ten mecz.
+    m = difflib.get_close_matches(k, list(by), n=1, cutoff=0.80)
+    if m:
+        print(f'  UWAGA: "{name}" dopasowane ROZMYTO do "{by[m[0]]}" — upewnij sie, ze to ta sama druzyna.')
+        return by[m[0]]
+    return None
 
 
 def cached(key, fn):
