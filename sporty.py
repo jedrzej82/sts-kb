@@ -60,6 +60,30 @@ K = 24
 def norm(s): return re.sub(r'[^a-z0-9]', '', unicodedata.normalize('NFKD', str(s)).encode('ascii', 'ignore').decode().lower())
 
 
+def scal_warianty(d, cicho=False):
+    """Ta sama druzyna zapisana na dwa sposoby to w bazie DWIE rozne druzyny: kazda z czescia meczow
+    i wlasnym Elo, a resolve() trafia w losowa z nich (slownik {norm: nazwa} zostawia ostatnia).
+    Zmierzone 21.09.2026 na trzech miesiacach danych: 15 takich grup w sportach (804 wystapienia
+    druzyn w meczach) i 11 w pilce — m.in. "China (W)"/"China W", "Cuba"/"CUBA",
+    "Havlickuv Brod"/"Havlíčkův Brod". Sprowadzamy warianty do najczestszej pisowni W OBREBIE SPORTU."""
+    if not len(d): return d
+    par = pd.concat([d[['sport', c]].rename(columns={c: 'n'}) for c in ('gosp', 'gosc')], ignore_index=True)
+    par['k'] = par.n.map(norm); par = par[par.k != '']
+    cnt = par.groupby(['sport', 'k', 'n']).size().rename('ile').reset_index()
+    wiele = cnt.groupby(['sport', 'k']).n.transform('size') > 1
+    if not wiele.any(): return d
+    cnt = cnt[wiele].sort_values('ile', kind='stable')
+    kanon = cnt.groupby(['sport', 'k']).n.last()          # najczestsza pisownia wygrywa
+    zm = {(r.sport, r.n): kanon[(r.sport, r.k)] for r in cnt.itertuples() if r.n != kanon[(r.sport, r.k)]}
+    if zm:
+        if not cicho:
+            prz = ', '.join(f'{a[1]!r}->{b!r}' for a, b in list(zm.items())[:3])
+            print(f'  scalono warianty pisowni nazw: {len(zm)} (np. {prz})')
+        for c in ('gosp', 'gosc'):
+            d[c] = [zm.get((sp, n), n) for sp, n in zip(d.sport, d[c])]
+    return d
+
+
 def load():
     cols = ['data', 'sport', 'liga', 'gosp', 'gosc', 'pg', 'pa', 'dogrywka']
     h = pd.read_csv(HIST) if os.path.exists(HIST) else pd.DataFrame(columns=cols)
@@ -71,6 +95,7 @@ def load():
     d = pd.concat([h, x], ignore_index=True); d['data'] = pd.to_datetime(d.data)
     for liga, m in (('NFL', NFL), ('MLB', MLB)):
         i = d.liga == liga; d.loc[i, 'gosp'] = d.loc[i, 'gosp'].replace(m); d.loc[i, 'gosc'] = d.loc[i, 'gosc'].replace(m)
+    d = scal_warianty(d)
     return d.sort_values('data', kind='stable')
 
 
@@ -89,13 +114,21 @@ def _tok_seed(s):
     return [x for x in t if x not in SEED_POMIN and len(x) > 1]
 
 
-REZERWY = re.compile(r'(^|[\s.\-])(b|ii|2|c|iii|3|u\s?1[6-9]|u\s?2[0-3]|jun|junior|juniors|res|reserve|reserves|'
-                     r'young|academy|akademia|w|women|kobiety|damen|femenino|feminin|fem)([\s.\-]|$)', re.I)
+# Znacznik rezerw/mlodziezy/kobiet jako OSOBNY czlon nazwy. Liczymy je po obu stronach i blokujemy
+# dopasowanie tylko wtedy, gdy kandydat ma ich WIECEJ niz zrodlo. Samo "czy kandydat zawiera znacznik"
+# nie wystarczalo: "Boca Juniors" i "Young Boys" to pierwsze zespoly, a zawieraja "juniors" i "young",
+# przez co ochrona sie dla nich wylaczala i "Boca Juniors" lapalo sie na "Boca Juniors Sub-20".
+_ZNACZNIK = re.compile(r'^(b|ii|iii|2|3|c|u-?1[6-9]|u-?2[0-3]|sub-?2[0-3]|jun|juniors?|res|reserves?|'
+                       r'young|youth|yth|academy|akademia|w|women|kobiety|damen|femenino|feminin|fem)\.?$', re.I)
+
+
+def _znaczniki(s):
+    return sum(1 for t in re.split(r'[\s]+', str(s).strip()) if _ZNACZNIK.match(t))
 
 
 def _rezerwa_a_nie_pierwsza(zrodlo, kandydat):
-    """Blokuje 'Lvi Praha' -> 'Lvi Praha B' i pierwsza druzyne -> zespol kobiecy/mlodziezowy."""
-    return bool(REZERWY.search(' ' + str(kandydat) + ' ')) and not REZERWY.search(' ' + str(zrodlo) + ' ')
+    """Blokuje "Lvi Praha" -> "Lvi Praha B" i pierwsza druzyne -> zespol kobiecy/mlodziezowy."""
+    return _znaczniki(kandydat) > _znaczniki(zrodlo)
 
 
 def dopasuj_seed(nazwa, pula):
@@ -171,13 +204,41 @@ def elo(d, sport, pre=None, info=None):
     return R, N, hfa, draws, (draw_n + 50 * pr) / (tot + 50)
 
 
+def _zaw_nazwy(a, b):
+    """Zawieranie jednej nazwy w drugiej, ale tylko gdy to naprawde ta sama druzyna.
+    Bez progow "USC" zawiera sie w "virtUSCiseranobergamo", a "Nova" w "CucineLubeCivitaNOVA".
+    Wymagamy wiec >=5 znakow i by krotszy stanowil >=45% dluzszego — tak samo jak w dopasuj_seed()."""
+    if len(a) < 5 or len(b) < 5: return False
+    if min(len(a), len(b)) / max(len(a), len(b)) < 0.45: return False
+    return a in b or b in a
+
+
 def resolve(name, pool):
-    k_ = norm(name); by = {norm(p): p for p in pool}
+    """Zwraca nazwe z bazy albo None. None JEST POPRAWNYM WYNIKIEM — wolacz ma sie wtedy zatrzymac.
+    21.09.2026: naprawiona ta sama usterka, ktora wykryto w typuj.py. Nazwa zapisana cyrylica
+    (np. "Pyx") po norm() daje PUSTY klucz, a pusty ciag zawiera sie w kazdym napisie, wiec
+    warunek "kk in k_" byl dla niej zawsze prawdziwy. Taka nazwa stawala sie uniwersalnym jokerem:
+    kazda nieznana druzyna z oferty dostawala jej Elo i pelna, wiarygodnie wygladajaca tabele P.
+    Dawny warunek "k_ and (...)" chronil tylko przed pustym ZRODLEM, nie przed pustym wpisem w PULI.
+    Sprawdzone na 7000 nazw: po wstrzykknieciu jednej nazwy cyrylica 5 z 6 nieznanych nazw
+    dostawalo dopasowanie. Dlatego ponizej odrzucamy z puli wszystkie klucze puste."""
+    k_ = norm(name)
+    if not k_: return None
+    by = {norm(p): p for p in pool if norm(p) and not _rezerwa_a_nie_pierwsza(name, p)}
     if k_ in by: return by[k_]
-    c = [p for kk, p in by.items() if k_ and (k_ in kk or kk in k_)]
+    c = [p for kk, p in by.items() if _zaw_nazwy(k_, kk)]
     if len(c) == 1: return c[0]
-    m = difflib.get_close_matches(k_, list(by), n=1, cutoff=0.7)
-    return by[m[0]] if m else None
+    if c:   # pierwszy czlon nazwy jest niemal zawsze wlasciwym klubem
+        pref = [p for p in c if k_.startswith(norm(p)) or norm(p).startswith(k_)]
+        if len(pref) == 1: return pref[0]
+        if pref: return max(pref, key=lambda p: len(norm(p)))
+        return min(c, key=lambda p: abs(len(norm(p)) - len(k_)))
+    # prog 0.7 byl za luzny i milczacy; 0.80 jak w typuj.py, z ostrzezeniem dla czlowieka
+    m = difflib.get_close_matches(k_, list(by), n=1, cutoff=0.80)
+    if m:
+        print(f'  UWAGA: "{name}" dopasowane ROZMYTO do "{by[m[0]]}" — upewnij sie, ze to ta sama druzyna.')
+        return by[m[0]]
+    return None
 
 
 def calibrate(sport, p):
@@ -245,7 +306,17 @@ def main(a):
             t = pd.read_csv(TAB); print('\nTabele lig (siła startowa):'); print(t.groupby(['sport', 'liga']).agg(druzyn=('druzyna', 'size'), sezon=('sezon', 'max')).to_string())
     elif a[0] == 'typuj':
         sport = a[1].lower(); d = load(); inf = {}; R, N, hfa, draws, pdraw = elo(d, sport, info=inf); L_ = inf['last']
-        pool = set(R); h, g = resolve(a[2], pool) or a[2], resolve(a[3], pool) or a[3]
+        pool = set(R); h, g = resolve(a[2], pool), resolve(a[3], pool)
+        # 21.09.2026 (POPRAWKA 11): dawniej bylo "resolve(...) or a[2]" — przy nieznanej nazwie
+        # skrypt podstawial surowa nazwe z oferty, nadawal jej domyslne Elo 1500 i mimo ostrzezenia
+        # DRUKOWAL PELNA TABELE P. To ten sam typ usterki co joker w resolve(): zamiast bledu
+        # czlowiek dostawal wiarygodnie wygladajace liczby dla druzyny, ktorej nie ma w bazie.
+        brak = [n for n, r in ((a[2], h), (a[3], g)) if r is None]
+        if brak:
+            sys.exit(f'BRAK W BAZIE: {", ".join(repr(x) for x in brak)} — analiza przerwana.\n'
+                     f'Sprawdz nazwe: python3 sporty.py druzyny {sport} FRAGMENT\n'
+                     f'Brak dopasowania jest poprawnym wynikiem — to noga MNIEJ na kuponie, '
+                     f'a nie noga policzona z cudzych danych.')
         n = min(N.get(h, 0), N.get(g, 0))
         hf = 0 if '--neutral' in a else hfa
         today = pd.Timestamp.today().normalize()
@@ -255,7 +326,6 @@ def main(a):
         print(f'{sport}: {h} (Elo {R.get(h, 1500):.0f}, {N.get(h, 0)} m.) – {g} (Elo {R.get(g, 1500):.0f}, {N.get(g, 0)} m.)')
         for t in (h, g):
             if t in inf['seeded']: print(f'  {t}: siła startowa z tabeli ligi {inf["seeded"][t]} (+ wyniki dopisane później)')
-            if t not in R: print(f'  UWAGA: {t} — brak w bazie (sprawdź nazwę: python3 sporty.py druzyny {sport} FRAGMENT)')
         ec, note = calibrate(sport, e)
         prm = (__import__('json').load(open(PARAM)) if os.path.exists(PARAM) else {}).get(sport)
         if prm and not draws:

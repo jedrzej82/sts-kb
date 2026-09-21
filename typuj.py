@@ -36,13 +36,31 @@ ALIASES = {'lech': 'Lech Poznan', 'lechpoznan': 'Lech Poznan', 'legiawarszawa': 
            'nottinghamforest': "Nott'm Forest", 'newcastleunited': 'Newcastle', 'tottenhamhotspur': 'Tottenham'}
 
 
-REZERWY = re.compile(r'(^|[\s.\-])(ii|2|b|c|iii|3|u\s?1[6-9]|u\s?2[0-3]|jun|junior|res|reserve|reserves|'
-                     r'young|academy|akademia|w|women|kobiety|damen|femenino|fem)([\s.\-]|$)', re.I)
+# Znacznik rezerw/mlodziezy/kobiet jako OSOBNY czlon nazwy. Liczymy je po obu stronach i blokujemy
+# dopasowanie tylko wtedy, gdy kandydat ma ich WIECEJ niz zrodlo. Samo "czy kandydat zawiera znacznik"
+# nie wystarczalo: "Boca Juniors" i "Young Boys" to pierwsze zespoly, a zawieraja "juniors" i "young",
+# przez co ochrona sie dla nich wylaczala i "Boca Juniors" lapalo sie na "Boca Juniors Sub-20".
+_ZNACZNIK = re.compile(r'^(b|ii|iii|2|3|c|u-?1[6-9]|u-?2[0-3]|sub-?2[0-3]|jun|juniors?|res|reserves?|'
+                       r'young|youth|yth|academy|akademia|w|women|kobiety|damen|femenino|feminin|fem)\.?$', re.I)
+
+
+def _znaczniki(s):
+    return sum(1 for t in re.split(r'[\s]+', str(s).strip()) if _ZNACZNIK.match(t))
 
 
 def _rezerwa(zrodlo, kandydat):
     """Blokuje "Inter Milan" -> "Inter Milan U23" i pierwsza druzyne -> zespol kobiecy/mlodziezowy."""
-    return bool(REZERWY.search(' ' + str(kandydat) + ' ')) and not REZERWY.search(' ' + str(zrodlo) + ' ')
+    return _znaczniki(kandydat) > _znaczniki(zrodlo)
+
+
+def _zaw_nazwy(a, b):
+    """Zawieranie jednej nazwy w drugiej, ale tylko gdy to naprawde ta sama druzyna.
+    21.09.2026: samo "a in b" bralo tez przypadkowe podciagi — "USC" zawiera sie
+    w "virtUSCiseranobergamo", a "Nova" w "CucineLubeCivitaNOVA". Wymagamy >=5 znakow
+    i by krotsza nazwa stanowila >=45% dluzszej."""
+    if len(a) < 5 or len(b) < 5: return False
+    if min(len(a), len(b)) / max(len(a), len(b)) < 0.45: return False
+    return a in b or b in a
 
 
 def resolve(name, pool):
@@ -58,7 +76,7 @@ def resolve(name, pool):
     if k in ALIASES and ALIASES[k] in pool: return ALIASES[k]
     by = {norm(p): p for p in pool if norm(p) and not _rezerwa(name, p)}   # <-- bez tego filtra wraca blad z 21.09
     if k in by: return by[k]
-    c = [p for kk, p in by.items() if k in kk or kk in k]
+    c = [p for kk, p in by.items() if _zaw_nazwy(k, kk)]
     if len(c) == 1: return c[0]
     if c:
         # "Chievo Verona" zawiera i "Chievo", i "Verona" — dawny wybor po dlugosci dawal Verone

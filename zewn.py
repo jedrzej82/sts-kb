@@ -170,7 +170,10 @@ def _nawierzchnie():
         th = pd.read_csv(os.path.join(HERE, 'tenis_hist.csv'), usecols=['tourney_name', 'nawierzchnia'], low_memory=False).dropna()
         th['m'] = th.tourney_name.map(lambda t: _n(re.sub(r'\b(open|challenger|cup|ii|2|125k?|wta|atp|itf)\b', ' ', str(t))).strip())
         znane = th.groupby('m').nawierzchnia.agg(lambda x: x.value_counts().index[0]).replace({'Carpet': 'Hard'}).to_dict()
-    except Exception: pass
+    except Exception as e:
+        # bylo "pass": gdy tenis_hist.csv nie wczytal sie, WSZYSTKIE nawierzchnie stawaly sie nieznane
+        # i model tenisowy liczyl dalej bez slowa — cichy spadek jakosci zamiast bledu
+        print(f'UWAGA: nawierzchnie z tenis_hist.csv nie wczytane ({e}) — zostaja tylko turnieje z list ZIEMNE/TRAWIASTE.')
     for w in ZIEMNE: znane.setdefault(w.rstrip('?'), 'Clay')
     znane['sao paulo'] = 'Hard'   # WTA 250 São Paulo (wrzesień) — twarda
     for w in TRAWIASTE: znane.setdefault(w, 'Grass')
@@ -220,7 +223,9 @@ def tenis(max_tcl=None):
             c = idx.get((_n(m.group(1)), m.group(2).lower()))
             return next(iter(c)) if c and len(c) == 1 else n
         s = s.assign(gosp=s.gosp.map(pelne), gosc=s.gosc.map(pelne))
-    except Exception: pass
+    except Exception as e:
+        # bylo "pass": nazwiska zostawaly w formie skroconej "Nowak J.", co psuje pozniejsze dopasowanie
+        print(f'UWAGA: rozwijanie skroconych nazwisk tenisistow nie powiodlo sie ({e}) — zostaja skroty.')
     w1 = s.zwyciezca == '1'
     def wynik(a, b, first, n=None):
         A = [x for x in str(a).split(';') if x != '']; B = [x for x in str(b).split(';') if x != '']

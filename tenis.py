@@ -67,18 +67,56 @@ def norm(s): return re.sub(r'[^a-z]', '', unicodedata.normalize('NFKD', s).encod
 NCOUNT = {}
 
 
-def resolve(name, players):
-    k_ = norm(name); by = {norm(p): p for p in players}
+def _resolve1(name, players):
+    k_ = norm(name)
+    if not k_: return None
+    by = {norm(p): p for p in players if norm(p)}
     if k_ in by: return by[k_]
-    parts = name.replace('.', ' ').split(); sur = norm(parts[-1]) if parts else k_
-    c = [p for p in players if norm(p.split()[-1]) == sur]
+    parts = [x for x in str(name).replace('.', ' ').split() if x]
+    sur = norm(parts[-1]) if parts else k_
+    if not sur: return None
+    c = [p for p in players if p.split() and norm(p.split()[-1]) == sur]
     if len(c) == 1: return c[0]
-    if c and len(parts) == 1: return max(c, key=lambda p: NCOUNT.get(p, 0))
+    if c and len(parts) == 1:
+        # kilku zawodnikow o tym nazwisku, a w ofercie samo nazwisko — wybor po liczbie meczow
+        # jest ZGADYWANIEM, wiec musi byc widoczny dla czlowieka
+        w = max(c, key=lambda p: NCOUNT.get(p, 0))
+        print(f'  UWAGA: "{name}" to samo nazwisko, w bazie {len(c)} zawodnikow '
+              f'({", ".join(sorted(c)[:4])}) — wybrano najczesciej grajacego: "{w}". Sprawdz, czy to ten.')
+        return w
     if c and len(parts) > 1:
-        c2 = [p for p in c if norm(p)[0] == norm(parts[0])[0]]
-        if c2: return c2[0]
+        ini = norm(parts[0])[:1]
+        c2 = [p for p in c if ini and norm(p)[:1] == ini]
+        if len(c2) == 1: return c2[0]
+        if c2:
+            print(f'  UWAGA: "{name}" pasuje do {len(c2)} zawodnikow ({", ".join(sorted(c2)[:4])}) — '
+                  f'nie dopasowano. Podaj pelne imie i nazwisko.')
+            return None
     m = difflib.get_close_matches(k_, list(by), n=1, cutoff=0.8)
-    return by[m[0]] if m else None
+    if m:
+        print(f'  UWAGA: "{name}" dopasowane ROZMYTO do "{by[m[0]]}" — upewnij sie, ze to ten zawodnik.')
+        return by[m[0]]
+    return None
+
+
+def resolve(name, players):
+    """Zwraca nazwe z bazy albo None. None JEST POPRAWNYM WYNIKIEM — wolacz ma sie zatrzymac.
+    21.09.2026 (POPRAWKA 11.4): STS podaje zawodnikow jako "Nazwisko Imie", a baza ma
+    "Imie Nazwisko". W przebiegu 19:30 wszystkie cztery mecze tenisa zwrocily "Brak zawodnika
+    w bazie" wlasnie z tego powodu. Dlatego przy braku trafienia probujemy tez odwroconej
+    kolejnosci czlonow. Dolozone tez ostrzezenia tam, gdzie kod wczesniej po cichu zgadywal."""
+    r = _resolve1(name, players)
+    if r: return r
+    czl = [x for x in str(name).replace('.', ' ').split() if x]
+    if len(czl) > 1:
+        for war in ([czl[-1]] + czl[:-1], list(reversed(czl))):   # "Mensik Jakub" -> "Jakub Mensik"
+            alt = ' '.join(war)
+            if norm(alt) == norm(name): continue
+            r = _resolve1(alt, players)
+            if r:
+                print(f'  UWAGA: "{name}" dopasowane po ODWROCENIU imienia i nazwiska -> "{r}".')
+                return r
+    return None
 
 
 def state():

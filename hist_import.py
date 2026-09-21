@@ -241,7 +241,9 @@ def rugby():
     for f in sorted(glob.glob(os.path.join(RAW, 'rugby/json/*.json'))):
         comp = _re.sub(r'-\d{4}(-\d{4})?$', '', os.path.basename(f)[:-5])
         try: j = json.load(open(f))
-        except Exception: continue
+        except Exception as e:
+            # bylo "continue": uszkodzony plik znikal po cichu, wiec liga po prostu miala mniej meczow
+            print(f'UWAGA: pominieto nieczytelny plik rugby {os.path.basename(f)} ({e})'); continue
         for m in j if isinstance(j, list) else []:
             h, a = m.get('home', {}), m.get('away', {})
             if h.get('score') is None or a.get('score') is None or not m.get('date'): continue
