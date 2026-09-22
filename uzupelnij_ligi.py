@@ -352,12 +352,6 @@ def main():
         grupy = []
     else:
         grupy = list(w.groupby(['Division', 'season']))
-    # Rezerwacje terminow musza byc WSPOLNE dla calego przebiegu, nie osobne dla kazdego
-    # sezonu. 22.09.2026: okna sezonow zachodza na siebie, wiec mecze dopisane przy
-    # sezonie A byly niewidoczne przy ukladaniu sezonu B — i klub dostawal dwa mecze
-    # tego samego dnia mimo zabezpieczenia. Tak powstalo np. "Inter Turku 1:0 KuPS"
-    # i "KuPS 1:1 Inter Turku" z ta sama data: to dwie rundy, obie wrzucone na 31.08.
-    zajete_globalnie = set()
     for (div, s), g in grupy:
         lo, hi = season_range(s)
         lo = pd.Timestamp(WIKI_START.get((div, s), lo)); hi = pd.Timestamp(WIKI_END.get((div, s), hi))
@@ -389,11 +383,11 @@ def main():
         # spelnia oczywista regule terminarza, jest BLIZEJ prawdy niz wariant, ktory
         # jej lamie. Zajete dni zaczytujemy tez z meczow, ktore juz maja prawdziwa date,
         # zeby dopisane nie wpadaly na nie.
-        zajete = zajete_globalnie
+        zajete = set()
         for _df in (dd, kbs):
             for _h, _a, _d in zip(_df.HomeTeam, _df.AwayTeam, _df.MatchDate):
                 _d = pd.Timestamp(_d).normalize()
-                zajete.add((div, norm(_h), _d)); zajete.add((div, norm(_a), _d))
+                zajete.add((norm(_h), _d)); zajete.add((norm(_a), _d))
 
         koniec = max(hi, start)
         dni = list(pd.date_range(start, koniec).normalize()) or [start]
@@ -402,12 +396,12 @@ def main():
             kh, ka = norm(r.HomeTeam), norm(r.AwayTeam)
             wybrany = None
             for d in dni:
-                if (div, kh, d) not in zajete and (div, ka, d) not in zajete:
+                if (kh, d) not in zajete and (ka, d) not in zajete:
                     wybrany = d; break
             if wybrany is None:                      # okno wyczerpane — dokladamy dni na koncu
                 wybrany = dni[-1] + pd.Timedelta(days=1)
                 dni.append(wybrany); rozszerzono = True
-            zajete.add((div, kh, wybrany)); zajete.add((div, ka, wybrany))
+            zajete.add((kh, wybrany)); zajete.add((ka, wybrany))
             przydzial.append((r, wybrany))
         if rozszerzono:
             print(f'  wiki {div} {s}: okno sezonu za krotkie dla {len(rest)} meczow — '
