@@ -144,7 +144,16 @@ def inne():
         if nreg:
             try:
                 g = [float(x) for x in str(r.okresy_g).split(';') if x != ''][:nreg]; a = [float(x) for x in str(r.okresy_a).split(';') if x != ''][:nreg]
-                if len(g) == nreg and len(a) == nreg and (sum(g) != pg or sum(a) != pa): ot = 1
+                if len(g) == nreg and len(a) == nreg:
+                    ot = 1 if (sum(g) != pg or sum(a) != pa) else 0
+                else:
+                    # 22.09.2026: BRAK wynikow tercji/kwart to NIE JEST "mecz bez dogrywki", tylko
+                    # BRAK INFORMACJI. Wczesniej zostawalo tu 0, czyli "rozstrzygniety w regulaminowym
+                    # czasie" — a w hokeju z 365scores pole okresow jest puste dla WSZYSTKICH meczow.
+                    # Skutek: statystyka remisow liczyla same zera i P(X) w hokeju wychodzilo 3,1%
+                    # dla kazdego meczu, przy rzeczywistych 20-23%. Wartosc -1 wyklucza mecz
+                    # ze statystyki remisow (sporty.py to obsluguje), wiec model wraca do prioru.
+                    ot = -1
             except ValueError: ot = -1
         rows.append((r.data, sp, liga, r.gosp, r.gosc, pg, pa, ot))
     return pd.DataFrame(rows, columns=['data', 'sport', 'liga', 'gosp', 'gosc', 'pg', 'pa', 'dogrywka'])
@@ -195,7 +204,13 @@ def tenis(max_tcl=None):
     # krecz/walkower: zwycięzca bez kompletu setów (365 podaje tylko sety) — do bazy Elo nie wchodzi
     wg_, wa_ = pd.to_numeric(s.wg, errors='coerce'), pd.to_numeric(s.wa, errors='coerce')
     s = s[np.maximum(wg_, wa_) >= 2]
-    if max_tcl is not None: s = s[~s.tour.isin(['ATP', 'WTA']) | (pd.to_datetime(s.data) > max_tcl)]
+    # 22.09.2026: filtr odsiewal duplikaty po TOUR, a nie po POZIOMIE turnieju. TennisCourtLog
+    # pokrywa tylko glowny cykl (WTA 1000/500/250, Grand Slam i odpowiedniki ATP), natomiast
+    # WTA 125 dostaje tour='WTA' — przez co CALY WTA 125 byl wyrzucany jako "duplikat" czegos,
+    # czego w TCL nigdy nie bylo. Zmierzone: z 1 220 wierszy singlowych WTA/WTA 125K do bazy
+    # trafialo 13. Dlatego zawodniczki z drabinek 125 mialy zero albo jeden mecz i model
+    # wypisywal dla nich "BRAK DANYCH RYWALA". Meski Challenger (tour='CH') filtra nie dotyczyl.
+    if max_tcl is not None: s = s[~s.poz.isin(['ATP', 'WTA']) | (pd.to_datetime(s.data) > max_tcl)]
     g = (s.ground.fillna('') if 'ground' in s else s.nawierzchnia.fillna('')) + ' ' + s.turniej.fillna('')   # Flashscore: „Monastir (Tunisia), hard”
     surf = np.where(g.str.contains('clay|ziem|terre', case=False), 'Clay', np.where(g.str.contains('grass|trawa', case=False), 'Grass',
                     np.where(g.str.contains('hard|carpet|indoor', case=False), 'Hard', '')))

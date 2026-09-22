@@ -75,6 +75,28 @@ def norm(s): return re.sub(r'[^a-z]', '', unicodedata.normalize('NFKD', str(s).t
 NCOUNT = {}
 
 
+NIEJEDNOZNACZNE = object()   # odrzucenie ostateczne — zadna inna sciezka nie ma prawa go cofnac
+
+
+def _skrot(p):
+    """Czy wpis w bazie jest w formie skroconej: "Johnson S." / "Wang X."."""
+    t = str(p).replace('.', ' ').split()
+    return len(t) > 1 and len(t[-1]) == 1
+
+
+def _pelne_dla_skrotu(skrot, players):
+    """Pelne nazwiska pasujace do skrotu "Nazwisko I." — jesli jest ich kilka, skrot jest wieloznaczny."""
+    t = str(skrot).replace('.', ' ').split()
+    if len(t) < 2: return []
+    naz, ini = norm(' '.join(t[:-1])), norm(t[-1])[:1]
+    out = []
+    for p in players:
+        if _skrot(p) or p == skrot: continue
+        tp = str(p).split()
+        if len(tp) > 1 and norm(tp[-1]) == naz and norm(tp[0])[:1] == ini: out.append(p)
+    return out
+
+
 def _resolve1(name, players):
     k_ = norm(name)
     if not k_: return None
@@ -99,11 +121,20 @@ def _resolve1(name, players):
         if c2:
             print(f'  UWAGA: "{name}" pasuje do {len(c2)} zawodnikow ({", ".join(sorted(c2)[:4])}) — '
                   f'nie dopasowano. Podaj pelne imie i nazwisko.')
-            return None
+            return NIEJEDNOZNACZNE
     m = difflib.get_close_matches(k_, list(by), n=1, cutoff=0.8)
     if m:
-        print(f'  UWAGA: "{name}" dopasowane ROZMYTO do "{by[m[0]]}" — upewnij sie, ze to ten zawodnik.')
-        return by[m[0]]
+        kand = by[m[0]]
+        # 22.09.2026: nie dopasowuj do wpisu SKROCONEGO, jesli skrot pasuje do kilku pelnych nazwisk.
+        # W przebiegu 12:00 "Sofia Johnson" (WTA 125 Porto) trafilo tak na "Johnson S.", a wsrod
+        # pasujacych byl Steve Johnson — zawodnik ATP.
+        pelne = _pelne_dla_skrotu(kand, players) if _skrot(kand) else []
+        if len(pelne) > 1:
+            print(f'  UWAGA: "{name}" -> skrot "{kand}" pasuje do {len(pelne)} pelnych nazwisk '
+                  f'({", ".join(sorted(pelne)[:4])}) — NIE dopasowano.')
+            return NIEJEDNOZNACZNE
+        print(f'  UWAGA: "{name}" dopasowane ROZMYTO do "{kand}" — upewnij sie, ze to ten zawodnik.')
+        return kand
     return None
 
 
@@ -114,6 +145,14 @@ def resolve(name, players):
     w bazie" wlasnie z tego powodu. Dlatego przy braku trafienia probujemy tez odwroconej
     kolejnosci czlonow. Dolozone tez ostrzezenia tam, gdzie kod wczesniej po cichu zgadywal."""
     r = _resolve1(name, players)
+    if r is NIEJEDNOZNACZNE:
+        # 22.09.2026: ODRZUCENIE Z POWODU WIELOZNACZNOSCI JEST OSTATECZNE. Wczesniej sciezka
+        # odwracania imienia i nazwiska (dodana 21.09) wpuszczala z powrotem dopasowanie, ktore
+        # skrypt sam przed chwila odrzucil: "Sofia Johnson" -> odrzucone jako 4 kandydatow ->
+        # po odwroceniu na "Johnson Sofia" dopasowane ROZMYTO do "Johnson S.". Zabezpieczenie
+        # dzialalo tylko w jedna strone, dokladnie jak w Poprawce 15.2.
+        print(f'  "{name}": odrzucone jako niejednoznaczne — nie probuje innych sciezek.')
+        return None
     if r: return r
     czl = [x for x in str(name).replace('.', ' ').split() if x]
     if len(czl) > 1:
@@ -121,6 +160,9 @@ def resolve(name, players):
             alt = ' '.join(war)
             if norm(alt) == norm(name): continue
             r = _resolve1(alt, players)
+            if r is NIEJEDNOZNACZNE:
+                print(f'  "{name}": po odwroceniu tez niejednoznaczne — nie dopasowano.')
+                return None
             if r:
                 print(f'  UWAGA: "{name}" dopasowane po ODWROCENIU imienia i nazwiska -> "{r}".')
                 return r
