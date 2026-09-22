@@ -163,6 +163,73 @@ def _zaw_nazwy(a, b):
     return d[:len(k)] == k or d[-len(k):] == k
 
 
+# Czlony, ktorych brak NIE zmienia klubu: forma prawna / typ klubu i nazwa dyscypliny.
+# "FC Barcelona" -> "Barcelona", "MHK Nitra" -> "Nitra", "Montpellier Handball" -> "Montpellier".
+# CELOWO NIE MA tu: u19/u21/u23, ii, b, reserves (to INNE druzyny) ani rdzeni typu
+# Real/Sporting/Dinamo/Independiente (to ONE sa wspolne dla wielu klubow).
+_OGOLNE = frozenset('fc cf sc ac as ss sv fk nk sk bk hk hc mhk vk kk rk ok ks cd ca cs ud sd ec afc cfc fbc sad '
+                    'club clube klub calcio futbol football fussball handball basket basketball volley volleyball '
+                    'hockey sport sports de del la el the da do'.split())
+
+
+def _skrot_albo_nic(name, wyn, pula):
+    """22.09.2026, USTERKA U1 z przebiegu 21:00: "Independiente Yumbo" (Kolumbia, II liga) zostalo
+    policzone jako "Independiente" (Argentyna, Avellaneda) — oczekiwane gole 2,05 : 0,84 z sily
+    klubu z innego kraju. Kod wypisywal ostrzezenie i MIMO TO zwracal klub. Ostrzezenie w logu
+    nie zatrzymuje modelu, wiec zamiast ostrzegac — rozstrzygamy:
+      (a) odpadly wylacznie czlony ogolne (FC, MHK, Handball) — ten sam klub, zwracamy;
+      (b) odpadl czlon rozrozniajacy, a zachowany rdzen maja w bazie TAKZE inne kluby — nie da sie
+          ustalic, ktory to, zwracamy None;
+      (c) odpadl czlon rozrozniajacy, rdzen jednoznaczny ("Chievo Verona" -> "Chievo") — zwracamy
+          z ostrzezeniem. Tego przypadku NIE DA SIE odroznic od "Independiente Yumbo" po samym
+          napisie (w bazie jest jedno Independiente), dlatego typuj.py sprawdza dodatkowo KRAJ ligi."""
+    tn, tk = _tokeny(name), _tokeny(wyn)
+    if len(tn) <= len(tk): return wyn
+    if tn[:len(tk)] == tk: odp = tn[len(tk):]
+    elif tn[-len(tk):] == tk: odp = tn[:-len(tk)]
+    else: odp = tuple(t for t in tn if t not in tk)
+    if odp and all(t in _OGOLNE for t in odp): return wyn
+    inne = sorted(p for p in pula if p != wyn and len(_tokeny(p)) > len(tk)
+                  and (_tokeny(p)[:len(tk)] == tk or _tokeny(p)[-len(tk):] == tk))
+    if inne:
+        print(f'  ODRZUCONO: "{name}" -> "{wyn}" zgubiloby czlon rozrozniajacy, a rdzen "{wyn}" maja '
+              f'w bazie tez: {", ".join(inne[:4])}{" ..." if len(inne) > 4 else ""}. '
+              f'Nie da sie ustalic, ktory to klub — noga MNIEJ.')
+        return None
+    print(f'  UWAGA: "{name}" dopasowane do KROTSZEJ nazwy "{wyn}" — pominieto czlon '
+          f'rozrozniajacy. Rdzen jest w bazie jednoznaczny, ale sprawdz, czy to ten sam klub.')
+    return wyn
+
+
+
+# Kraj ligi — do kontroli, czy obie druzyny meczu ligowego sa z jednego kraju.
+_KRAJ_KODU_EXTRA = {'SC2': 'scotland', 'SC3': 'scotland', 'EC': 'england'}
+
+
+def _kraj_ligi(div):
+    """Kraj rozgrywek z kodu Division, albo None, gdy nie da sie ustalic (wtedy NIE blokujemy).
+    Zrodla: 'Kraj | Liga' (ligi spoza mapy, zewn.py), mapa SOFA_DIV z zewn.py (kod -> kraj),
+    nazwa wolna z uzupelnij_ligi ('Chile First Division B' -> chile)."""
+    if not div: return None
+    s = str(div)
+    if '|' in s: return norm(s.split('|')[0]) or None
+    try:
+        from zewn import SOFA_DIV
+    except Exception:
+        SOFA_DIV = []
+    for kraj, _, kod in SOFA_DIV:
+        if kod == s: return norm(kraj)
+    if s in _KRAJ_KODU_EXTRA: return _KRAJ_KODU_EXTRA[s]
+    n = norm(s)
+    for kraj in sorted({norm(k) for k, _, _ in SOFA_DIV}, key=len, reverse=True):
+        if kraj and n.startswith(kraj): return kraj
+    return None
+
+
+def _ten_sam_kraj(a, b):
+    """'turk' (kod T1) i 'turkey' ('Turkey | 1. Lig') to ten sam kraj — fragmenty w SOFA_DIV sa skrocone."""
+    return a == b or a in b or b in a
+
 def resolve(name, pool):
     """Zwraca nazwe z bazy albo None. None jest POPRAWNYM wynikiem — wolacz ma sie wtedy zatrzymac.
     21.09.2026: naprawiony blad, przez ktory zwracalo ZAWSZE cos, takze dla nieznanych druzyn.
@@ -193,22 +260,15 @@ def resolve(name, pool):
               f'({", ".join(sorted(_kol[k]))}) — sprawdz, ktory to.')
     if k in by: return by[k]
     c = [p for p in by.values() if _zaw_nazwy(name, p)]
-    if len(c) == 1:
-        # gdy nazwa z oferty ma WIECEJ czlonow niz dopasowana, gubimy czlon rozrozniajacy:
-        # "Independiente Rivadavia" -> "Independiente" i "Operario Ferroviario" -> "Ferroviario"
-        # to INNE kluby. Strukturalnie nie da sie tego odroznic od "Montpellier Handball" ->
-        # "Montpellier", wiec zamiast blokowac — mowimy o tym glosno.
-        if len(_tokeny(name)) > len(_tokeny(c[0])):
-            print(f'  UWAGA: "{name}" dopasowane do KROTSZEJ nazwy "{c[0]}" — pominieto czlon '
-                  f'rozrozniajacy. Sprawdz, czy to ten sam klub, a nie inny o podobnej nazwie.')
-        return c[0]
     if c:
-        # "Chievo Verona" zawiera i "Chievo", i "Verona" — dawny wybor po dlugosci dawal Verone
-        # z Serie A. Pierwszy czlon nazwy jest niemal zawsze wlasciwym klubem, wiec ma pierwszenstwo.
-        pref = [p for p in c if k.startswith(norm(p)) or norm(p).startswith(k)]
-        if len(pref) == 1: return pref[0]
-        if pref: return max(pref, key=lambda p: len(norm(p)))
-        return min(c, key=lambda p: abs(len(norm(p)) - len(k)))
+        if len(c) == 1:
+            wyn = c[0]
+        else:   # "Chievo Verona" zawiera i "Chievo", i "Verona" — pierwszy czlon to niemal zawsze wlasciwy klub
+            pref = [p for p in c if k.startswith(norm(p)) or norm(p).startswith(k)]
+            if len(pref) == 1: wyn = pref[0]
+            elif pref: wyn = max(pref, key=lambda p: len(norm(p)))
+            else: wyn = min(c, key=lambda p: abs(len(norm(p)) - len(k)))
+        return _skrot_albo_nic(name, wyn, by.values())
     # prog 0.55 byl za luzny: "RC Warwick" trafialo na "RKC Waalwijk", a "Virtus Ciserano Bergamo"
     # na "Virtus Lanciano". Lepiej zwrocic None i zatrzymac analize, niz policzyc nie ten mecz.
     # rozmyte tylko dla dluzszych nazw i z wysokim progiem (0,87 zamiast 0,80:
@@ -281,6 +341,16 @@ def club(home, away, kursy, live=None):
     div_of = lambda t: (m[(m.HomeTeam == t) | (m.AwayTeam == t)].sort_values('MatchDate').Division.iloc[-1]
                         if ((m.HomeTeam == t) | (m.AwayTeam == t)).any() else None)
     dh, da = div_of(h), div_of(a)
+    # 22.09.2026, USTERKA U1: "Independiente Yumbo" (Kolumbia) -> Independiente (Argentyna), skrypt
+    # wypisal "liga: ARG/COL" i policzyl model. W meczu LIGI KRAJOWEJ druzyny z dwoch krajow sa
+    # niemozliwe — to znaczy, ze jedna z nazw trafila w cudzy klub. Po samym napisie nie da sie
+    # tego wykryc ("Chievo Verona" -> "Chievo" ma ten sam ksztalt), po kraju ligi — tak.
+    kh, ka = _kraj_ligi(dh), _kraj_ligi(da)
+    if kh and ka and not _ten_sam_kraj(kh, ka) and '--kontynentalny' not in sys.argv:
+        sys.exit(f'ROZNE KRAJE: "{home}" -> {h} ({dh}, {kh}) | "{away}" -> {a} ({da}, {ka}). '
+                 f'W meczu ligi krajowej obie druzyny sa z jednego kraju — jedna z nazw zostala '
+                 f'dopasowana do INNEGO klubu. Analiza przerwana, noga MNIEJ. '
+                 f'Puchary kontynentalne (Libertadores, Liga Mistrzow...) i sparingi: dodaj --kontynentalny.')
     ldc, rho = None, -0.05
     if dh and dh == da:
         mdl = cached(f'dc_{dh}_{today.date()}', lambda: fit_dc(m[m.Division == dh], today))

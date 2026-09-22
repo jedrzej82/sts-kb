@@ -332,6 +332,44 @@ def _zaw_nazwy(a, b):
     return d[:len(k)] == k or d[-len(k):] == k
 
 
+# Czlony, ktorych brak NIE zmienia klubu: forma prawna / typ klubu i nazwa dyscypliny.
+# "FC Barcelona" -> "Barcelona", "MHK Nitra" -> "Nitra", "Montpellier Handball" -> "Montpellier".
+# CELOWO NIE MA tu: u19/u21/u23, ii, b, reserves (to INNE druzyny) ani rdzeni typu
+# Real/Sporting/Dinamo/Independiente (to ONE sa wspolne dla wielu klubow).
+_OGOLNE = frozenset('fc cf sc ac as ss sv fk nk sk bk hk hc mhk vk kk rk ok ks cd ca cs ud sd ec afc cfc fbc sad '
+                    'club clube klub calcio futbol football fussball handball basket basketball volley volleyball '
+                    'hockey sport sports de del la el the da do'.split())
+
+
+def _skrot_albo_nic(name, wyn, pula):
+    """22.09.2026, USTERKA U1 z przebiegu 21:00: "Independiente Yumbo" (Kolumbia, II liga) zostalo
+    policzone jako "Independiente" (Argentyna, Avellaneda) — oczekiwane gole 2,05 : 0,84 z sily
+    klubu z innego kraju. Kod wypisywal ostrzezenie i MIMO TO zwracal klub. Ostrzezenie w logu
+    nie zatrzymuje modelu, wiec zamiast ostrzegac — rozstrzygamy:
+      (a) odpadly wylacznie czlony ogolne (FC, MHK, Handball) — ten sam klub, zwracamy;
+      (b) odpadl czlon rozrozniajacy, a zachowany rdzen maja w bazie TAKZE inne kluby — nie da sie
+          ustalic, ktory to, zwracamy None;
+      (c) odpadl czlon rozrozniajacy, rdzen jednoznaczny ("Chievo Verona" -> "Chievo") — zwracamy
+          z ostrzezeniem. Tego przypadku NIE DA SIE odroznic od "Independiente Yumbo" po samym
+          napisie (w bazie jest jedno Independiente), dlatego typuj.py sprawdza dodatkowo KRAJ ligi."""
+    tn, tk = _tokeny(name), _tokeny(wyn)
+    if len(tn) <= len(tk): return wyn
+    if tn[:len(tk)] == tk: odp = tn[len(tk):]
+    elif tn[-len(tk):] == tk: odp = tn[:-len(tk)]
+    else: odp = tuple(t for t in tn if t not in tk)
+    if odp and all(t in _OGOLNE for t in odp): return wyn
+    inne = sorted(p for p in pula if p != wyn and len(_tokeny(p)) > len(tk)
+                  and (_tokeny(p)[:len(tk)] == tk or _tokeny(p)[-len(tk):] == tk))
+    if inne:
+        print(f'  ODRZUCONO: "{name}" -> "{wyn}" zgubiloby czlon rozrozniajacy, a rdzen "{wyn}" maja '
+              f'w bazie tez: {", ".join(inne[:4])}{" ..." if len(inne) > 4 else ""}. '
+              f'Nie da sie ustalic, ktory to klub — noga MNIEJ.')
+        return None
+    print(f'  UWAGA: "{name}" dopasowane do KROTSZEJ nazwy "{wyn}" — pominieto czlon '
+          f'rozrozniajacy. Rdzen jest w bazie jednoznaczny, ale sprawdz, czy to ten sam klub.')
+    return wyn
+
+
 def resolve(name, pool):
     """Zwraca nazwe z bazy albo None. None JEST POPRAWNYM WYNIKIEM — wolacz ma sie wtedy zatrzymac.
     21.09.2026: naprawiona ta sama usterka, ktora wykryto w typuj.py. Nazwa zapisana cyrylica
@@ -360,20 +398,15 @@ def resolve(name, pool):
               f'({", ".join(sorted(_kol[k_]))}) — sprawdz, ktory to.')
     if k_ in by: return by[k_]
     c = [p for p in by.values() if _zaw_nazwy(name, p)]
-    if len(c) == 1:
-        # gdy nazwa z oferty ma WIECEJ czlonow niz dopasowana, gubimy czlon rozrozniajacy:
-        # "Independiente Rivadavia" -> "Independiente" i "Operario Ferroviario" -> "Ferroviario"
-        # to INNE kluby. Strukturalnie nie da sie tego odroznic od "Montpellier Handball" ->
-        # "Montpellier", wiec zamiast blokowac — mowimy o tym glosno.
-        if len(_tokeny(name)) > len(_tokeny(c[0])):
-            print(f'  UWAGA: "{name}" dopasowane do KROTSZEJ nazwy "{c[0]}" — pominieto czlon '
-                  f'rozrozniajacy. Sprawdz, czy to ten sam klub, a nie inny o podobnej nazwie.')
-        return c[0]
-    if c:   # pierwszy czlon nazwy jest niemal zawsze wlasciwym klubem
-        pref = [p for p in c if k_.startswith(norm(p)) or norm(p).startswith(k_)]
-        if len(pref) == 1: return pref[0]
-        if pref: return max(pref, key=lambda p: len(norm(p)))
-        return min(c, key=lambda p: abs(len(norm(p)) - len(k_)))
+    if c:
+        if len(c) == 1:
+            wyn = c[0]
+        else:   # "Chievo Verona" zawiera i "Chievo", i "Verona" — pierwszy czlon to niemal zawsze wlasciwy klub
+            pref = [p for p in c if k_.startswith(norm(p)) or norm(p).startswith(k_)]
+            if len(pref) == 1: wyn = pref[0]
+            elif pref: wyn = max(pref, key=lambda p: len(norm(p)))
+            else: wyn = min(c, key=lambda p: abs(len(norm(p)) - len(k_)))
+        return _skrot_albo_nic(name, wyn, by.values())
     # prog 0.7 byl za luzny i milczacy; 0.80 jak w typuj.py, z ostrzezeniem dla czlowieka
     # rozmyte tylko dla dluzszych nazw i z wysokim progiem (0,87 zamiast 0,80:
     # przy 0,80 "Argentinos"->"Argentino MM", "Champions"->"Campion", "Karlstad"->"Harstad") — przy 3-5 znakach prog 0,80 osiaga sie trywialnie
