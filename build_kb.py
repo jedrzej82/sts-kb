@@ -164,6 +164,179 @@ def openfootball_rows(m):
     return pd.DataFrame(rows), unmatched
 
 
+
+
+
+def _zawiera(x, y):
+    """Czy jedna nazwa zawiera sie w drugiej na poziomie CZLONOW, nie liter."""
+    tx, ty = set(_czlony(x)), set(_czlony(y))
+    return bool(tx) and bool(ty) and (tx <= ty or ty <= tx)
+
+
+def _aliasy_raz(allm):
+    """Znajduje pary nazw oznaczajace TEN SAM klub, na podstawie terminarza, nie napisow.
+
+    22.09.2026. Dwa zrodla opisuja ten sam mecz zupelnie inaczej — po OBU stronach:
+        SC Corinthians Paulista 0:2 Fluminense FC   [openfootball]
+        Corinthians             0:2 Fluminense      [fbref]
+        Santos FC               2:0 CA Mineiro      [openfootball]
+        Santos                  2:0 Atletico-MG     [fbref]
+    Reguly na napisach sa tu bezradne: "CA Mineiro" i "Atletico-MG" nie maja ze soba nic
+    wspolnego, podobnie "Gallos Blancos" i "Queretaro" czy "Aguilas Doradas" i "Rionegro".
+
+    Dlatego kojarzymy MECZE, a nie nazwy, i korzystamy z trzech faktow:
+      1) ta sama liga, dzien i wynik — to kandydat na jeden mecz zapisany dwa razy,
+      2) wystarczy, ze JEDNA strona pasuje mocno; druga wynika wtedy z eliminacji,
+         dokladnie tak, jak czyta to czlowiek,
+      3) dwa ROZNE kluby jednej ligi predzej czy pozniej ze soba graja — para, ktora
+         nigdy ze soba nie zagrala, to dwie nazwy jednej druzyny.
+    Warunek (3) jest zabezpieczeniem: bez niego scalilibysmy kluby, ktore przypadkiem
+    zagraly tego samego dnia z takim samym wynikiem."""
+    d = allm.dropna(subset=['MatchDate', 'HomeTeam', 'AwayTeam']).copy()
+
+    def sim(a, b):
+        ka, kb_ = norm(a), norm(b)
+        if not ka or not kb_: return 0.0
+        if ka == kb_: return 1.0
+        o = difflib.SequenceMatcher(None, ka, kb_).ratio()
+        ta, tb = set(_czlony(a)), set(_czlony(b))
+        if ta and tb and (ta <= tb or tb <= ta): o = max(o, 0.85)
+        return o
+
+    kandydaci = {}
+    for _, g in d.groupby(['Division', 'MatchDate', 'FTHome', 'FTAway'], dropna=False):
+        if len(g) < 2 or len(g) > 12: continue
+        w = list(g.itertuples())
+        oceny = []
+        for i in range(len(w)):
+            for j in range(i + 1, len(w)):
+                a, b = w[i], w[j]
+                # celowo NIE filtrujemy po src: build_kb nadpisuje je wartoscia "extra"
+                # dla wszystkich wierszy z ligi_extra.csv, wiec oryginalne etykiety
+                # (openfootball / fbref / sofa) sa tu juz nie do odroznienia.
+                sh, sa = sim(a.HomeTeam, b.HomeTeam), sim(a.AwayTeam, b.AwayTeam)
+                if str(a.HomeTeam) == str(b.HomeTeam) and str(a.AwayTeam) == str(b.AwayTeam):
+                    continue                              # identyczne NAPISY, nic do nauczenia
+                    # uwaga: nie wolno porownywac tu ocen — "Vitoria" i "Vitória" maja
+                    # ocene 1.0 po normalizacji, a jako napisy sa rozne i wlasnie takie
+                    # pary trzeba wychwycic.
+                # Strona "mocna" musi byc PEWNA, a nie tylko podobna. 22.09.2026 prog 0.80
+                # scalil "Bedford Town" z "Hednesford Town" (ocena rowno 0.800), a przez to
+                # takze ich rywali: "Hebburn Town" ze "Spalding United". Cztery rozne kluby.
+                # Samo podobienstwo nie rozdziela: poprawne "CA Mineiro"="Atletico-MG" ma 0.118,
+                # a bledne "Bedford"/"Hednesford" ma 0.800.
+                if max(sh, sa) < 0.90 and not (_zawiera(a.HomeTeam, b.HomeTeam)
+                                               or _zawiera(a.AwayTeam, b.AwayTeam)):
+                    continue
+                oceny.append((sh + sa, i, j, sh, sa))
+        oceny.sort(key=lambda x: (-x[0], x[1], x[2]))
+        uzyte = set()
+        for _, i, j, sh, sa in oceny:
+            if i in uzyte or j in uzyte: continue
+            uzyte.add(i); uzyte.add(j)
+            a, b = w[i], w[j]
+            for x, y in ((a.HomeTeam, b.HomeTeam), (a.AwayTeam, b.AwayTeam)):
+                if str(x) == str(y): continue
+                kl = (a.Division,) + tuple(sorted((str(x), str(y))))
+                kandydaci[kl] = kandydaci.get(kl, 0) + 1
+
+    spotkania = set()
+    for r in d.itertuples():
+        spotkania.add((r.Division,) + tuple(sorted((str(r.HomeTeam), str(r.AwayTeam)))))
+
+    ile = pd.concat([d.HomeTeam, d.AwayTeam]).value_counts()
+    mapa, odrzucone = {}, 0
+    for (div, x, y), n in sorted(kandydaci.items(), key=lambda kv: (-kv[1], kv[0])):
+        if (div, x, y) in spotkania:       # zagrali ze soba, wiec to DWA rozne kluby
+            odrzucone += 1; continue
+        # Para o NISKIM wlasnym podobienstwie jest wnioskowana z eliminacji, wiec wymaga
+        # POTWIERDZENIA: musi wyjsc z co najmniej trzech niezaleznych meczow. Jednorazowe
+        # zderzenie to za malo — tak powstalo bledne "Hebburn Town" = "Spalding United".
+        if sim(x, y) < 0.90 and not _zawiera(x, y) and n < 3:
+            odrzucone += 1; continue
+        zwyciezca, przegrany = (x, y) if (ile.get(x, 0), len(x)) >= (ile.get(y, 0), len(y)) else (y, x)
+        while (div, zwyciezca) in mapa:    # domykamy lancuchy A->B->C
+            zwyciezca = mapa[(div, zwyciezca)]
+        if zwyciezca != przegrany:
+            mapa[(div, przegrany)] = zwyciezca
+
+    if mapa:
+        print(f'  BUILD_KB: rozpoznano {len(mapa)} nazw bedacych aliasem innej druzyny '
+              f'(ten sam dzien, wynik i rywal, a nigdy ze soba nie graly). Przyklady:')
+        for (div, zle), dobre in sorted(mapa.items())[:10]:
+            print(f'      [{div}] "{zle}" = "{dobre}"')
+        if odrzucone:
+            print(f'      Odrzucono {odrzucone} par, bo te druzyny ze soba GRALY — to rozne kluby.')
+
+    for kol in ('HomeTeam', 'AwayTeam'):
+        allm[kol] = [mapa.get((dv, nm), nm) for dv, nm in zip(allm.Division, allm[kol])]
+    return allm, len(mapa)
+
+
+def aliasy_z_terminarza(allm, maks_rund=6):
+    """Powtarza rozpoznawanie aliasow, az przestanie cokolwiek znajdowac.
+    Jedno przejscie nie wystarcza: dopiero gdy "Fluminense FC" stanie sie "Fluminense",
+    wiersze, ktorych wczesniej nie dalo sie skojarzyc, zaczynaja do siebie pasowac
+    i odslaniaja kolejne pary ("Gremio"/"Grêmio FBPA", "Botafogo (RJ)"/"Botafogo RJ")."""
+    lacznie = 0
+    for runda in range(maks_rund):
+        allm, n = _aliasy_raz(allm)
+        lacznie += n
+        if not n: break
+        allm = allm.drop_duplicates(subset=['Division', 'MatchDate', 'HomeTeam', 'AwayTeam'], keep='first')
+    if lacznie:
+        print(f'  BUILD_KB: lacznie {lacznie} aliasow w {runda + 1} rundach.')
+    return allm
+
+
+
+def przesun_daty_przyblizone(allm):
+    """Przesuwa mecze o dacie PRZYBLIZONEJ (zrodlo wiki), gdy koliduja z meczem o dacie
+    prawdziwej. Matryce wiki nie zawieraja dat, wiec date im nadajemy — jesli wypadla
+    tam, gdzie klub ma juz mecz z prawdziwa data, to nasza data jest bledna, nie tamta.
+    Szukamy najblizszego wolnego dnia, zeby nie gubic wyniku."""
+    if 'src_zrodlo' not in allm.columns: return allm
+    d = allm.dropna(subset=['MatchDate', 'HomeTeam', 'AwayTeam']).copy()
+    d['dt'] = pd.to_datetime(d.MatchDate, errors='coerce')
+    d = d.dropna(subset=['dt'])
+
+    zajete = set()
+    for r in d.itertuples():
+        zajete.add((r.Division, str(r.HomeTeam), r.dt)); zajete.add((r.Division, str(r.AwayTeam), r.dt))
+
+    # liczba meczow klubu w danym dniu — liczona RAZ, nie dla kazdego wiersza osobno
+    dl = pd.concat([d.assign(kk=d.HomeTeam.astype(str)), d.assign(kk=d.AwayTeam.astype(str))])
+    licznik = dl.groupby(['Division', 'dt', 'kk']).size().to_dict()
+
+    przybl = d[d.src_zrodlo == 'wiki']
+    zmiany, nieudane = {}, 0
+    for r in przybl.itertuples():
+        if max(licznik.get((r.Division, r.dt, str(r.HomeTeam)), 0),
+               licznik.get((r.Division, r.dt, str(r.AwayTeam)), 0)) < 2:
+            continue                                # nie koliduje z nikim
+        nowa = None
+        for krok in range(1, 40):
+            for zn in (1, -1):
+                kand = r.dt + pd.Timedelta(days=krok * zn)
+                if (r.Division, str(r.HomeTeam), kand) not in zajete and \
+                   (r.Division, str(r.AwayTeam), kand) not in zajete:
+                    nowa = kand; break
+            if nowa is not None: break
+        if nowa is None:
+            nieudane += 1; continue
+        zajete.discard((r.Division, str(r.HomeTeam), r.dt)); zajete.discard((r.Division, str(r.AwayTeam), r.dt))
+        zajete.add((r.Division, str(r.HomeTeam), nowa)); zajete.add((r.Division, str(r.AwayTeam), nowa))
+        zmiany[r.Index] = nowa.strftime('%Y-%m-%d')
+
+    if zmiany:
+        print(f'  BUILD_KB: przesunieto {len(zmiany)} meczow o dacie przyblizonej (wiki), '
+              f'bo kolidowaly z meczem o dacie prawdziwej.')
+        if nieudane: print(f'      {nieudane} nie udalo sie przesunac — brak wolnego dnia w zasiegu.')
+        for idx, nowa in zmiany.items():
+            if idx in allm.index: allm.loc[idx, 'MatchDate'] = nowa
+    return allm
+
+
 def main():
     fetch('--refresh' in sys.argv)
     cols = ['Division', 'MatchDate', 'MatchTime', 'HomeTeam', 'AwayTeam', 'HomeElo', 'AwayElo', 'FTHome', 'FTAway',
@@ -179,13 +352,22 @@ def main():
         d = pd.read_csv(delta); d['src'] = 'delta'; parts.append(d)
     extra = os.path.join(HERE, 'ligi_extra.csv')  # uzupelnij_ligi.py: FBref (worldfootballR_data) + openfootball + matryce Wikipedii
     if os.path.exists(extra):
-        e = pd.read_csv(extra); e['src'] = 'extra'; parts.append(e)
+        e = pd.read_csv(extra)
+        # zachowujemy oryginalne zrodlo: tylko ono mowi, ktory wiersz ma date PRZYBLIZONA
+        # (wiki) a ktory prawdziwa (sofa/fbref/espn). Bez tego nie da sie rozstrzygnac,
+        # ktora z dwoch kolidujacych dat jest ta wymyslona.
+        e['src_zrodlo'] = e['src'] if 'src' in e.columns else None
+        e['src'] = 'extra'; parts.append(e)
         try:
             from uzupelnij_ligi import NOWE; DIV_NAME.update({k: v for k, v in NOWE.items() if k not in DIV_NAME})
         except Exception: pass
     allm = pd.concat(parts, ignore_index=True)
     allm = allm.drop_duplicates(subset=['Division', 'MatchDate', 'HomeTeam', 'AwayTeam'], keep='first')
+    allm = aliasy_z_terminarza(allm)
+    allm = przesun_daty_przyblizone(allm)
+    allm = allm.drop_duplicates(subset=['Division', 'MatchDate', 'HomeTeam', 'AwayTeam'], keep='first')
     DIV_NAME.update({d: d for d in allm.Division.dropna().unique() if d not in DIV_NAME})  # ligi z Sofascore: „Kraj | Liga”
+    allm = allm.drop(columns=['src_zrodlo'], errors='ignore')
     allm = allm.sort_values(['MatchDate', 'Division']).reset_index(drop=True)
     intl = pd.read_csv(os.path.join(RAW, 'intl_results.csv')).dropna(subset=['home_score', 'away_score'])
     elo = pd.read_csv(os.path.join(RAW, 'EloRatings.csv'))

@@ -268,6 +268,12 @@ def club(home, away, kursy, live=None):
     elo = elo.sort_values('date').groupby('club').last()
     pool = set(m.HomeTeam) | set(m.AwayTeam) | set(elo.index)
     h, a = resolve(home, pool), resolve(away, pool)
+    if h is not None and h == a:
+        # patrz komentarz w sporty.py: dwie rozne nazwy z oferty wskazujace jeden wpis
+        # w bazie daja mecz druzyny z sama soba i P okolo 50% dla obu stron — liczby
+        # wygladaja normalnie, a sa bez wartosci.
+        sys.exit(f'TA SAMA DRUZYNA PO OBU STRONACH: "{home}" i "{away}" wskazuja na "{h}" '
+                 f'— analiza przerwana. Sprawdz nazwy w bazie przed dalsza praca.')
     print(f'Dopasowano: "{home}" → {h} | "{away}" → {a}')
     if not h or not a: sys.exit('Nie znaleziono drużyny w bazie — podaj inną pisownię.')
     today = pd.Timestamp(dt.date.today())
@@ -420,6 +426,12 @@ def intl(home, away, neutral, kursy):
     df = pd.read_sql('select * from intl order by date', db())
     R, pre = cached(f'intl_{dt.date.today()}', lambda: intl_elo(df))
     h, a = resolve(home, set(R)), resolve(away, set(R))
+    if h is not None and h == a:
+        # patrz komentarz w sporty.py: dwie rozne nazwy z oferty wskazujace jeden wpis
+        # w bazie daja mecz druzyny z sama soba i P okolo 50% dla obu stron — liczby
+        # wygladaja normalnie, a sa bez wartosci.
+        sys.exit(f'TA SAMA DRUZYNA PO OBU STRONACH: "{home}" i "{away}" wskazuja na "{h}" '
+                 f'— analiza przerwana. Sprawdz nazwy w bazie przed dalsza praca.')
     print(f'Dopasowano: {h} | {a}')
     df = df.assign(rh=[p[0] for p in pre], ra=[p[1] for p in pre], adv=[p[2] for p in pre])
     d = df[df.date >= '2010-01-01']

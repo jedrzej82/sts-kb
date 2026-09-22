@@ -39,6 +39,68 @@ def kompletnosc(daty, etykieta):
     return out
 
 
+
+def niemozliwe_mecze(pokaz=12):
+    """Wykrywa mecze, ktore fizycznie nie mogly sie odbyc. Dwa warunki, oba zerojedynkowe:
+      1) klub gra SAM ZE SOBA — dwie rozne nazwy zostaly scalone w jedna,
+      2) klub gra DWA RAZY tego samego dnia w tej samej lidze — do jednej nazwy
+         przypisano mecze dwoch roznych klubow.
+    22.09.2026: w bazie bylo 122 mecze z punktu 1 (m.in. derby Sydney zapisane jako
+    "Sydney FC - Sydney FC") i 756 z punktu 2. Wykryto je RECZNIE, przypadkiem, przy
+    okazji innego audytu. Ten test istnieje po to, zeby nastepnym razem krzyknely same:
+    to jedyna klasa bledu, ktora psuje dane bez zadnego komunikatu o bledzie."""
+    baza = os.path.join(HERE, 'kb.sqlite')
+    if not os.path.exists(baza):
+        print('  kb.sqlite nie istnieje — pomijam kontrole spojnosci.'); return 0
+    try:
+        con = sqlite3.connect(baza)
+        m = pd.read_sql('select Division, MatchDate, HomeTeam, AwayTeam, src from matches', con)
+    except Exception as e:
+        print(f'  nie udalo sie odczytac kb.sqlite ({type(e).__name__}: {e}) — pomijam.'); return 0
+    m = m.dropna(subset=['HomeTeam', 'AwayTeam'])
+    zle = 0
+
+    sam = m[m.HomeTeam == m.AwayTeam]
+    if len(sam):
+        zle += 1
+        print(f'  KLUB GRA SAM ZE SOBA: {len(sam)} meczow, {sam.HomeTeam.nunique()} nazw, '
+              f'{sam.Division.nunique()} lig.')
+        for (d, t), n in sam.groupby(['Division', 'HomeTeam']).size().sort_values(ascending=False).head(pokaz).items():
+            print(f'      [{d}] "{t}" — {n}')
+        print('      To znaczy, ze DWA rozne kluby maja w bazie te sama nazwe. Ich Elo i forma sa')
+        print('      wymieszane. Napraw mapowanie nazw (uzupelnij_ligi.py / build_kb.py), nie dane.')
+
+    d2 = m.dropna(subset=['MatchDate'])
+    dl = pd.concat([d2.assign(k=d2.HomeTeam), d2.assign(k=d2.AwayTeam)])
+    g = dl.groupby(['Division', 'MatchDate', 'k']).size()
+    r = g[g > 1].reset_index().rename(columns={0: 'ile'})
+
+    # Rozdzielamy dwie rzeczy, bo maja rozna wage. Detektor, ktory krzyczy przy kazdym
+    # przebiegu, przestaje cokolwiek znaczyc — a czesc zrodel (matryce wiki) NIE ZNA dat
+    # i przypisuje przyblizone, wiec pojedyncze nalozenia sa tam normalne i nieusuwalne.
+    ciezkie = r[r.ile >= 4]
+    lekkie = r[r.ile < 4]
+
+    if len(ciezkie):
+        zle += 1
+        print(f'  LICZBA MECZOW NIEMOZLIWA: {len(ciezkie)} przypadkow, gdzie klub ma 4+ meczow')
+        print(f'      jednego dnia (maks {int(ciezkie.ile.max())}). Zadna liga tak nie gra —')
+        print(f'      to znaczy, ze caly blok terminarza dostal JEDNA date.')
+        for x in ciezkie.sort_values('ile', ascending=False).head(pokaz).itertuples():
+            print(f'      [{x.Division}] {x.MatchDate} "{x.k}" — {x.ile} meczow')
+        print('      Sprawdz przypisywanie dat w uzupelnij_ligi.py (sciezka wiki).')
+
+    if len(lekkie):
+        print(f'  Nalozen po 2-3 mecze dziennie: {len(lekkie)} ({lekkie.k.nunique()} nazw). '
+              f'To NIE jest zglaszane jako usterka:')
+        print('      matryce wiki nie zawieraja dat i dostaja daty przyblizone, wiec pojedyncze')
+        print('      nalozenia sa tam nieuniknione. Zglos dopiero, gdy liczba wyraznie urosnie.')
+
+    if not zle:
+        print('  Spojnosc nazw: brak meczow niemozliwych.')
+    return zle
+
+
 def main():
     w, uwagi, niepelne = [], [], []
     kb = os.path.join(HERE, 'kb.sqlite')
@@ -110,6 +172,10 @@ def main():
         print("  Najczestsza przyczyna: pliki 365 z Dysku nie zostaly odswiezone po zamknieciu dnia.")
         print("  Napisz o tym w raporcie i traktuj forme z tych dni jako niepelna.")
         zle += len(niepelne)
+
+    print()
+    print("Spojnosc nazw druzyn (mecze fizycznie niemozliwe):")
+    zle += niemozliwe_mecze()
 
     print()
     if zle:

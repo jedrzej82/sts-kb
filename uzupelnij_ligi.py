@@ -181,37 +181,80 @@ def _tok(s):
     return [TOK_ROZW.get(x, x) for x in t if x not in TOK_POMIN]
 
 
-def match_one(n, pool, div):
+def _sprzeczne(zrodlo, baza):
+    """Czy obie nazwy maja WLASNY, charakterystyczny czlon, ktorego nie ma ta druga.
+    22.09.2026. Bez tego testu dopasowanie rozmyte scalalo ROZNE kluby:
+      "Melbourne Victory"   -> "Melbourne City FC"
+      "Deportivo Lara"      -> "Deportivo La Guaira"
+      "Radnicki Nis" oraz "Radnicki Kragujevac" -> "Radnicki 1923"
+    Wspolny czlon ("Melbourne", "Deportivo", "Radnicki") to nazwa miasta albo
+    slowo rodzajowe; rozroznia dopiero ten drugi. Gdy KAZDA strona ma swoj wlasny,
+    to sa dwa rozne kluby, choćby litery byly podobne.
+    Nie blokuje skrotow: "Hull" -> "Hull City" ma czlony {hull} c {hull, city},
+    wiec zrodlo nie wnosi nic wlasnego i dopasowanie przechodzi."""
+    import difflib as _d
+    tz, tb = set(_tok(zrodlo)), set(_tok(baza))
+    if not tz or not tb: return False
+
+    def _ten_sam(x, y):
+        # Czy to ten sam czlon zapisany inaczej ("espanyol"/"espanol", "munchen"/"munich"),
+        # czy dwa rozne slowa ("lara"/"guaira", "victory"/"city"). Zmierzone 22.09.2026:
+        # czlony bedace wariantem pisowni maja WSPOLNY PRZEDROSTEK >= 3 znaki (3-5),
+        # a czlony roznych klubow maja przedrostek 0 — nawet gdy ocena podobienstwa
+        # jest wysoka ("lara"/"guaira" to 0,60, wiecej niz "munchen"/"munich" bylo by
+        # warte bez przedrostka). Dlatego rozstrzyga przedrostek, a ocena tylko go potwierdza.
+        if x == y: return True
+        if min(len(x), len(y)) >= 4 and (x.startswith(y) or y.startswith(x)): return True
+        wsp = 0
+        for i in range(min(len(x), len(y))):
+            if x[i] != y[i]: break
+            wsp += 1
+        return wsp >= 3 and _d.SequenceMatcher(None, x, y).ratio() >= 0.65
+
+    wlasne_z = {t for t in tz if not any(_ten_sam(t, u) for u in tb)}
+    wlasne_b = {t for t in tb if not any(_ten_sam(t, u) for u in tz)}
+    wl_z = {t for t in wlasne_z if t not in OGOLNE and len(t) >= 3}
+    return bool(wl_z) and bool(wlasne_b)
+
+
+def match_one(n, pool, div, zwroc_sile=False):
+    """Zwraca nazwe z puli albo None. Z zwroc_sile=True zwraca (nazwa, sila),
+    gdzie sila rosnie wraz z pewnoscia dopasowania — canon() uzywa jej do
+    rozstrzygania, ktora nazwa ma prawo zajac dany klub."""
     import difflib
+    def w(cel, sila): return (cel, sila) if zwroc_sile else cel
     a = ALIAS2.get(div, {})
-    if n in a: return a[n]
-    if n in NIE_MAPUJ: return n if n in pool else None
-    if n in ALIAS_ZEWN and ALIAS_ZEWN[n] in pool: return ALIAS_ZEWN[n]
+    if n in a: return w(a[n], 9)
+    if n in NIE_MAPUJ: return w(n if n in pool else None, 9)
+    if n in ALIAS_ZEWN and ALIAS_ZEWN[n] in pool: return w(ALIAS_ZEWN[n], 9)
     k = norm(str(n).translate(ZNAKI))
     base = {norm(str(b).translate(ZNAKI)): b for b in pool}
-    if k in base: return base[k]
+    if k in base: return w(base[k], 8)
     if len(k) >= 5:
         cand = {b for kb_, b in base.items() if len(kb_) >= 5 and (k.startswith(kb_) or kb_.startswith(k) or kb_.endswith(k)
                                                                    or (len(kb_) >= 8 and k.endswith(kb_)))}
-        if len(cand) == 1: return cand.pop()
+        cand = {b for b in cand if not _sprzeczne(n, b)}
+        if len(cand) == 1: return w(cand.pop(), 5)
     # tokeny bez dopisków (FC, KAA, OGC…) i z rozwinięciami skrótów (Man→Manchester, Sp→Sporting)
     tn = _tok(n)
     if tn:
         st = set(tn)
         eq = [b for b in pool if set(_tok(b)) == st]
-        if len(eq) == 1: return eq[0]
+        if len(eq) == 1: return w(eq[0], 7)
         # nazwa w bazie krótsza (AIK ⊂ AIK Solna, Hull ⊂ Hull City) — ale nie same ogólniki (United, Athletic…)
         def _goly(b):   # „FC Lviv”, „SC Paderborn”: po odrzuceniu FC zostaje samo miasto — to za mało
             surowe = re.findall(r'[a-z0-9]+', str(b).lower())
             return len(_tok(b)) == 1 and len(surowe) > 1
         kr = [b for b in pool if _tok(b) and set(_tok(b)) < st and not set(_tok(b)) <= OGOLNE and not _goly(b)]
-        if len(kr) == 1: return kr[0]
+        if len(kr) == 1: return w(kr[0], 4)
         # nazwa ze źródła krótsza — tylko jednowyrazowa i charakterystyczna (Shamrock → Shamrock Rovers)
         if len(tn) == 1 and len(tn[0]) >= 5 and tn[0] not in OGOLNE:
             dl = [b for b in pool if st < set(_tok(b))]
-            if len(dl) == 1: return dl[0]
-    m = difflib.get_close_matches(k, list(base), n=1, cutoff=0.8)
-    return base[m[0]] if m else None
+            if len(dl) == 1: return w(dl[0], 4)
+    # sorted(): bez tego kolejnosc zalezy od ziarna hasha procesu
+    m = difflib.get_close_matches(k, sorted(base), n=1, cutoff=0.8)
+    if m and not _sprzeczne(n, base[m[0]]): return w(base[m[0]], 2)
+    return w(None, 0)
 
 
 def canon(df, kb):
@@ -221,14 +264,45 @@ def canon(df, kb):
     rec = kb[kb.MatchDate >= '2022-07-01']
     for div, g in df.groupby('Division'):
         base = sorted(set(rec.loc[rec.Division == div, 'HomeTeam']) | set(rec.loc[rec.Division == div, 'AwayTeam']))
-        known = {}
+        known, sila = {}, {}
         for src in ('espn', 'sofa', 'fbref', 'openfootball', 'wiki'):
             gs = g[g.src == src]
             names = sorted(set(gs.HomeTeam) | set(gs.AwayTeam))
             for n in names:
                 if n in known: continue
                 pool = base + sorted(set(known.values()) - set(base))
-                known[n] = match_one(n, pool, div) or n
+                cel, sl = match_one(n, pool, div, zwroc_sile=True)
+                known[n], sila[n] = (cel or n), (sl if cel else 0)
+
+        # W JEDNEJ LIDZE przypisanie musi byc ROZNOWARTOSCIOWE: dwie rozne nazwy ze
+        # zrodel nie moga wskazywac tego samego klubu. 22.09.2026 wskazywaly, i to
+        # scalalo ROZNE kluby w jeden: "Melbourne Victory" wpadalo na "Melbourne City FC",
+        # "Radnicki Nis" i "Radnicki Kragujevac" na "Radnicki 1923", a w bazie pojawialy
+        # sie mecze, w ktorych klub gra SAM ZE SOBA (122 takie mecze, m.in. derby Sydney).
+        # Przy konflikcie klub zostaje przy nazwie o NAJWYZSZEJ sile dopasowania;
+        # pozostale zachowuja wlasna nazwe i wchodza jako osobne kluby. Tracimy wtedy
+        # powiazanie z historia, ale NIE psujemy historii cudzej — a to jest gorszy blad.
+        zajete = {}
+        # Kolejnosc ma znaczenie i pierwszenstwo jest BEZWZGLEDNE dla nazwy, ktora wskazuje
+        # sama siebie. Bez tego "W Sydney" (Western Sydney Wanderers) zajmowalo nazwe
+        # "Sydney FC", bo mialo wyzsza sile dopasowania i trafialo wczesniej — a wtedy
+        # prawdziwe "Sydney FC" tez zostawalo przy "Sydney FC" i derby dalej byly
+        # meczem klubu z samym soba. Nazwa zawsze ma prawo do siebie.
+        for n in sorted(known, key=lambda x: (0 if known[x] == x else 1, -sila.get(x, 0), x)):
+            cel = known[n]
+            if cel not in base:          # nowa druzyna, nie zabiera nikomu miejsca
+                if cel in zajete and zajete[cel] != n:
+                    known[n] = n
+                else:
+                    zajete.setdefault(cel, n)
+                continue
+            if cel in zajete:
+                print(f'  UZUPELNIJ_LIGI [{div}]: "{n}" i "{zajete[cel]}" wskazuja na ten sam klub '
+                      f'"{cel}". Zostaje "{zajete[cel]}" (dopasowanie pewniejsze); "{n}" wchodzi '
+                      f'jako osobny klub. Jesli to ta sama druzyna, dopisz ja do ALIAS2["{div}"].')
+                known[n] = n
+            else:
+                zajete[cel] = n
         mapping[div] = known
         g = g.copy(); g['HomeTeam'] = g.HomeTeam.map(known); g['AwayTeam'] = g.AwayTeam.map(known); out.append(g)
     return pd.concat(out, ignore_index=True), mapping
@@ -278,6 +352,12 @@ def main():
         grupy = []
     else:
         grupy = list(w.groupby(['Division', 'season']))
+    # Rezerwacje terminow musza byc WSPOLNE dla calego przebiegu, nie osobne dla kazdego
+    # sezonu. 22.09.2026: okna sezonow zachodza na siebie, wiec mecze dopisane przy
+    # sezonie A byly niewidoczne przy ukladaniu sezonu B — i klub dostawal dwa mecze
+    # tego samego dnia mimo zabezpieczenia. Tak powstalo np. "Inter Turku 1:0 KuPS"
+    # i "KuPS 1:1 Inter Turku" z ta sama data: to dwie rundy, obie wrzucone na 31.08.
+    zajete_globalnie = set()
     for (div, s), g in grupy:
         lo, hi = season_range(s)
         lo = pd.Timestamp(WIKI_START.get((div, s), lo)); hi = pd.Timestamp(WIKI_END.get((div, s), hi))
@@ -298,8 +378,41 @@ def main():
         rng = np.random.default_rng(19)
         rest = [rest[i] for i in rng.permutation(len(rest))]          # przemieszaj (matryca nie jest chronologiczna)
         rest.sort(key=lambda r: order.get(r.phase, 1))                # fazy końcowe na koniec sezonu
-        dates = pd.date_range(start, max(hi, start), periods=len(rest)).normalize()
-        for r, d in zip(rest, dates):
+        # 22.09.2026, druga poprawka. Najpierw bylo date_range(start, max(hi, start), ...),
+        # ktore przy start za koncem okna zwracalo N KOPII JEDNEJ DATY (143 mecze CHN
+        # z 2026-09-07). Rownomierne rozlozenie to naprawilo tylko polowicznie: daty
+        # przestaly sie stakowac, ale KLUB nadal trafial dwa razy na ten sam dzien,
+        # bo rozkladalismy mecze po LICZBIE, nie ogladajac, kto w nich gra.
+        # Teraz przydzielamy daty tak, zeby zaden klub nie gral dwa razy jednego dnia.
+        # To nie jest zgadywanie na sile: te daty sa z zalozenia przyblizone (matryca
+        # wiki nie zawiera dat), wiec wybranie sposrod nich takiego wariantu, ktory
+        # spelnia oczywista regule terminarza, jest BLIZEJ prawdy niz wariant, ktory
+        # jej lamie. Zajete dni zaczytujemy tez z meczow, ktore juz maja prawdziwa date,
+        # zeby dopisane nie wpadaly na nie.
+        zajete = zajete_globalnie
+        for _df in (dd, kbs):
+            for _h, _a, _d in zip(_df.HomeTeam, _df.AwayTeam, _df.MatchDate):
+                _d = pd.Timestamp(_d).normalize()
+                zajete.add((div, norm(_h), _d)); zajete.add((div, norm(_a), _d))
+
+        koniec = max(hi, start)
+        dni = list(pd.date_range(start, koniec).normalize()) or [start]
+        przydzial, rozszerzono = [], False
+        for r in rest:
+            kh, ka = norm(r.HomeTeam), norm(r.AwayTeam)
+            wybrany = None
+            for d in dni:
+                if (div, kh, d) not in zajete and (div, ka, d) not in zajete:
+                    wybrany = d; break
+            if wybrany is None:                      # okno wyczerpane — dokladamy dni na koncu
+                wybrany = dni[-1] + pd.Timedelta(days=1)
+                dni.append(wybrany); rozszerzono = True
+            zajete.add((div, kh, wybrany)); zajete.add((div, ka, wybrany))
+            przydzial.append((r, wybrany))
+        if rozszerzono:
+            print(f'  wiki {div} {s}: okno sezonu za krotkie dla {len(rest)} meczow — '
+                  f'rozszerzam do {dni[-1].date()}, zeby zaden klub nie gral 2x jednego dnia.')
+        for r, d in przydzial:
             add.append(dict(Division=div, MatchDate=d, HomeTeam=r.HomeTeam, AwayTeam=r.AwayTeam, FTHome=r.FTHome,
                             FTAway=r.FTAway, src='wiki'))
         print(f'  wiki {div} {s}: {len(g)} meczów w matrycy, dopisano {len(rest)} (daty przybliżone {start.date()}–{hi.date()})')

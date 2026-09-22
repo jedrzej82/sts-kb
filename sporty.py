@@ -466,6 +466,15 @@ def main(a):
                      f'Sprawdz nazwe: python3 sporty.py druzyny {sport} FRAGMENT\n'
                      f'Brak dopasowania jest poprawnym wynikiem — to noga MNIEJ na kuponie, '
                      f'a nie noga policzona z cudzych danych.')
+        # Gospodarz i gosc NIE MOGA rozwiazac sie do tej samej druzyny. Gdy to sie stanie,
+        # dwie rozne nazwy z oferty wskazuja jeden wpis w bazie — model policzylby wtedy
+        # mecz druzyny z sama soba i wyprodukowal P blisko 50% dla obu stron, wygladajace
+        # zupelnie normalnie. 22.09.2026 taka sytuacja siedziala w bazie 122 razy.
+        if h == g:
+            sys.exit(f'TA SAMA DRUZYNA PO OBU STRONACH: "{a[2]}" i "{a[3]}" wskazuja na "{h}" '
+                     f'— analiza przerwana.\n'
+                     f'Sprawdz nazwy: python3 sporty.py druzyny {sport} FRAGMENT\n'
+                     f'Lepiej nie miec tej nogi, niz miec ja policzona z pomylonych druzyn.')
         n = min(N.get(h, 0), N.get(g, 0))
         hf = 0 if '--neutral' in a else hfa
         today = pd.Timestamp.today().normalize()
