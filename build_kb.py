@@ -46,23 +46,91 @@ def norm(s):
 
 ALIAS = {'Athletic Club': 'Ath Bilbao', 'Borussia Mönchengladbach': "M'gladbach", 'FC Internazionale Milano': 'Inter',
          'NEC': 'Nijmegen', 'Queens Park Rangers FC': 'QPR', 'Sporting Clube de Braga': 'Sp Braga',
-         'Sporting Clube de Portugal': 'Sp Lisbon', 'Stade Rennais FC 1901': 'Rennes', 'Wolverhampton Wanderers FC': 'Wolves'}
+         'Sporting Clube de Portugal': 'Sp Lisbon', 'Stade Rennais FC 1901': 'Rennes', 'Wolverhampton Wanderers FC': 'Wolves',
+         # 22.09.2026 — cztery pary, w ktorych stare dopasowanie podstawialo INNY klub.
+         # Oba kluby z kazdej pary sa w bazie osobno, wiec nie chodzilo o pisownie.
+         'RCD Espanyol de Barcelona': 'Espanol', 'RCD Espanyol': 'Espanol', 'Espanyol': 'Espanol',
+         'Paris Saint-Germain FC': 'Paris SG', 'Paris Saint-Germain': 'Paris SG',
+         'AE Lárissa': 'Larisa', 'AE Larissa': 'Larisa',
+         'İstanbul Başakşehir': 'Buyuksehyr', 'Istanbul Basaksehir': 'Buyuksehyr',
+         'Aris Saloniki': 'Aris', 'AEK Athen': 'AEK', 'PAOK Saloniki': 'PAOK',
+         # Kluby, ktorych ocena podobienstwa wypada PONIZEJ progu, mimo ze dopasowanie jest
+         # poprawne. Zmierzone 22.09.2026: oceny par poprawnych (0,50-0,62) NAKLADAJA SIE na
+         # oceny par blednych (0,54-0,77) — "Espanyol -> Barcelona" dostawalo 0,77, czyli
+         # wiecej niz poprawne "Benfica" (0,62). Zadnym progiem sie ich nie rozdzieli,
+         # wiec te przypadki zapisujemy WPROST, zamiast obnizac prog i wpuszczac bledne.
+         'Crewe Alexandra': 'Crewe', 'Olympique Lyonnais': 'Lyon', 'Stade Brestois 29': 'Brest',
+         'Stade Lavallois': 'Laval', 'AZ': 'AZ Alkmaar', 'PSV': 'PSV Eindhoven',
+         'Sport Lisboa e Benfica': 'Benfica'}
+
+
+def _czlony(s):
+    """Czlony nazwy po normalizacji — do porownywania na GRANICACH slow, nie liter."""
+    s = unicodedata.normalize('NFKD', str(s)).encode('ascii', 'ignore').decode().lower()
+    s = re.sub(r"\b(fc|cf|afc|ac|sc|ssc|as|us|ud|cd|rc|rcd|sd|ca|sv|vfl|vfb|tsg|fk|sk|bk|if|club|calcio|balompie|de|futbol|football|1\.|\d{4})\b", ' ', s)
+    return tuple(t for t in re.findall(r'[a-z]+', s) if t)
+
+
+def _podobienstwo(zrodlo, baza):
+    """Ocena 0..1, jak bardzo nazwa z biezacego sezonu pasuje do nazwy z bazy.
+    Laczy podobienstwo liter z dopasowaniem CZLONOW, bo bazy skracaja czlony
+    ("Manchester City" -> "Man City", "Olympique Lyonnais" -> "Lyon")."""
+    kz, kb = norm(zrodlo), norm(baza)
+    if not kz or not kb: return 0.0
+    if kz == kb: return 1.0
+    ocena = difflib.SequenceMatcher(None, kz, kb).ratio()
+    tz, tb = _czlony(zrodlo), _czlony(baza)
+    if tz and tb:
+        # kazdy czlon bazy, ktory jest przedrostkiem jakiegos czlonu zrodla (lub odwrotnie)
+        trafione = 0
+        for b in tb:
+            for z in tz:
+                if b == z or (len(b) >= 3 and z.startswith(b)) or (len(z) >= 3 and b.startswith(z)):
+                    trafione += 1; break
+        ocena = max(ocena, trafione / max(len(tz), len(tb)))
+        if tz[0] == tb[0] or tz[-1] == tb[-1]: ocena += 0.08
+    return min(ocena, 0.999)
+
+
+PROG = 0.62
 
 
 def map_names(of_names, base_names):
-    base = {norm(b): b for b in base_names}
-    out = {}
-    for n in of_names:
-        if n in ALIAS and ALIAS[n] in base_names:
-            out[n] = ALIAS[n]; continue
-        k = norm(n)
-        if k in base:
-            out[n] = base[k]; continue
-        cand = [b for kb, b in base.items() if kb and (kb in k or k in kb)]
-        if len(cand) == 1:
-            out[n] = cand[0]; continue
-        m = difflib.get_close_matches(k, list(base), n=1, cutoff=0.6)
-        out[n] = base[m[0]] if m else None
+    """Przypisanie GLOBALNE, nie nazwa po nazwie.
+    22.09.2026. Poprzednio kazda nazwa szukala sobie dopasowania osobno, regula
+    "czy litery jednej zawieraja sie w drugiej", a na koniec difflib z progiem 0.6.
+    Skutkiem byly PODMIANY DRUZYN, nie literowki:
+      "RCD Espanyol de Barcelona" -> "Barcelona"    (Espanyol to inny klub)
+      "Paris Saint-Germain FC"    -> "Paris FC"     (PSG to inny klub)
+      "AE Larissa"                -> "Aris"         (Larisa to inny klub)
+    Oba kluby z kazdej pary sa w bazie OSOBNO. Mecz ladowal na koncie niewlasciwego
+    klubu i psul Elo obu naraz — a poniewaz to build_kb, blad zapisywal sie w bazie.
+    Teraz: w jednej lidze przypisanie musi byc ROZNOWARTOSCIOWE (klub bazy trafia
+    do co najwyzej jednej nazwy z sezonu). Liczymy oceny wszystkich par i bierzemy
+    je od najlepszej; "FC Barcelona" zabiera "Barcelona" wczesniej, niz zdazy po nia
+    siegnac "RCD Espanyol de Barcelona", ktore dostaje wtedy "Espanol"."""
+    out = {n: None for n in of_names}
+    wolne_z = set(of_names)
+    wolne_b = set(base_names)
+
+    for n in sorted(of_names):                       # aliasy maja pierwszenstwo
+        if n in ALIAS and ALIAS[n] in wolne_b:
+            out[n] = ALIAS[n]; wolne_z.discard(n); wolne_b.discard(ALIAS[n])
+
+    pary = []
+    for n in sorted(wolne_z):
+        for b in sorted(wolne_b):
+            o = _podobienstwo(n, b)
+            if o >= PROG: pary.append((o, n, b))
+    # sortujemy malejaco po ocenie; przy remisie po nazwach, zeby wynik byl powtarzalny
+    pary.sort(key=lambda x: (-x[0], x[1], x[2]))
+    for o, n, b in pary:
+        if n in wolne_z and b in wolne_b:
+            out[n] = b; wolne_z.discard(n); wolne_b.discard(b)
+            if o < 0.80:
+                print(f'  BUILD_KB: "{n}" -> "{b}" (ocena {o:.2f}) — dopasowanie slabe, sprawdz i dopisz do ALIAS.')
+    for n in sorted(wolne_z):
+        print(f'  BUILD_KB: "{n}" bez dopasowania w bazie — mecze tego klubu pominiete.')
     return out
 
 
@@ -84,6 +152,12 @@ def openfootball_rows(m):
             h, a = mp.get(x['team1']), mp.get(x['team2'])
             if not h or not a:
                 unmatched.update([t for t, v in ((x['team1'], h), (x['team2'], a)) if not v]); continue
+            if h == a:
+                # klub nie moze grac sam ze soba. Jesli do tego doszlo, dwie rozne nazwy
+                # zostaly zlepione w jedna — mecz jest bezwartosciowy, a zapisany psulby Elo.
+                print(f'  BUILD_KB: "{x["team1"]}" i "{x["team2"]}" wskazuja na ten sam klub "{h}" '
+                      f'({div}, {x["date"]}) — mecz POMINIETY. Dopisz obie nazwy do ALIAS.')
+                unmatched.update([x['team1'], x['team2']]); continue
             ht = x['score'].get('ht') or [None, None]
             rows.append(dict(Division=div, MatchDate=x['date'], MatchTime=x.get('time'), HomeTeam=h, AwayTeam=a,
                              FTHome=x['score']['ft'][0], FTAway=x['score']['ft'][1], HTHome=ht[0], HTAway=ht[1], src='openfootball'))
