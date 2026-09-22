@@ -166,6 +166,13 @@ def openfootball_rows(m):
 
 
 
+
+def _zawiera(x, y):
+    """Czy jedna nazwa zawiera sie w drugiej na poziomie CZLONOW, nie liter."""
+    tx, ty = set(_czlony(x)), set(_czlony(y))
+    return bool(tx) and bool(ty) and (tx <= ty or ty <= tx)
+
+
 def _aliasy_raz(allm):
     """Znajduje pary nazw oznaczajace TEN SAM klub, na podstawie terminarza, nie napisow.
 
@@ -213,7 +220,14 @@ def _aliasy_raz(allm):
                     # uwaga: nie wolno porownywac tu ocen — "Vitoria" i "Vitória" maja
                     # ocene 1.0 po normalizacji, a jako napisy sa rozne i wlasnie takie
                     # pary trzeba wychwycic.
-                if max(sh, sa) < 0.80: continue      # zadna strona nie pasuje — to inny mecz
+                # Strona "mocna" musi byc PEWNA, a nie tylko podobna. 22.09.2026 prog 0.80
+                # scalil "Bedford Town" z "Hednesford Town" (ocena rowno 0.800), a przez to
+                # takze ich rywali: "Hebburn Town" ze "Spalding United". Cztery rozne kluby.
+                # Samo podobienstwo nie rozdziela: poprawne "CA Mineiro"="Atletico-MG" ma 0.118,
+                # a bledne "Bedford"/"Hednesford" ma 0.800.
+                if max(sh, sa) < 0.90 and not (_zawiera(a.HomeTeam, b.HomeTeam)
+                                               or _zawiera(a.AwayTeam, b.AwayTeam)):
+                    continue
                 oceny.append((sh + sa, i, j, sh, sa))
         oceny.sort(key=lambda x: (-x[0], x[1], x[2]))
         uzyte = set()
@@ -234,6 +248,11 @@ def _aliasy_raz(allm):
     mapa, odrzucone = {}, 0
     for (div, x, y), n in sorted(kandydaci.items(), key=lambda kv: (-kv[1], kv[0])):
         if (div, x, y) in spotkania:       # zagrali ze soba, wiec to DWA rozne kluby
+            odrzucone += 1; continue
+        # Para o NISKIM wlasnym podobienstwie jest wnioskowana z eliminacji, wiec wymaga
+        # POTWIERDZENIA: musi wyjsc z co najmniej trzech niezaleznych meczow. Jednorazowe
+        # zderzenie to za malo — tak powstalo bledne "Hebburn Town" = "Spalding United".
+        if sim(x, y) < 0.90 and not _zawiera(x, y) and n < 3:
             odrzucone += 1; continue
         zwyciezca, przegrany = (x, y) if (ile.get(x, 0), len(x)) >= (ile.get(y, 0), len(y)) else (y, x)
         while (div, zwyciezca) in mapa:    # domykamy lancuchy A->B->C
@@ -270,6 +289,54 @@ def aliasy_z_terminarza(allm, maks_rund=6):
     return allm
 
 
+
+def przesun_daty_przyblizone(allm):
+    """Przesuwa mecze o dacie PRZYBLIZONEJ (zrodlo wiki), gdy koliduja z meczem o dacie
+    prawdziwej. Matryce wiki nie zawieraja dat, wiec date im nadajemy — jesli wypadla
+    tam, gdzie klub ma juz mecz z prawdziwa data, to nasza data jest bledna, nie tamta.
+    Szukamy najblizszego wolnego dnia, zeby nie gubic wyniku."""
+    if 'src_zrodlo' not in allm.columns: return allm
+    d = allm.dropna(subset=['MatchDate', 'HomeTeam', 'AwayTeam']).copy()
+    d['dt'] = pd.to_datetime(d.MatchDate, errors='coerce')
+    d = d.dropna(subset=['dt'])
+
+    zajete = set()
+    for r in d.itertuples():
+        zajete.add((r.Division, str(r.HomeTeam), r.dt)); zajete.add((r.Division, str(r.AwayTeam), r.dt))
+
+    # liczba meczow klubu w danym dniu — liczona RAZ, nie dla kazdego wiersza osobno
+    dl = pd.concat([d.assign(kk=d.HomeTeam.astype(str)), d.assign(kk=d.AwayTeam.astype(str))])
+    licznik = dl.groupby(['Division', 'dt', 'kk']).size().to_dict()
+
+    przybl = d[d.src_zrodlo == 'wiki']
+    zmiany, nieudane = {}, 0
+    for r in przybl.itertuples():
+        if max(licznik.get((r.Division, r.dt, str(r.HomeTeam)), 0),
+               licznik.get((r.Division, r.dt, str(r.AwayTeam)), 0)) < 2:
+            continue                                # nie koliduje z nikim
+        nowa = None
+        for krok in range(1, 40):
+            for zn in (1, -1):
+                kand = r.dt + pd.Timedelta(days=krok * zn)
+                if (r.Division, str(r.HomeTeam), kand) not in zajete and \
+                   (r.Division, str(r.AwayTeam), kand) not in zajete:
+                    nowa = kand; break
+            if nowa is not None: break
+        if nowa is None:
+            nieudane += 1; continue
+        zajete.discard((r.Division, str(r.HomeTeam), r.dt)); zajete.discard((r.Division, str(r.AwayTeam), r.dt))
+        zajete.add((r.Division, str(r.HomeTeam), nowa)); zajete.add((r.Division, str(r.AwayTeam), nowa))
+        zmiany[r.Index] = nowa.strftime('%Y-%m-%d')
+
+    if zmiany:
+        print(f'  BUILD_KB: przesunieto {len(zmiany)} meczow o dacie przyblizonej (wiki), '
+              f'bo kolidowaly z meczem o dacie prawdziwej.')
+        if nieudane: print(f'      {nieudane} nie udalo sie przesunac — brak wolnego dnia w zasiegu.')
+        for idx, nowa in zmiany.items():
+            if idx in allm.index: allm.loc[idx, 'MatchDate'] = nowa
+    return allm
+
+
 def main():
     fetch('--refresh' in sys.argv)
     cols = ['Division', 'MatchDate', 'MatchTime', 'HomeTeam', 'AwayTeam', 'HomeElo', 'AwayElo', 'FTHome', 'FTAway',
@@ -285,15 +352,22 @@ def main():
         d = pd.read_csv(delta); d['src'] = 'delta'; parts.append(d)
     extra = os.path.join(HERE, 'ligi_extra.csv')  # uzupelnij_ligi.py: FBref (worldfootballR_data) + openfootball + matryce Wikipedii
     if os.path.exists(extra):
-        e = pd.read_csv(extra); e['src'] = 'extra'; parts.append(e)
+        e = pd.read_csv(extra)
+        # zachowujemy oryginalne zrodlo: tylko ono mowi, ktory wiersz ma date PRZYBLIZONA
+        # (wiki) a ktory prawdziwa (sofa/fbref/espn). Bez tego nie da sie rozstrzygnac,
+        # ktora z dwoch kolidujacych dat jest ta wymyslona.
+        e['src_zrodlo'] = e['src'] if 'src' in e.columns else None
+        e['src'] = 'extra'; parts.append(e)
         try:
             from uzupelnij_ligi import NOWE; DIV_NAME.update({k: v for k, v in NOWE.items() if k not in DIV_NAME})
         except Exception: pass
     allm = pd.concat(parts, ignore_index=True)
     allm = allm.drop_duplicates(subset=['Division', 'MatchDate', 'HomeTeam', 'AwayTeam'], keep='first')
     allm = aliasy_z_terminarza(allm)
+    allm = przesun_daty_przyblizone(allm)
     allm = allm.drop_duplicates(subset=['Division', 'MatchDate', 'HomeTeam', 'AwayTeam'], keep='first')
     DIV_NAME.update({d: d for d in allm.Division.dropna().unique() if d not in DIV_NAME})  # ligi z Sofascore: „Kraj | Liga”
+    allm = allm.drop(columns=['src_zrodlo'], errors='ignore')
     allm = allm.sort_values(['MatchDate', 'Division']).reset_index(drop=True)
     intl = pd.read_csv(os.path.join(RAW, 'intl_results.csv')).dropna(subset=['home_score', 'away_score'])
     elo = pd.read_csv(os.path.join(RAW, 'EloRatings.csv'))
