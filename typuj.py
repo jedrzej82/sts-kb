@@ -351,6 +351,21 @@ def club(home, away, kursy, live=None):
                  f'W meczu ligi krajowej obie druzyny sa z jednego kraju — jedna z nazw zostala '
                  f'dopasowana do INNEGO klubu. Analiza przerwana, noga MNIEJ. '
                  f'Puchary kontynentalne (Libertadores, Liga Mistrzow...) i sparingi: dodaj --kontynentalny.')
+    # 22.09.2026, USTERKA U3: KROK 2b wymaga ostrzezenia dla ligi bez meczow z ostatnich 60 dni,
+    # a skrypt go nie wypisywal. Liga PAR konczyla sie w bazie 2025-07-31, Sol de America mial ostatni
+    # mecz 2024-06-06 (838 dni), a model podawal dla tego meczu rynki z dokladnoscia do dziesiatych
+    # procenta. Stara historia daje sile druzyny sprzed roku — innego skladu, czasem innej ligi.
+    # Wypisujemy OD RAZU, nie tylko w zbiorczej liscie na koncu, zeby nie zginelo pod tabela P.
+    for t_, d_ in ((h, dh), (a, da)):
+        ost_l = m.loc[m.Division == d_, 'MatchDate'].max() if d_ else pd.NaT
+        ost_t = m.loc[(m.HomeTeam == t_) | (m.AwayTeam == t_), 'MatchDate'].max()
+        for co, ost in ((f'LIGA {d_}', ost_l), (f'DRUZYNA {t_}', ost_t)):
+            if pd.notna(ost) and (today - ost).days > 60:
+                msg = (f'{co} NIESWIEZA: ostatni mecz w bazie {ost.date()} ({(today - ost).days} dni temu) '
+                       f'— P to SZACUNEK: podawaj przedzial, nie dziesiate czesci procenta; max 1 noga na kupon.')
+                if msg not in ostrz:
+                    print('  ' + msg)
+                    ostrz.append(msg)
     ldc, rho = None, -0.05
     if dh and dh == da:
         mdl = cached(f'dc_{dh}_{today.date()}', lambda: fit_dc(m[m.Division == dh], today))
