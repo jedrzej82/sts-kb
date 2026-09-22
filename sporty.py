@@ -483,6 +483,20 @@ def main(a):
             print(f'  braku danych. NIE buduj na tym nogi kuponu, nawet jesli EV wychodzi wysokie.')
         elif n < 10:
             print(f'  UWAGA: mało meczów w bazie ({n}) — P to szacunek; opieraj się na statystykach z sieci (MASTER PROMPT część B).')
+        elif n < 25:
+            # 22.09.2026. Polska-Niemcy (siatkowka, 16 i 10 meczow) nie dostawalo ZADNEGO ostrzezenia,
+            # bo prog konczyl sie na n<10. A to wlasnie ten zakres myli sie w PRZEWIDYWALNA strone.
+            # Elo startuje od 1500 i po kilkunastu meczach jeszcze tam nie dotarlo: cale reprezentacje
+            # siatkarskie mieszcza sie w pasmie 1383-1718 (335 pkt), podczas gdy same KLUBY, majace
+            # po 22-28 meczow, siegaja 1783. Rozstep jest scisniety, wiec faworyt dostaje P za niskie,
+            # a slabszy za wysokie — i to tym mocniej, im wieksza jest prawdziwa roznica klas.
+            # Skutek praktyczny: na slabszej druzynie wychodzi pozorne, bardzo wysokie EV. To nie jest
+            # przewaga, tylko brak zbieznosci Elo. Ostrzegamy o kierunku bledu, nie o jego istnieniu.
+            print(f'  ELO NIEZBIEZNE: najslabiej opisana druzyna ma {n} mecz(e) — za malo, by Elo')
+            print(f'  odeszlo od startowych 1500. Rozstep jest scisniety KU SRODKOWI: P faworyta jest')
+            print(f'  zanizone, P slabszego zawyzone, tym bardziej im wieksza roznica klas.')
+            print(f'  Wysokie EV na SLABSZEJ druzynie jest tu artefaktem, nie przewaga — nie graj go.')
+            print(f'  P faworyta traktuj jako DOLNA granice. Mecze wyrownane sa wiarygodniejsze.')
     elif a[0] == 'typ':
         row = dict(data=a[1], sport=a[2].lower(), gosp=a[3], gosc=a[4], rynek=a[5], p=float(a[6]), trafiony=None)
         pd.DataFrame([row]).to_csv(LOG, mode='a', header=not os.path.exists(LOG), index=False); print('zapisano', row)
