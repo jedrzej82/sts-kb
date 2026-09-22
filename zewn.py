@@ -68,7 +68,13 @@ def czytaj(wzor):
                   f'(np. {przyk}) — uszkodzone przy zapisie przez Apps Script.')
             d = d[ok].reset_index(drop=True)
 
-    klucz = [c for c in ('data', 'sport', 'liga', 'gosp', 'gosc') if c in d.columns]
+    # 22.09.2026. Do klucza dochodzi WYNIK i TURNIEJ. Bez nich dwa rozne mecze tej samej pary
+    # tego samego dnia zlewaly sie w jeden: baseball (MLB, meksykanska LMB) gra dwumecze,
+    # zostawal tylko ostatni. Zmierzone na snapshocie zewn/: 175 meczow traconych cicho
+    # (167 baseball/inne, 5 pilka, 1 boks). Powtorka zapisu z Apps Script ma wynik IDENTYCZNY,
+    # wiec dalej jest odsiewana — a tych bylo duzo: 17-19.09 kazdy mecz siedzial w pliku 2-4 razy.
+    klucz = [c for c in ('data', 'sport', 'liga', 'turniej', 'gosp', 'gosc',
+                         'wg', 'wa', 'gg', 'ga', 'pg', 'pa') if c in d.columns]
     if 'okresy_g' in d.columns:   # ten sam mecz pobrany ponownie: zostaje wiersz z pełniejszymi danymi (okresy/nawierzchnia)
         d = d.assign(_pel=(d.okresy_g != '').astype(int) + (d.get('nawierzchnia', '') != '').astype(int)).sort_values('_pel', kind='stable')
         d = d.drop(columns='_pel')
