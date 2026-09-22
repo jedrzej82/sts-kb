@@ -20,28 +20,41 @@ NOWE_DIV = {'POL2': 'Polska I liga', 'ISR': 'Izrael', 'CYP': 'Cypr', 'SVK': 'Sł
 # Sofascore: (fragment kraju, wzorzec nazwy rozgrywek) → Division kb; reszta lig → „Kraj | Liga” (każda liga świata)
 SOFA_DIV = [('england', r'^premier league$', 'E0'), ('england', r'^championship$', 'E1'), ('england', r'^league one$', 'E2'),
             ('england', r'^league two$', 'E3'), ('england', r'^national league$', 'EC'), ('spain', r'^laliga$', 'SP1'),
-            ('spain', r'laliga 2|hypermotion|^segunda division$', 'SP2'), ('germany', r'^bundesliga$', 'D1'), ('germany', r'^2\. bundesliga$', 'D2'),
+            ('spain', r'laliga 2|hypermotion|^segunda division$', 'SP2'), ('germany', r'^bundesliga$', 'D1'), ('germany', r'^2\. bundesliga$|^bundesliga 2$', 'D2'),
             ('germany', r'^3\. liga$', 'D3'), ('italy', r'^serie a$', 'I1'), ('italy', r'^serie b$', 'I2'), ('france', r'^ligue 1$', 'F1'),
             ('france', r'^ligue 2$', 'F2'), ('netherlands', r'^eredivisie$', 'N1'), ('netherlands', r'eerste divisie|keuken kampioen', 'N2'),
             ('portugal', r'liga portugal$|^liga portugal betclic|primeira liga', 'P1'), ('belgium', r'^(jupiler )?pro league$|jupiler', 'B1'),
-            ('belgium', r'challenger pro league', 'B2'), ('scotland', r'^premiership$', 'SC0'), ('scotland', r'^championship$', 'SC1'),
+            ('belgium', r'challenger pro league', 'B2'), ('scotland', r'^(scottish )?premiership$', 'SC0'), ('scotland', r'^(scottish )?championship$', 'SC1'),
+            ('scotland', r'^(scottish )?league one$', 'SC2'), ('scotland', r'^(scottish )?league two$', 'SC3'),
             ('turk', r'^(trendyol )?s[uü]per lig$', 'T1'), ('greece', r'super league( 1)?$|stoiximan', 'G1'),
             ('norway', r'^eliteserien$', 'NOR'), ('sweden', r'^allsvenskan$', 'SWE'), ('sweden', r'^superettan$', 'SWE2'),
             ('denmark', r'superliga', 'DEN'), ('finland', r'veikkausliiga', 'FIN'), ('ireland', r'premier division', 'IRL'),
-            ('switzerland', r'^super league$', 'SUI'), ('austria', r'^bundesliga$', 'AUT'), ('russia', r'^premier league$', 'RUS'),
-            ('romania', r'^(superliga|liga i)$', 'ROM'), ('poland', r'^ekstraklasa$', 'POL'), ('poland', r'^(i liga|1\. liga|betclic 1\. liga)$', 'POL2'),
+            ('switzerland', r'^super league$', 'SUI'), ('austria', r'^bundesliga$', 'AUT'), ('russia', r'^premier (league|liga)$', 'RUS'),
+            ('romania', r'^(superliga|liga i|liga 1)$', 'ROM'), ('poland', r'^ekstraklasa$', 'POL'), ('poland', r'^(i liga|1\. liga|betclic 1\. liga)$', 'POL2'),
             ('mexico', r'^liga mx', 'MEX'), ('usa', r'^mls$', 'USA'), ('usa', r'usl championship', 'USL'),
             ('argentina', r'liga profesional', 'ARG'), ('brazil', r's[eé]rie a$', 'BRA'), ('brazil', r's[eé]rie b$', 'BRA2'),
             ('japan', r'^j1 league$', 'JAP'), ('japan', r'^j2 league$', 'JAP2'), ('china', r'super league', 'CHN'),
             ('czech', r'(1\. liga|chance liga)$', 'CZE'), ('croatia', r'hnl$', 'CRO'), ('serbia', r'super ?liga', 'SRB'),
-            ('ukraine', r'^premier league$', 'UKR'), ('korea', r'^k league 1$', 'KOR'), ('saudi', r'pro league', 'KSA'),
+            ('ukraine', r'^premier league$', 'UKR'), ('korea', r'^k league 1$', 'KOR'), ('saudi', r'pro league|^saudi league$', 'KSA'),
             ('australia', r'a-league men', 'AUS'), ('bulgaria', r'(parva liga|efbet liga|first league)', 'BUL'),
-            ('hungary', r'^nb i$', 'HUN'), ('chile', r'liga de primera|primera divisi', 'CHI'), ('colombia', r'primera a', 'COL'),
-            ('ecuador', r'ligapro', 'ECU'), ('uruguay', r'primera divisi', 'URU'), ('peru', r'^liga 1', 'PER'),
-            ('paraguay', r'primera divisi', 'PAR'), ('bolivia', r'divisi[oó]n profesional', 'BOL'), ('venezuela', r'^(liga futve|primera divisi[oó]n)$', 'VEN'),
-            ('south africa', r'premiership', 'RSA'), ('iran', r'pro league', 'IRN'), ('canada', r'canadian premier league', 'CAN'),
-            ('israel', r'premier league', 'ISR'), ('cyprus', r'1st division|first division', 'CYP'),
-            ('slovakia', r'(niké liga|super liga|1\. liga)', 'SVK'), ('slovenia', r'prvaliga', 'SVN')]
+            ('hungary', r'^nb i$|otp bank liga', 'HUN'), ('chile', r'liga de primera|primera divisi|^first division$', 'CHI'), ('colombia', r'primera a|^liga betplay$', 'COL'),
+            ('ecuador', r'liga ?pro', 'ECU'), ('uruguay', r'primera divisi|^uruguayan championship$', 'URU'), ('peru', r'^liga 1', 'PER'),
+            ('paraguay', r'primera divisi|^copa de primera$', 'PAR'), ('bolivia', r'divisi[oó]n profesional', 'BOL'), ('venezuela', r'^(liga futve|primera divisi[oó]n)$', 'VEN'),
+            ('south africa', r'premiership|^premier league$', 'RSA'), ('iran', r'pro league', 'IRN'), ('canada', r'canadian premier league', 'CAN'),
+            ('israel', r'premier league', 'ISR'), ('cyprus', r'1st division|first division|cyta championship', 'CYP'),
+            ('slovakia', r'(nike liga|super liga|1\. liga)', 'SVK'), ('slovenia', r'prvaliga', 'SVN')]
+# Ligi, w ktorych nazwie jest slowo pucharowe, a to sa rozgrywki LIGOWE. Paragwajska ekstraklasa
+# w 365scores nazywa sie "Copa de Primera" i filtr PUCHAR wyrzucal ja w calosci — dlatego liga PAR
+# stala w bazie na 2025-07-31. Wyjatek wymaga kraju i DOKLADNEJ nazwy, zeby nie otworzyc furtki
+# pucharom krajowym (Copa Paraguay dalej jest odrzucana).
+LIGA_NIE_PUCHAR = [('paraguay', r'^copa de primera$')]
+
+
+def _liga_nie_puchar(kraj, turniej):
+    k, t = _n(kraj), _n(turniej)
+    return any(kk in k and re.search(rx, t) for kk, rx in LIGA_NIE_PUCHAR)
+
+
 PUCHAR = re.compile(r'cup|pokal|copa|coupe|coppa|ta[cç]a|beker|pohar|puchar|friendl|qualif|play-?off|super ?cup|trophy|shield|u1\d|u2\d|youth|reserv|amateur|femen|feminin|women|frauen|damen|\(w\)|liga f$|premier league 2|primavera|juvenil|sub-?\d\d', re.I)
 
 
@@ -155,11 +168,12 @@ def pilka():
                                      HomeRed=num('czerwone_g'), AwayRed=num('czerwone_a'), src='espn')))
     s = czytaj('wyniki_*_pilka_*.csv')
     if len(s):
-        s = s[~s.turniej.str.contains(PUCHAR) & ~s.kraj.str.contains(r'international|world|europe|south america|africa|asia|north|club', case=False)]
+        _puchar = s.turniej.str.contains(PUCHAR) & ~pd.Series([_liga_nie_puchar(k, t) for k, t in zip(s.kraj, s.turniej)], index=s.index, dtype=bool)
+        s = s[~_puchar & ~s.kraj.str.contains(r'^(?:international|world|europe|south america|africa|asia|oceania|north america|north (?:and|&) central america|club.*)$', case=False)]
         div = [sofa_div(k, t) or f'{k} | {t}' for k, t in zip(s.kraj, s.turniej)]
         s = s.assign(Division=div)
         n = s.groupby('Division').Division.transform('size')
-        s = s[(n >= 60) | s.Division.isin(set(ESPN_DIV.values()) | {'EC', 'SC1'})]   # nieznane ligi: tylko z historią ≥60 meczów
+        s = s[(n >= 60) | s.Division.isin(set(ESPN_DIV.values()) | {kod for _, _, kod in SOFA_DIV})]   # nieznane ligi: tylko z historią ≥60 meczów
         out.append(pd.DataFrame(dict(Division=s.Division, MatchDate=pd.to_datetime(s.data), HomeTeam=s.gosp, AwayTeam=s.gosc,
                                      FTHome=pd.to_numeric(s.wg, errors='coerce'), FTAway=pd.to_numeric(s.wa, errors='coerce'),
                                      HTHome=pd.to_numeric(s.okresy_g.str.split(';').str[0], errors='coerce'),

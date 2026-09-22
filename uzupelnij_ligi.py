@@ -92,6 +92,8 @@ def ofjson():
 
 
 ALIAS2 = {
+ # 22.09.2026: nazwy z 365scores po poprawce mapy lig w zewn.py — bez tego klub rozpadal sie na dwa wpisy
+ 'SC2': {'Queen Of The South': 'Queen of Sth', 'Queen of the South': 'Queen of Sth'},
  'SWE': {'AIK Stockholm': 'AIK', 'Östersund': 'Ostersunds', 'Östersunds FK': 'Ostersunds'},
  'USA': {'LA Galaxy': 'Los Angeles Galaxy', 'NE Revolution': 'New England Revolution', 'NYCFC': 'New York City',
          'New York RB': 'New York Red Bulls', 'Sporting KC': 'Sporting Kansas City'},
@@ -126,7 +128,7 @@ ALIAS2 = {
          'CF América': 'Club America', 'León': 'Club Leon', 'Club León': 'Club Leon', 'Tijuana': 'Club Tijuana',
          'Guadalajara': 'Guadalajara Chivas', 'Chivas': 'Guadalajara Chivas', 'FC Juárez': 'Juarez', 'Santos': 'Santos Laguna',
          'Mazatlán': 'Mazatlan FC', 'Atlético': 'Atl. San Luis', 'Deportivo Guadalajara': 'Guadalajara Chivas', 'Gallos Blancos': 'Queretaro', 'Mazatlán FC': 'Mazatlan FC'},
- 'ROM': {'CS U Craiova': 'Univ. Craiova', 'Universitatea Craiova': 'Univ. Craiova', 'CS Universitatea Craiova': 'Univ. Craiova',
+ 'ROM': {'Csíkszereda Miercurea Ciuc': 'Csikszereda M. Ciuc', 'Csikszereda Miercurea Ciuc': 'Csikszereda M. Ciuc', 'CS U Craiova': 'Univ. Craiova', 'Universitatea Craiova': 'Univ. Craiova', 'CS Universitatea Craiova': 'Univ. Craiova',
          'FC U Craiova': 'U Craiova 1948', 'FC U Craiova 1948': 'U Craiova 1948', 'U Cluj': 'U. Cluj',
          'Universitatea Cluj': 'U. Cluj', 'Dinamo București': 'Din. Bucuresti', 'Rapid București': 'FC Rapid Bucuresti',
          'Sepsi': 'Sepsi Sf. Gheorghe', 'Sepsi OSK': 'Sepsi Sf. Gheorghe', 'Oțelul Galați': 'Otelul'},
