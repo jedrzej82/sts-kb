@@ -23,15 +23,33 @@ PYTH = {'hokej': 2.0, 'koszykówka': 13.9, 'piłka ręczna': 7.5, 'siatkówka': 
 def seeds(sport):
     """Startowe Elo z tabeli ligowej: udział zwycięstw (dogrywki = wygrane, remis = ½) + Pitagoras z bramek/punktów/setów,
     ściągnięte do średniej (6 meczów). Elo = 1500 + 400·log10(w/(1−w)) — siła względem średniej ligi."""
+    # 22.09.2026: JEDEN uszkodzony wiersz w tabele_eu.csv wywracal caly skrypt, a przez to
+    # caly dzien konczyl sie bez kuponu — tak bylo 21.09 (Bilans: "sporty.py padal na
+    # uszkodzonym tabele_eu.csv"). Tabela daje tylko SILE STARTOWA, wiec zly wiersz ma byc
+    # pominiety i GLOSNO zgloszony, a nie zatrzymywac analize wszystkich sportow.
     if not os.path.exists(TAB): return []
-    t = pd.read_csv(TAB); t = t[(t.sport == sport) & (t.gp > 0)]
+    t = pd.read_csv(TAB)
+    t = t[t.sport == sport].copy()
+    if not len(t): return []
+    n0 = len(t)
+    for kol in ('gp', 'w', 'd', 'l', 'otw', 'otl', 'gf', 'ga'):
+        t[kol] = pd.to_numeric(t.get(kol), errors='coerce')
+    t['data'] = pd.to_datetime(t.get('data'), errors='coerce')
+    t = t.dropna(subset=['gp', 'w', 'd', 'l', 'otw', 'otl', 'gf', 'ga', 'data', 'druzyna'])
+    t = t[(t.gp > 0) & (t.gf >= 0) & (t.ga >= 0)]
+    if len(t) < n0:
+        print(f'  tabele_eu.csv ({sport}): pominieto {n0 - len(t)} z {n0} wierszy z uszkodzonymi danymi '
+              f'— sila startowa z tabeli bedzie niepelna dla tego sportu.')
     out = []
     for r in t.itertuples():
-        wp = (r.w + r.otw + 0.5 * r.d) / r.gp
-        k = PYTH.get(sport, 2.0)
-        c = 0.5 * wp + 0.5 * (r.gf ** k / (r.gf ** k + r.ga ** k)) if r.gf + r.ga > 0 else wp
-        c = (c * r.gp + 0.5 * 6) / (r.gp + 6); c = min(max(c, 0.03), 0.97)
-        out.append((pd.Timestamp(r.data), r.druzyna, 1500 + 400 * np.log10(c / (1 - c)), int(r.gp), r.liga))
+        try:
+            wp = (r.w + r.otw + 0.5 * r.d) / r.gp
+            k = PYTH.get(sport, 2.0)
+            c = 0.5 * wp + 0.5 * (r.gf ** k / (r.gf ** k + r.ga ** k)) if r.gf + r.ga > 0 else wp
+            c = (c * r.gp + 0.5 * 6) / (r.gp + 6); c = min(max(c, 0.03), 0.97)
+            out.append((pd.Timestamp(r.data), r.druzyna, 1500 + 400 * np.log10(c / (1 - c)), int(r.gp), r.liga))
+        except (ValueError, TypeError, ZeroDivisionError, OverflowError) as e:
+            print(f'  tabele_eu.csv ({sport}): wiersz "{r.druzyna}" pominiety ({type(e).__name__}: {e})')
     return sorted(out)
 NFL = dict(ARI='Arizona Cardinals', ATL='Atlanta Falcons', BAL='Baltimore Ravens', BUF='Buffalo Bills', CAR='Carolina Panthers', CHI='Chicago Bears',
            CIN='Cincinnati Bengals', CLE='Cleveland Browns', DAL='Dallas Cowboys', DEN='Denver Broncos', DET='Detroit Lions', GB='Green Bay Packers',
