@@ -52,6 +52,22 @@ def czytaj(wzor):
     fs = sorted(glob.glob(os.path.join(ZD, wzor)) + glob.glob(os.path.join(ZD, wzor + '.gz')))
     if not fs: return pd.DataFrame()
     d = pd.concat([pd.read_csv(f, dtype=str, keep_default_na=False) for f in fs], ignore_index=True).drop_duplicates()
+
+    # 22.09.2026. Pliki z Apps Script zawieraja pojedyncze wiersze uszkodzone przy zapisie,
+    # np. "\t\t\t\t   (W): 2" w kolumnie daty. To nie jest mecz — to smiec z parsowania.
+    # Wchodzil do bazy jako drużyna o nazwie z tabulatorow i zasmiecal pule nazw, przez co
+    # dopasowanie nazw mialo o jednego falszywego kandydata wiecej. Odrzucamy wiersze,
+    # ktorych DATA sie nie parsuje, i glosno zglaszamy ile — cicha strata bylaby gorsza.
+    if 'data' in d.columns and len(d):
+        n0 = len(d)
+        ok = pd.to_datetime(d.data, errors='coerce').notna()
+        if not ok.all():
+            zle = d.loc[~ok, 'data'].astype(str).str.strip().replace('', '(puste)')
+            przyk = ', '.join(repr(x[:30]) for x in zle.head(3))
+            print(f'  zewn: pominieto {int((~ok).sum())} z {n0} wierszy bez poprawnej daty '
+                  f'(np. {przyk}) — uszkodzone przy zapisie przez Apps Script.')
+            d = d[ok].reset_index(drop=True)
+
     klucz = [c for c in ('data', 'sport', 'liga', 'gosp', 'gosc') if c in d.columns]
     if 'okresy_g' in d.columns:   # ten sam mecz pobrany ponownie: zostaje wiersz z pełniejszymi danymi (okresy/nawierzchnia)
         d = d.assign(_pel=(d.okresy_g != '').astype(int) + (d.get('nawierzchnia', '') != '').astype(int)).sort_values('_pel', kind='stable')
