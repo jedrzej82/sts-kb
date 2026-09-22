@@ -337,6 +337,61 @@ def przesun_daty_przyblizone(allm):
     return allm
 
 
+
+def wymus_jeden_mecz_dziennie(allm):
+    """Ostatnia furtka: w jednej kolejce klub gra DOKLADNIE RAZ.
+
+    Po naprawie nazw i dat zostaja pojedyncze wiersze, ktorych nie da sie pogodzic
+    z terminarzem — najczesciej zrodlo podalo zlego rywala albo zla date, np.:
+        FK Proleter Novi Sad 0:0 FK Metalac   \  ten sam wynik, ten sam rywal,
+        Proleter 023 Zrenjanin 0:0 FK Metalac /   dwa ROZNE kluby jako gospodarz
+        FK Pohronie 3:1 Bytca  obok  FK Pohronie 3:1 MFK Skalica
+    Nie scalamy ich po nazwie — jedno wystapienie to za malo, zeby uznac dwie nazwy
+    za ten sam klub (tak powstalo bledne "Hebburn Town" = "Spalding United").
+    Zamiast zgadywac, usuwamy wiersz, ktory lamie terminarz: mecz o zlej dacie albo
+    zlym rywalu jest bezwartosciowy, a zostawiony psuje forme i Elo realnych klubow.
+
+    Ktory wiersz zostaje: ten lepiej potwierdzony. Kolejnosc pewnosci:
+      1) para, ktora w tym sezonie wystepuje takze w innym terminie (rewanz),
+      2) mecz o dacie prawdziwej przed meczem o dacie przyblizonej (wiki),
+      3) przy remisie — kolejnosc alfabetyczna, zeby wynik byl powtarzalny."""
+    d = allm.dropna(subset=['MatchDate', 'HomeTeam', 'AwayTeam']).copy()
+    d['idx'] = d.index
+    dl = pd.concat([d.assign(kk=d.HomeTeam.astype(str)), d.assign(kk=d.AwayTeam.astype(str))])
+    licz = dl.groupby(['Division', 'MatchDate', 'kk']).size()
+    sporne = {(dv, dt) for (dv, dt, _), n in licz.items() if n > 1}
+    if not sporne: return allm
+
+    # jak czesto dana para gra ze soba w tej lidze (rewanz = potwierdzenie, ze para istnieje)
+    pary = {}
+    for r in d.itertuples():
+        kl = (r.Division,) + tuple(sorted((str(r.HomeTeam), str(r.AwayTeam))))
+        pary[kl] = pary.get(kl, 0) + 1
+
+    usun = []
+    for dv, dt in sorted(sporne):
+        g = d[(d.Division == dv) & (d.MatchDate == dt)]
+        def pewnosc(r):
+            kl = (r.Division,) + tuple(sorted((str(r.HomeTeam), str(r.AwayTeam))))
+            przybl = 1 if getattr(r, 'src_zrodlo', None) == 'wiki' else 0
+            return (-pary.get(kl, 0), przybl, str(r.HomeTeam), str(r.AwayTeam))
+        zajete = set()
+        for r in sorted(g.itertuples(), key=pewnosc):
+            h, a = str(r.HomeTeam), str(r.AwayTeam)
+            if h in zajete or a in zajete:
+                usun.append((dv, dt, h, a, r.FTHome, r.FTAway, r.idx)); continue
+            zajete.add(h); zajete.add(a)
+
+    if usun:
+        print(f'  BUILD_KB: usunieto {len(usun)} meczow lamiacych terminarz '
+              f'(klub nie moze grac dwa razy tego samego dnia):')
+        for dv, dt, h, a, fh, fa, _ in usun[:20]:
+            print(f'      [{dv}] {dt}  {h} {fh:.0f}:{fa:.0f} {a}')
+        print('      Zrodlo podalo dla nich zla date albo zlego rywala. Zostal wiersz')
+        print('      lepiej potwierdzony; usuniety byl nie do pogodzenia z reszta kolejki.')
+    return allm.drop(index=[i for _, _, _, _, _, _, i in usun if i in allm.index])
+
+
 def main():
     fetch('--refresh' in sys.argv)
     cols = ['Division', 'MatchDate', 'MatchTime', 'HomeTeam', 'AwayTeam', 'HomeElo', 'AwayElo', 'FTHome', 'FTAway',
@@ -365,6 +420,7 @@ def main():
     allm = allm.drop_duplicates(subset=['Division', 'MatchDate', 'HomeTeam', 'AwayTeam'], keep='first')
     allm = aliasy_z_terminarza(allm)
     allm = przesun_daty_przyblizone(allm)
+    allm = wymus_jeden_mecz_dziennie(allm)
     allm = allm.drop_duplicates(subset=['Division', 'MatchDate', 'HomeTeam', 'AwayTeam'], keep='first')
     DIV_NAME.update({d: d for d in allm.Division.dropna().unique() if d not in DIV_NAME})  # ligi z Sofascore: „Kraj | Liga”
     allm = allm.drop(columns=['src_zrodlo'], errors='ignore')
