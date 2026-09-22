@@ -97,6 +97,31 @@ def _pelne_dla_skrotu(skrot, players):
     return out
 
 
+
+def _czl_norm(s):
+    return [norm(t) for t in str(s).replace('.', ' ').split() if norm(t)]
+
+
+def _czlon_pasuje(a, b):
+    """Czy dwa czlony nazwiska to ten sam czlon: identyczne, jeden przedrostkiem drugiego,
+    albo jeden jest inicjalem drugiego ("S." i "Sofia")."""
+    if a == b: return True
+    if len(a) == 1 or len(b) == 1: return a[:1] == b[:1]
+    return a.startswith(b) or b.startswith(a)
+
+
+def _wspolne_czlony(zrodlo, kandydat):
+    """Ile czlonow nazwy ze zrodla ma odpowiednik u kandydata. Kazdy czlon kandydata
+    moze byc zuzyty tylko raz, zeby "Tyler" nie liczyl sie dwa razy."""
+    tz, tk = _czl_norm(zrodlo), list(_czl_norm(kandydat))
+    n = 0
+    for z in tz:
+        for i, k in enumerate(tk):
+            if _czlon_pasuje(z, k):
+                n += 1; tk.pop(i); break
+    return n
+
+
 def _resolve1(name, players):
     k_ = norm(name)
     if not k_: return None
@@ -106,6 +131,15 @@ def _resolve1(name, players):
     sur = norm(parts[-1]) if parts else k_
     if not sur: return None
     c = [p for p in players if p.split() and norm(p.split()[-1]) == sur]
+    # 22.09.2026. Dopasowanie po OSTATNIM czlonie zwracalo kandydata BEZ sprawdzenia pozostalych:
+    #   "Zink Tyler"    -> "Michelle Tyler"  (inna osoba, inna plec, inny tour)
+    #   "Grabher Julia" -> "Marilda Julia"   (ostatni mecz w bazie 1987-10-12)
+    # STS podaje "Nazwisko Imie", wiec ostatni czlon to czesto IMIE, a nie nazwisko — i wtedy
+    # trafiamy na przypadkowa osobe, ktora akurat tak sie nazywa. Sciezka odwracania czlonow
+    # istniala, ale nigdy nie startowala, bo kod zwracal zle trafienie zamiast None.
+    # Przy nazwie wieloczlonowej zadamy zgodnosci CO NAJMNIEJ DWOCH czlonow.
+    if len(parts) > 1:
+        c = [p for p in c if _wspolne_czlony(name, p) >= 2]
     if len(c) == 1: return c[0]
     if c and len(parts) == 1:
         # kilku zawodnikow o tym nazwisku, a w ofercie samo nazwisko — wybor po liczbie meczow
@@ -133,6 +167,13 @@ def _resolve1(name, players):
             print(f'  UWAGA: "{name}" -> skrot "{kand}" pasuje do {len(pelne)} pelnych nazwisk '
                   f'({", ".join(sorted(pelne)[:4])}) — NIE dopasowano.')
             return NIEJEDNOZNACZNE
+        # ta sama zasada co wyzej: przy nazwie wieloczlonowej rozmyte trafienie musi zgadzac
+        # sie na dwoch czlonach, inaczej "Zink Tyler" i "Michelle Tyler" przechodza przez
+        # difflib tylko dlatego, ze dziela czlon "Tyler".
+        if len(parts) > 1 and _wspolne_czlony(name, kand) < 2:
+            print(f'  UWAGA: "{name}" -> rozmyte "{kand}" zgadza sie tylko na jednym czlonie '
+                  f'— NIE dopasowano.')
+            return None
         print(f'  UWAGA: "{name}" dopasowane ROZMYTO do "{kand}" — upewnij sie, ze to ten zawodnik.')
         return kand
     return None

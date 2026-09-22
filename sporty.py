@@ -450,7 +450,22 @@ def main(a):
         for t in sorted(R, key=lambda t: -R[t]):
             if q in norm(t): print(f'{t:<40} Elo {R[t]:6.0f}  meczów {N.get(t, 0):5d}  {inf["seeded"].get(t, "")}')
     elif a[0] == 'stan':
-        d = load(); print(d.groupby('sport').agg(mecze=('gosp', 'size'), od=('data', 'min'), do=('data', 'max')).to_string() if len(d) else 'baza pusta')
+        d = load()
+        if len(d):
+            print(d.groupby('sport').agg(mecze=('gosp', 'size'), od=('data', 'min'), do=('data', 'max')).to_string())
+        else:
+            # 22.09.2026. Wczesniej bylo po prostu "baza pusta" — i to jest mylace, bo najczestsza
+            # przyczyna nie jest pusta baza, tylko BRAK PLIKU: hist_import.py jeszcze nie skonczyl
+            # albo padl. W przebiegu 17:02 sporty.py pokazal "baza pusta" dokladnie w tej sytuacji,
+            # a gdyby przebieg temu zaufal, odrzucilby wszystkie sporty poza pilka i tenisem.
+            # Rozroznienie kosztuje dwie linie i zapobiega cichemu wyrzuceniu polowy oferty.
+            brak = [f for f in (HIST, DB) if not os.path.exists(f)]
+            if brak:
+                print('BRAK PLIKU BAZY: ' + ', '.join(os.path.basename(f) for f in brak))
+                print('To NIE znaczy, ze baza jest pusta — plik jeszcze nie powstal.')
+                print('Uruchom hist_import.py i POCZEKAJ na jego zakonczenie, zanim uznasz sporty za niedostepne.')
+                sys.exit(2)
+            print('baza pusta (pliki istnieja, ale nie zawieraja zadnego meczu) — sprawdz hist_import.py')
         if os.path.exists(TAB):
             t = pd.read_csv(TAB); print('\nTabele lig (siła startowa):'); print(t.groupby(['sport', 'liga']).agg(druzyn=('druzyna', 'size'), sezon=('sezon', 'max')).to_string())
     elif a[0] == 'typuj':
