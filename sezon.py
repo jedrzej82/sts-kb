@@ -58,35 +58,61 @@ def wczytaj(sport, plik=None):
         return list(csv.DictReader(fh))
 
 
+def _osoba(nazwa):
+    """Czy nazwa wyglada na nazwisko zawodnika, a nie na klub. Rozstrzyga inicjal:
+    "Mensik J.", "Coton F.", "Wang X." maja czlon jednoliterowy albo kropke."""
+    s = str(nazwa)
+    return '.' in s or any(len(t) == 1 for t in norm(s).split())
+
+
+def _zaw_czlony(a, b):
+    """Zawieranie po CALYCH czlonach, na poczatku albo koncu — jak w typuj.py i sporty.py."""
+    ta, tb = a.split(), b.split()
+    if not ta or not tb: return False
+    d, k = (ta, tb) if len(ta) >= len(tb) else (tb, ta)
+    if len(''.join(k)) < 4: return False
+    return d[:len(k)] == k or d[-len(k):] == k
+
+
 def znajdz(wiersze, nazwa, liga=None):
+    """22.09.2026: naprawione podstawianie INNEGO meczu. Przebieg 21:00 dnia 21.09 pokazal
+    "Nueva Chicago" -> "Chicago Fire" (pewnosc 0,80) i pelna tabele P dla Chicago Fire - Toronto FC.
+    Przyczyna: heurystyka od nazwisk tenisistow ("najdluzszy czlon to nazwisko") byla stosowana
+    takze do nazw KLUBOW, a "Nueva Chicago" i "Chicago Fire" dziela czlon "chicago".
+    Teraz ta sciezka dziala tylko dla nazw wygladajacych na osobe (inicjal albo kropka),
+    zawieranie idzie po calych czlonach, a prog rozmytego podniesiony z 0,75 do 0,90."""
     cel = norm(nazwa)
+    if not cel: return None, 0.0
     kand = [w for w in wiersze if not liga or w.get('liga') == liga]
     mec = lambda w: f(w.get('mecze'), 0) or 0
     dokl = sorted([w for w in kand if norm(w['druzyna']) == cel], key=mec, reverse=True)
     if dokl:   # v5p: ta sama drużyna w lidze i w pucharach → wiersz z największą liczbą meczów (liga krajowa)
         return dokl[0], 1.0
-    zaw = [w for w in kand if cel in norm(w['druzyna']) or norm(w['druzyna']) in cel]
+    zaw = [w for w in kand if _zaw_czlony(cel, norm(w['druzyna']))]
     if zaw and len({norm(w['druzyna']) for w in zaw}) == 1:
         return max(zaw, key=mec), 0.9
-    # tenis: „Mensik J.” vs „Jakub Mensik” — porównaj nazwisko
-    naz = max(cel.split(), key=len)                     # nazwisko = najdłuższy człon
-    ini = [t[0] for t in cel.split() if t != naz]
-    nazw = [w for w in kand if naz in norm(w['druzyna']).split()]
-    if len(nazw) > 1 and ini:                           # kilku o tym nazwisku — sprawdź inicjał
-        nazw = [w for w in nazw if any(t[0] == ini[0] for t in norm(w['druzyna']).split() if t != naz)]
-    if len(nazw) == 1:
-        return nazw[0], 0.8
-    nazwy = {norm(w['druzyna']): w for w in kand}
-    m = difflib.get_close_matches(cel, list(nazwy), n=1, cutoff=0.75)
-    if m:
-        return nazwy[m[0]], difflib.SequenceMatcher(None, cel, m[0]).ratio()
+    if _osoba(nazwa):   # tenis: „Mensik J.” vs „Jakub Mensik” — porównaj nazwisko
+        naz = max(cel.split(), key=len)                 # nazwisko = najdłuższy człon
+        ini = [t[0] for t in cel.split() if t != naz]
+        nazw = [w for w in kand if naz in norm(w['druzyna']).split()]
+        if len(nazw) > 1 and ini:                       # kilku o tym nazwisku — sprawdź inicjał
+            nazw = [w for w in nazw if any(t[0] == ini[0] for t in norm(w['druzyna']).split() if t != naz)]
+        if len(nazw) == 1:
+            return nazw[0], 0.8
+    nazwy = {norm(w['druzyna']): w for w in sorted(kand, key=lambda w: str(w.get('druzyna', '')))}
+    if len(cel) >= 8:
+        m = difflib.get_close_matches(cel, list(nazwy), n=1, cutoff=0.90)
+        m = [x for x in m if x[:3] == cel[:3]]
+        if m:
+            return nazwy[m[0]], difflib.SequenceMatcher(None, cel, m[0]).ratio()
     return None, 0.0
 
 
 def wymagaj(wiersze, nazwa, liga=None):
     w, pew = znajdz(wiersze, nazwa, liga)
     if not w:
-        sys.exit(f'NIE ZNALEZIONO: „{nazwa}” — sprawdź: python3 sezon.py druzyny <plik> {max(nazwa.split(), key=len)}')
+        sys.exit(f'NIE ZNALEZIONO: „{nazwa}” — sprawdź: python3 sezon.py druzyny <plik> '
+                 f'{max(str(nazwa).split(), key=len) if str(nazwa).split() else nazwa}')
     if pew < 1.0:
         print(f'  dopasowano „{nazwa}” → „{w["druzyna"]}” (pewność {pew:.2f})')
     return w

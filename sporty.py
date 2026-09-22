@@ -127,17 +127,26 @@ def _tok_seed(s):
 # dopasowanie tylko wtedy, gdy kandydat ma ich WIECEJ niz zrodlo. Samo "czy kandydat zawiera znacznik"
 # nie wystarczalo: "Boca Juniors" i "Young Boys" to pierwsze zespoly, a zawieraja "juniors" i "young",
 # przez co ochrona sie dla nich wylaczala i "Boca Juniors" lapalo sie na "Boca Juniors Sub-20".
-_ZNACZNIK = re.compile(r'^(b|ii|iii|2|3|c|u-?1[6-9]|u-?2[0-3]|sub-?2[0-3]|jun|juniors?|res|reserves?|'
-                       r'young|youth|yth|academy|akademia|w|women|kobiety|damen|femenino|feminin|fem)\.?$', re.I)
+_ZNACZNIK = re.compile(r'^(b|ii|iii|2|3|c|k|u-?1[6-9]|u-?2[0-3]|sub-?2[0-3]|jun|juniors?|res|reserves?|'
+                       r'young|youth|yth|academy|akademia|w|women|kobiet[ay]?|damen|femenino|femenil|'
+                       r'feminin[oa]?|fem)\.?$', re.I)
 
 
 def _znaczniki(s):
-    return sum(1 for t in re.split(r'[\s]+', str(s).strip()) if _ZNACZNIK.match(t))
+    # 22.09.2026: STS oznacza druzyny kobiece sufiksem "[K]", a czasem "(W)". Bez zdjecia
+    # nawiasow token "[K]" nie pasowal do wzorca i "Club Leon [K]" dopasowywalo sie
+    # do meskiego "Club Leon" — zmierzone na 5 meczach w przebiegu 21:00 dnia 21.09,
+    # bez zadnego ostrzezenia. Model liczyl mecze meskie dla zdarzen kobiecych.
+    return sum(1 for t in re.split(r'[\s]+', str(s).strip())
+               if _ZNACZNIK.match(t.strip('[](){}<>.,;:')))
 
 
 def _rezerwa_a_nie_pierwsza(zrodlo, kandydat):
-    """Blokuje "Lvi Praha" -> "Lvi Praha B" i pierwsza druzyne -> zespol kobiecy/mlodziezowy."""
-    return _znaczniki(kandydat) > _znaczniki(zrodlo)
+    """Blokuje "Lvi Praha" -> "Lvi Praha B" i pierwsza druzyne -> zespol kobiecy/mlodziezowy.
+    Test jest SYMETRYCZNY: rozna liczba znacznikow w obie strony znaczy, ze to nie ten sam
+    zespol. 22.09.2026: wersja jednostronna przepuszczala "Club Leon [K]" -> "Club Leon"
+    i "Barcelona (W)" -> "Barcelona", bo znacznik byl po stronie ZRODLA, nie kandydata."""
+    return _znaczniki(kandydat) != _znaczniki(zrodlo)
 
 
 def dopasuj_seed(nazwa, pula):
@@ -260,7 +269,15 @@ def resolve(name, pool):
               f'({", ".join(sorted(_kol[k_]))}) — sprawdz, ktory to.')
     if k_ in by: return by[k_]
     c = [p for p in by.values() if _zaw_nazwy(name, p)]
-    if len(c) == 1: return c[0]
+    if len(c) == 1:
+        # gdy nazwa z oferty ma WIECEJ czlonow niz dopasowana, gubimy czlon rozrozniajacy:
+        # "Independiente Rivadavia" -> "Independiente" i "Operario Ferroviario" -> "Ferroviario"
+        # to INNE kluby. Strukturalnie nie da sie tego odroznic od "Montpellier Handball" ->
+        # "Montpellier", wiec zamiast blokowac — mowimy o tym glosno.
+        if len(_tokeny(name)) > len(_tokeny(c[0])):
+            print(f'  UWAGA: "{name}" dopasowane do KROTSZEJ nazwy "{c[0]}" — pominieto czlon '
+                  f'rozrozniajacy. Sprawdz, czy to ten sam klub, a nie inny o podobnej nazwie.')
+        return c[0]
     if c:   # pierwszy czlon nazwy jest niemal zawsze wlasciwym klubem
         pref = [p for p in c if k_.startswith(norm(p)) or norm(p).startswith(k_)]
         if len(pref) == 1: return pref[0]
@@ -390,7 +407,12 @@ def main(a):
         stale = [t for t in (h, g) if t in L_ and (pd.Timestamp.today() - L_[t]).days > 150]
         if stale: print('  OSTRZEŻENIE: ostatni mecz w bazie >150 dni temu dla:', ', '.join(stale), '— sprawdź transfery/formę w sieci, korekta maks. ±6 pp.')
         print(f'  {note}')
-        if n < 10: print(f'  UWAGA: mało meczów w bazie ({n}) — P to szacunek; opieraj się na statystykach z sieci (MASTER PROMPT część B).')
+        if n < 5:
+            print(f'  BRAK DANYCH RYWALA: najslabiej opisana druzyna ma {n} mecz(e) w bazie. Elo jest')
+            print(f'  wtedy bliskie domyslnemu 1500, wiec powyzsze P nie jest pomiarem, tylko artefaktem')
+            print(f'  braku danych. NIE buduj na tym nogi kuponu, nawet jesli EV wychodzi wysokie.')
+        elif n < 10:
+            print(f'  UWAGA: mało meczów w bazie ({n}) — P to szacunek; opieraj się na statystykach z sieci (MASTER PROMPT część B).')
     elif a[0] == 'typ':
         row = dict(data=a[1], sport=a[2].lower(), gosp=a[3], gosc=a[4], rynek=a[5], p=float(a[6]), trafiony=None)
         pd.DataFrame([row]).to_csv(LOG, mode='a', header=not os.path.exists(LOG), index=False); print('zapisano', row)

@@ -171,7 +171,19 @@ def main():
     p = p_win(st, A, B, surf, '--bo5' in a); pc = calibrate(max(p, 1 - p)); fav = A if p >= 0.5 else B
     for x in (A, B):
         print(f'  {x}: Elo {st["R"].get(x, 1500):.0f}, {surf} {st["Rs"].get((x, surf), st["R"].get(x, 1500)):.0f}, meczów {st["N"].get(x, 0)}, ostatni w bazie {st["last"].get(x).date()}')
-    print(f'Faworyt: {fav}  P_model {max(p, 1 - p):.1%}  P_skalibr {pc:.1%}')
+    _nmin = min(st['N'].get(A, 0), st['N'].get(B, 0))
+    if _nmin < 5:
+        # 22.09.2026, usterka z przebiegu 21:00: Vekic - Wang Xinyu. Wang miala w bazie JEDEN mecz,
+        # dostala domyslne Elo 1487 i model wypisal Vekic 85,3% przy kursie 1,90, czyli EV +42%
+        # — najwyzsza "wartosc" calego okna, podczas gdy rynek wycenial mecz na 50/50.
+        # To nie jest przewaga informacyjna, tylko BRAK DANYCH UDAJACY PRZEWAGE.
+        print(f'  BRAK DANYCH RYWALA: najslabiej opisany zawodnik ma {_nmin} mecz(e) w bazie.')
+        print(f'  Elo jest wtedy bliskie domyslnemu 1500, wiec ponizsze P NIE JEST pomiarem, tylko')
+        print(f'  artefaktem braku danych. NIE buduj na tym nogi kuponu — szczegolnie gdy wychodzi')
+        print(f'  wysokie EV przy kursie bliskim 2,00: to sygnal falszywy, nie okazja.')
+        print(f'Faworyt: {fav}  P (SZACUNEK, brak danych rywala) ok. {max(p, 1 - p):.0%}')
+    else:
+        print(f'Faworyt: {fav}  P_model {max(p, 1 - p):.1%}  P_skalibr {pc:.1%}')
     stale = [x for x in (A, B) if (pd.Timestamp.today() - st['last'].get(x)).days > 90]
     if stale: print('OSTRZEŻENIE: dane nieaktualne (>90 dni) dla:', ', '.join(stale), '— sprawdź formę 2026 w sieci, korekta maks. ±6 pp.')
 

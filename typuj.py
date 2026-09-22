@@ -49,17 +49,26 @@ ALIASES = {'lech': 'Lech Poznan', 'lechpoznan': 'Lech Poznan', 'legiawarszawa': 
 # dopasowanie tylko wtedy, gdy kandydat ma ich WIECEJ niz zrodlo. Samo "czy kandydat zawiera znacznik"
 # nie wystarczalo: "Boca Juniors" i "Young Boys" to pierwsze zespoly, a zawieraja "juniors" i "young",
 # przez co ochrona sie dla nich wylaczala i "Boca Juniors" lapalo sie na "Boca Juniors Sub-20".
-_ZNACZNIK = re.compile(r'^(b|ii|iii|2|3|c|u-?1[6-9]|u-?2[0-3]|sub-?2[0-3]|jun|juniors?|res|reserves?|'
-                       r'young|youth|yth|academy|akademia|w|women|kobiety|damen|femenino|feminin|fem)\.?$', re.I)
+_ZNACZNIK = re.compile(r'^(b|ii|iii|2|3|c|k|u-?1[6-9]|u-?2[0-3]|sub-?2[0-3]|jun|juniors?|res|reserves?|'
+                       r'young|youth|yth|academy|akademia|w|women|kobiet[ay]?|damen|femenino|femenil|'
+                       r'feminin[oa]?|fem)\.?$', re.I)
 
 
 def _znaczniki(s):
-    return sum(1 for t in re.split(r'[\s]+', str(s).strip()) if _ZNACZNIK.match(t))
+    # 22.09.2026: STS oznacza druzyny kobiece sufiksem "[K]", a czasem "(W)". Bez zdjecia
+    # nawiasow token "[K]" nie pasowal do wzorca i "Club Leon [K]" dopasowywalo sie
+    # do meskiego "Club Leon" — zmierzone na 5 meczach w przebiegu 21:00 dnia 21.09,
+    # bez zadnego ostrzezenia. Model liczyl mecze meskie dla zdarzen kobiecych.
+    return sum(1 for t in re.split(r'[\s]+', str(s).strip())
+               if _ZNACZNIK.match(t.strip('[](){}<>.,;:')))
 
 
 def _rezerwa(zrodlo, kandydat):
-    """Blokuje "Inter Milan" -> "Inter Milan U23" i pierwsza druzyne -> zespol kobiecy/mlodziezowy."""
-    return _znaczniki(kandydat) > _znaczniki(zrodlo)
+    """Blokuje "Inter Milan" -> "Inter Milan U23" i pierwsza druzyne -> zespol kobiecy/mlodziezowy.
+    Test jest SYMETRYCZNY: rozna liczba znacznikow w obie strony znaczy, ze to nie ten sam
+    zespol. 22.09.2026: wersja jednostronna przepuszczala "Club Leon [K]" -> "Club Leon"
+    i "Barcelona (W)" -> "Barcelona", bo znacznik byl po stronie ZRODLA, nie kandydata."""
+    return _znaczniki(kandydat) != _znaczniki(zrodlo)
 
 
 @functools.lru_cache(maxsize=None)
@@ -109,7 +118,15 @@ def resolve(name, pool):
               f'({", ".join(sorted(_kol[k]))}) — sprawdz, ktory to.')
     if k in by: return by[k]
     c = [p for p in by.values() if _zaw_nazwy(name, p)]
-    if len(c) == 1: return c[0]
+    if len(c) == 1:
+        # gdy nazwa z oferty ma WIECEJ czlonow niz dopasowana, gubimy czlon rozrozniajacy:
+        # "Independiente Rivadavia" -> "Independiente" i "Operario Ferroviario" -> "Ferroviario"
+        # to INNE kluby. Strukturalnie nie da sie tego odroznic od "Montpellier Handball" ->
+        # "Montpellier", wiec zamiast blokowac — mowimy o tym glosno.
+        if len(_tokeny(name)) > len(_tokeny(c[0])):
+            print(f'  UWAGA: "{name}" dopasowane do KROTSZEJ nazwy "{c[0]}" — pominieto czlon '
+                  f'rozrozniajacy. Sprawdz, czy to ten sam klub, a nie inny o podobnej nazwie.')
+        return c[0]
     if c:
         # "Chievo Verona" zawiera i "Chievo", i "Verona" — dawny wybor po dlugosci dawal Verone
         # z Serie A. Pierwszy czlon nazwy jest niemal zawsze wlasciwym klubem, wiec ma pierwszenstwo.
