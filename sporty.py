@@ -245,6 +245,56 @@ def _tokeny(s):
     return tuple(re.findall(r'[a-z0-9]+', unicodedata.normalize('NFKD', str(s).translate(_LITERY)).encode('ascii', 'ignore').decode().lower()))
 
 
+# --- 22.09.2026: NAZWY REPREZENTACJI PO POLSKU ---
+# STS podaje reprezentacje po polsku ("Polska", "Niemcy"), a baza trzyma je po angielsku
+# ("Poland", "Germany"). Przez to odrzucane byly mecze z NAJTANSZYMI rynkami dnia:
+# siatkarskie Polska-Niemcy (kurs 1,12, marza 105,3%) i Francja-Rumunia (1,18, 104,7%).
+# Raport 12:00 uznal, ze "baza siatkowki zawiera KLUBY, nie reprezentacje" — to bylo bledne:
+# w bazie jest 605 meczow reprezentacyjnych (siatkowka 404, koszykowka 174, baseball 15)
+# i 153 rozne reprezentacje. Brakowalo wylacznie tlumaczenia nazwy.
+_KRAJE_PL = {
+    'albania': 'Albania',    'algieria': 'Algeria',    'anglia': 'England',
+    'angola': 'Angola',    'argentyna': 'Argentina',    'armenia': 'Armenia',
+    'australia': 'Australia',    'austria': 'Austria',    'azerbejdzan': 'Azerbaijan',
+    'belgia': 'Belgium',    'bialorus': 'Belarus',    'boliwia': 'Bolivia',
+    'brazylia': 'Brazil',    'bulgaria': 'Bulgaria',    'chile': 'Chile',
+    'chiny': 'China',    'chorwacja': 'Croatia',    'cypr': 'Cyprus',
+    'czarnogora': 'Montenegro',    'czechy': 'Czechia',    'dania': 'Denmark',
+    'dominikana': 'Dominican Republic',    'egipt': 'Egypt',    'ekwador': 'Ecuador',
+    'estonia': 'Estonia',    'filipiny': 'Philippines',    'finlandia': 'Finland',
+    'francja': 'France',    'grecja': 'Greece',    'gruzja': 'Georgia',
+    'hiszpania': 'Spain',    'holandia': 'Netherlands',    'indie': 'India',
+    'indonezja': 'Indonesia',    'iran': 'Iran',    'irlandia': 'Ireland',
+    'islandia': 'Iceland',    'izrael': 'Israel',    'japonia': 'Japan',
+    'kamerun': 'Cameroon',    'kanada': 'Canada',    'katar': 'Qatar',
+    'kazachstan': 'Kazakhstan',    'kenia': 'Kenya',    'kolumbia': 'Colombia',
+    'koreapoludniowa': 'South Korea',    'kosowo': 'Kosovo',    'kuba': 'Cuba',
+    'litwa': 'Lithuania',    'lotwa': 'Latvia',    'luksemburg': 'Luxembourg',
+    'macedoniapolnocna': 'North Macedonia',    'malta': 'Malta',    'maroko': 'Morocco',
+    'meksyk': 'Mexico',    'niderlandy': 'Netherlands',    'niemcy': 'Germany',
+    'nigeria': 'Nigeria',    'norwegia': 'Norway',    'nowazelandia': 'New Zealand',
+    'paragwaj': 'Paraguay',    'peru': 'Peru',    'polska': 'Poland',
+    'portoryko': 'Puerto Rico',    'portugalia': 'Portugal',    'republikapoludniowejafryki': 'South Africa',
+    'rosja': 'Russia',    'rumunia': 'Romania',    'senegal': 'Senegal',
+    'serbia': 'Serbia',    'slowacja': 'Slovakia',    'slowenia': 'Slovenia',
+    'stanyzjednoczone': 'USA',    'szkocja': 'Scotland',    'szwajcaria': 'Switzerland',
+    'szwecja': 'Sweden',    'tajlandia': 'Thailand',    'tajwan': 'Chinese Taipei',
+    'tunezja': 'Tunisia',    'turcja': 'Turkiye',    'ukraina': 'Ukraine',
+    'urugwaj': 'Uruguay',    'usa': 'USA',    'walia': 'Wales',
+    'wegry': 'Hungary',    'wenezuela': 'Venezuela',    'wietnam': 'Vietnam',
+    'wlochy': 'Italy',
+}
+
+
+def _kraj_pl(name):
+    """Zwraca angielska nazwe reprezentacji dla polskiej, zachowujac znacznik druzyny kobiecej."""
+    k = norm(name)
+    if k in _KRAJE_PL: return _KRAJE_PL[k]
+    for suf in ('k', 'w', 'kobiety', 'kobiet'):
+        if k.endswith(suf) and k[:-len(suf)] in _KRAJE_PL:
+            return f'{_KRAJE_PL[k[:-len(suf)]]} (W)'
+    return None
+
 def _zaw_nazwy(a, b):
     """Czy jedna nazwa jest skrotem drugiej. Porownujemy CZLONY nazwy, nie litery.
     21.09.2026, trzecia proba — dwie poprzednie mylily druzyny:
@@ -272,6 +322,8 @@ def resolve(name, pool):
     dostawalo dopasowanie. Dlatego ponizej odrzucamy z puli wszystkie klucze puste."""
     k_ = norm(name)
     if not k_: return None
+    _kr = _kraj_pl(name)
+    if _kr and _kr in pool: return _kr
     # sorted(): pool to zbior, a kolejnosc iteracji zbioru zalezy od losowego ziarna
     # hasha w danym procesie. Bez tego przy dwoch nazwach o tym samym kluczu wynik
     # bywal RAZ jeden, RAZ drugi — ta sama nazwa z oferty dawala rozne druzyny.
