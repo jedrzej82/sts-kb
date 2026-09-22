@@ -48,6 +48,57 @@ PUCHAR = re.compile(r'cup|pokal|copa|coupe|coppa|ta[cç]a|beker|pohar|puchar|fri
 def _n(s): return unicodedata.normalize('NFKD', str(s)).encode('ascii', 'ignore').decode().lower().strip()
 
 
+def _scal_nazwy_rozgrywek(d):
+    """Ta sama liga pod dwiema nazwami. 365scores przemianowuje rozgrywki w trakcie sezonu:
+    Andora 20.09.2026 ma jedna kolejke zapisana i jako 'Super League', i jako 'Primera Divisio';
+    Ekwador ma 'Liga Basquet Pro' i 'Liga Nacional'. Division powstaje jako 'kraj | turniej',
+    wiec bez sklejenia JEDNA liga wchodzi do bazy jako DWIE — historia rozjezdza sie na pol,
+    a mecze z dnia przemianowania licza sie dwa razy.
+
+    Nazwy sklejamy STRUKTURALNIE, nie po podobienstwie: jezeli ten sam mecz (data, sport,
+    gospodarz, gosc, wynik) wystepuje pod dwiema nazwami rozgrywek tego samego kraju, to sa
+    te same rozgrywki — zaden prog podobienstwa nie odroznilby 'Primera Divisio' od
+    'Segunda Divisio', a te trzeba trzymac osobno. Zostaje nazwa czestsza."""
+    if not {'kraj', 'turniej', 'sport'} <= set(d.columns) or not len(d): return d
+    kol_w = [c for c in ('wg', 'wa', 'gg', 'ga', 'pg', 'pa') if c in d.columns]
+    mecz = [c for c in ('data', 'sport', 'gosp', 'gosc') if c in d.columns] + kol_w
+    if len(mecz) < 5: return d
+
+    rodzic = {}
+
+    def znajdz(x):
+        while rodzic.setdefault(x, x) != x:
+            rodzic[x] = rodzic[rodzic[x]]
+            x = rodzic[x]
+        return x
+
+    wezly = list(zip(d.sport, d.kraj, d.turniej))
+    d = d.assign(_wez=wezly)
+    for _, g in d.groupby(mecz, sort=False)['_wez']:
+        u = sorted(set(g))
+        for w in u[1:]:
+            a, b = znajdz(u[0]), znajdz(w)
+            if a != b: rodzic[b] = a
+
+    if not any(znajdz(w) != w for w in set(wezly)):
+        return d.drop(columns='_wez')
+
+    licz = d['_wez'].value_counts()
+    kanon = {}
+    for w in set(wezly):
+        k = znajdz(w)
+        grupa = [x for x in set(wezly) if znajdz(x) == k]
+        naj = max(grupa, key=lambda x: (licz.get(x, 0), x[2]))
+        kanon[w] = naj
+    zmienione = {w: n for w, n in kanon.items() if w != n}
+    for w, n in sorted(zmienione.items()):
+        print(f'  zewn: te same rozgrywki pod dwiema nazwami — "{w[1]} | {w[2]}" -> "{n[1]} | {n[2]}" '
+              f'({int(licz.get(w, 0))} meczow przeniesionych)')
+    d['turniej'] = [kanon[w][2] for w in wezly]
+    d['kraj'] = [kanon[w][1] for w in wezly]
+    return d.drop(columns='_wez')
+
+
 def czytaj(wzor):
     fs = sorted(glob.glob(os.path.join(ZD, wzor)) + glob.glob(os.path.join(ZD, wzor + '.gz')))
     if not fs: return pd.DataFrame()
@@ -73,6 +124,8 @@ def czytaj(wzor):
     # zostawal tylko ostatni. Zmierzone na snapshocie zewn/: 175 meczow traconych cicho
     # (167 baseball/inne, 5 pilka, 1 boks). Powtorka zapisu z Apps Script ma wynik IDENTYCZNY,
     # wiec dalej jest odsiewana — a tych bylo duzo: 17-19.09 kazdy mecz siedzial w pliku 2-4 razy.
+    d = _scal_nazwy_rozgrywek(d)   # jedna liga pod dwiema nazwami -> jedna nazwa, ZANIM odsiejemy
+
     klucz = [c for c in ('data', 'sport', 'liga', 'turniej', 'gosp', 'gosc',
                          'wg', 'wa', 'gg', 'ga', 'pg', 'pa') if c in d.columns]
     if 'okresy_g' in d.columns:   # ten sam mecz pobrany ponownie: zostaje wiersz z pełniejszymi danymi (okresy/nawierzchnia)
