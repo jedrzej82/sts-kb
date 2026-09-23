@@ -63,6 +63,10 @@ def _znaczniki(s):
                if _ZNACZNIK.match(t.strip('[](){}<>.,;:')))
 
 
+# 23.09.2026, USTERKA U5: Asociacion Deportivo Cali jest w bazie jako 'AD Cali'.
+ALIASES.setdefault('deportivocali', 'AD Cali')
+ALIASES.setdefault('asociaciondeportivocali', 'AD Cali')
+
 def _rezerwa(zrodlo, kandydat):
     """Blokuje "Inter Milan" -> "Inter Milan U23" i pierwsza druzyne -> zespol kobiecy/mlodziezowy.
     Test jest SYMETRYCZNY: rozna liczba znacznikow w obie strony znaczy, ze to nie ten sam
@@ -450,9 +454,20 @@ def club(home, away, kursy, live=None):
                 if lo <= pc < hi: pc = (1 - r.waga) * pc + r.waga * r.trafność
         rows.append((k, p, pc))
     print('\nRynek            P_model  P_skalibr.' + ('   (v5n: korekta per rynek z backtestu; „poniżej” już −4 pp — nie odejmuj drugi raz)' if calibrate_v5n else ''))
+    # 23.09.2026, USTERKA U4: przy danych nieswiezych albo jednym modelu tabela nie moze udawac
+    # pewnosci. Nacional Potosi - Real Potosi (22.09): obie druzyny NIESWIEZE (370 i 1738 dni), model
+    # tylko z pi, a wydruk pokazywal 1X 98,6% z gwiazdka. Wtedy: przedzial zamiast dziesiatych procenta
+    # i bez gwiazdek. Liczby do EV (value) zostaja jak byly — to czesc obliczeniowa, nie komunikat.
+    szac = [o for o in ostrz if 'NIESWIEZA' in o or 'TYLKO JEDEN MODEL' in o]
+    if szac:
+        print('SZACUNEK — P JAKO PRZEDZIAL, BEZ ★ (' + '; '.join(o.split(':')[0] for o in szac) + ')')
     for k, p, pc in sorted(rows, key=lambda r: -r[2]):
-        flag = ' ★' if pc >= 0.75 else ''
-        print(f'{k:<18}{p:7.1%}  {pc:7.1%}{flag}')
+        if szac:
+            lo, hi = max(pc - 0.10, 0.0), min(pc + 0.10, 0.95)
+            print(f'{k:<18}{p:7.1%}  ok. {lo:.0%}–{hi:.0%}')
+        else:
+            flag = ' ★' if pc >= 0.75 else ''
+            print(f'{k:<18}{p:7.1%}  {pc:7.1%}{flag}')
     for t, lbl in ((h, 'GOSP'), (a, 'GOŚĆ')):
         s = team_stats(m, t)
         if s:

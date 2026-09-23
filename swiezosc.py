@@ -60,6 +60,19 @@ def niemozliwe_mecze(pokaz=12):
     m = m.dropna(subset=['HomeTeam', 'AwayTeam'])
     zle = 0
 
+    # 23.09.2026, USTERKA U2: mecz z WYNIKIEM i data pozniejsza niz dzis jest niemozliwy. Tak weszly
+    # 26 meczow CHN z datami 23.09-02.10.2026 (matryca Wikipedii ukladana za ostatnim meczem), a kontrola
+    # swiezosci pokazywala potem 'wiek -10 d' jako 'ok'.
+    _dat = pd.to_datetime(m.MatchDate, errors='coerce')
+    przysz = m[_dat > pd.Timestamp.today().normalize()]
+    if len(przysz):
+        zle += 1
+        print(f'  MECZE Z PRZYSZLOSCI: {len(przysz)} meczow z wynikiem i data pozniejsza niz dzis.')
+        for (d, s_), n in przysz.groupby(['Division', 'src']).size().sort_values(ascending=False).head(pokaz).items():
+            print(f'      [{d}] zrodlo {s_} — {n}')
+        print('      Wynik z przyszlosci nie istnieje: to zle przypisana data. Forma i Elo tych druzyn')
+        print('      licza stare mecze jako najswiezsze. Napraw uklad dat (uzupelnij_ligi.py), nie dane.')
+
     sam = m[m.HomeTeam == m.AwayTeam]
     if len(sam):
         zle += 1

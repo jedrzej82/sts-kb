@@ -164,8 +164,57 @@ ALIAS_ZEWN.update({'Inter Milan': 'Inter', 'Internazionale': 'Inter', 'Amed SK':
 NIE_MAPUJ = {'Cerro Largo', 'NK Zagreb', 'FSV Frankfurt', 'Bury Town', 'Bayern Munich II', 'Bayern München II',
              'Felixstowe & Walton Utd.', 'Redditch Utd', 'Welling Utd', 'Ath Paranaense', 'Paraná', 'Remo', 'Clube do Remo',
              'Naft Tehran', 'Sanat Naft', 'Rukh Lviv', 'Esteghlal Ahvaz', 'Esteghlal Khuz', 'Wieczysta Krakow'}
+# 23.09.2026, USTERKA U1: reczne aliasy wariantow nazw TEGO SAMEGO klubu (przejrzane pojedynczo).
+# Rozne kluby o podobnej nazwie CELOWO tu nie weszly — patrz lataj_alias2 w historii commitow.
+_ALIAS2_2309 = {
+    'ARG': {'Atletico Tucuman': 'Atl. Tucuman', 'Atlé Tucumán': 'Atl. Tucuman', 'Riestra': 'Dep. Riestra', 'Deportivo Riestra': 'Dep. Riestra', 'Instituto AC Cordoba': 'Instituto'},
+    'AUS': {'Adelaide United': 'Adelaide', 'Brisbane Roar': 'Brisbane', 'Central Coast Mariners': 'Central Coast', 'Newcastle United Jets': 'Newcastle', 'Wellington Phoenix': 'Wellington'},
+    'AUT': {'LASK Linz': 'LASK', 'RB Salzburg': 'Salzburg', 'Red Bull Salzburg': 'Salzburg', 'FC Salzburg': 'Salzburg', 'Rapid Wien': 'SK Rapid', 'Rapid Vienna': 'SK Rapid', 'TSV Hartberg': 'Hartberg'},
+    'B2': {'Beerschot': 'K. Beerschot V.A.', 'Eupen': 'KAS Eupen', 'FC Seraing': 'RFC Seraing', 'Seraing': 'RFC Seraing', 'K. Patro Eisden Maasmechelen': 'Patro Eisden', 'KMSK Deinze': 'Deinze', 'Lokeren-Temse': 'K.S.C. Lokeren-Temse', 'Virton': 'Royal Excelsior Virton'},
+    'BRA': {'Chapecoense AF': 'Chapecoense', 'Grêmio FBPA': 'Gremio', 'SC Corinthians Paulista': 'Corinthians', 'SC Recife': 'Sport Recife', 'SE Palmeiras': 'Palmeiras'},
+    'BRA2': {'Brusque Futebol Clube': 'Brusque', 'Grêmio Novorizontino': 'Novorizontino', 'Mirassol Futebol Clube': 'Mirassol'},
+    'BUL': {'Cherno More': 'Cherno More Varna', 'Loko Plovdiv': 'Lokomotiv Plovdiv', 'Pirin Blagoevgrad': 'Blagoevgrad', 'Vitosha Bistritsa': 'Vitosha'},
+    'CHI': {'CD Everton': 'Everton De Vina', 'Everton': 'Everton De Vina', 'La Calera': 'U. La Calera', 'San Marcos de Arica': 'San Marcos'},
+    'CHN': {'Chongqing Tongliangloong': 'Chongqing Tonglianglong', 'Hebei Fortune': 'Hebei', 'Shanghai Shen': 'Shanghai Shenhua', 'Shijiazhuang Ever Bright': 'Shiji Ever Bright'},
+    'COL': {'CA Bucaramanga': 'Atlético Bucaramanga', 'CD América': 'America de Cali', 'Cúcuta': 'Cucuta Deportivo', 'Fortaleza CEIF': 'Fortaleza FC', 'Huila': 'Atlético Huila', 'Jaguares': 'Jaguares de Córdoba', 'Nacional': 'Atletico Nacional', 'Pasto': 'Deportivo Pasto', 'Pereira': 'Deportivo Pereira', 'Santa Fe': 'Independiente Santa Fe'},
+    'CRO': {'Gorica': 'HNK Gorica', 'Hajduk Split': 'HNK Hajduk Split', 'Lokomotiva': 'NK Lokomotiva Zagreb', 'Rijeka': 'HNK Rijeka'},
+    'CZE': {'Fastav Zlín': 'Zlin', 'České Budějovice': 'České Budĕjov.'},
+    'D3': {'Großaspach': 'Sonnenhof Großaspach', 'Havelse': 'TSV Havelse', 'SV Waldhof': 'SV Waldhof Mannheim 07 e.V.'},
+    'ECU': {'CD Cuenca': 'Deportivo Cuenca', 'Técnico Univ.': 'Tecnico Universitario', 'LDU de Quito': 'LDU'},
+    'FIN': {'FF Jaro': 'Jaro', 'HJK Helsinki': 'HJK', 'SJK Seinajoki': 'SJK'},
+    'HUN': {'Debrecen': 'Debreceni VSC', 'Honvéd': 'Kispest Honvéd', 'Paks': 'Paksi', 'Puskás': 'Puskas FC Academy', 'Zalaegerszeg': 'Zalaegerszegi TE'},
+    'IRL': {'Drogheda Utd': 'Drogheda', 'Shamrock': 'Shamrock Rovers', "St Patrick's Athletic": 'St. Patricks'},
+    'IRN': {'Esteghlal': 'Esteghlal FC Tehran', 'Foolad': 'Foolad Khuzestan', 'Kheybar': 'Kheybar Khorramabad', 'Nassaji': 'Nassaji Mazandaran', 'Shams Azar': 'Shams Azar Qazvin', 'Tractor Sazi': 'Tractor FC'},
+    'JAP': {'Fagi Okayama': 'Okayama', 'Fagiano Okayama': 'Okayama', 'Fukuoka': 'Avispa Fukuoka', 'Grampus': 'Nagoya Grampus', 'Kawa Frontale': 'Kawasaki Frontale', 'Kyoto Sanga FC': 'Kyoto', 'Kyoto Sanga': 'Kyoto', 'Marinos': 'Yokohama F. Marinos', 'S-Pulse': 'Shimizu S-Pulse', 'Sanfrecce': 'Sanfrecce Hiroshima'},
+    'JAP2': {'Albirex Niigata': 'Niigata', 'Consa Sapporo': 'Consadole Sapporo', 'Giravanz Kitakyushu': 'Giravanz', 'Kataller Toyama': 'Toyama', 'Omiya Ardija': 'RB Omiya Ardija', 'Roasso Kumamoto': 'Roasso', 'Ventforet Kofu': 'Kofu'},
+    'KOR': {'Daejeon Citizen FC': 'Daejeon Hana Citizen', 'Jeonbuk Hyundai': 'Jeonbuk Hyundai Motors', 'Jeonbuk': 'Jeonbuk Hyundai Motors', 'Pohang': 'Pohang Steelers'},
+    'KSA': {'Al Kholood Saudi Club': 'Al-Kholood', 'Al-Ahli': 'Al Ahli Jeddah', 'Al-Hazem': 'Al Hazm', 'Al-Hilal': 'Al Hilal Riyadh', 'Al-Nassr': 'Al Nassr FC Riyadh', 'Al-Shabab': 'Al Shabab Riyadh'},
+    'MEX': {'Atlas Guadalajara': 'Atlas', 'Deportivo Toluca': 'Toluca'},
+    'N2': {'Helmond Sport': 'Helmond', 'Heracles Almelo': 'Heracles', 'Jong AZ': 'Jong AZ Alkmaar', 'Roda JC': 'Roda JC Kerkrade'},
+    'PAR': {'Deportivo Recoleta': 'Recoleta FC', 'Sport Luqueño': 'Sportivo Luqueño', 'Trinidense': 'Sportivo Trinidense'},
+    'PER': {'Atlético Grau': 'Grau', 'Juan Pablo II': 'Juan Pablo II College'},
+    'POL': {'Cracovia Krakow': 'Cracovia', 'Katowice': 'GKS Katowice', 'Legia Warszawa': 'Legia', 'Miedź Legnica': 'Miedź', 'Nieciecza': 'Bruk-Bet Termalica Nieciecza', 'Pogon': 'Pogon Szczecin', 'RKS Raków': 'Rakow', 'Rakow Czestochowa': 'Rakow', 'Raków': 'Rakow', 'Wisła Kraków': 'Wisla', 'Zagłębie Lubin': 'Zaglebie'},
+    'ROM': {'Concordia Chiajna': 'Concordia', 'Dinamo Bucuresti': 'Din. Bucuresti', 'Dinamo București': 'Din. Bucuresti', 'Dunărea Călărași': 'Călăraşi', 'FC Arges Pitesti': 'FC Arges', 'Argeș Pitești': 'FC Arges', 'Otelul Galati': 'Otelul', 'Oțelul Galați': 'Otelul', 'Pandurii Târgu Jiu': 'Pandurii', 'Petrolul Ploiesti': 'Petrolul', 'Petrolul Ploiești': 'Petrolul', 'Viitorul Constanța': 'Viitorul'},
+    'RSA': {'Lamontville Golden Arrows': 'Golden Arrows', 'Sundowns': 'Mamelodi Sundowns', 'Swallows': 'Moroka Swallows'},
+    'RUS': {'Krylya Sovetov Samara': 'Krylya Sovetov', 'Krylia Sovetov Samara': 'Krylya Sovetov', 'Yenisey Krasnoyarsk': 'Yenisey'},
+    'SRB': {'Mačva Šabac': 'Macva', 'Napredak Kruševac': 'Napredak Kruš', 'Partizan': 'Partizan Belgrade', 'Radnički Kragujevac': 'Radnički Krag', 'Spartak Subotica': 'Spartak Subotic', 'TSC Bačka Top': 'TSC'},
+    'SUI': {'Grasshopper Club': 'Grasshoppers', 'Grasshopper': 'Grasshoppers', 'Lausanne-Sport': 'Lausanne', 'FC Lausanne-Sport': 'Lausanne'},
+    'SWE': {'AIK Solna': 'AIK', 'Djurgårdens IF': 'Djurgarden', 'Djurgården': 'Djurgarden', 'Halmstads BK': 'Halmstad', 'IFK Göteborg': 'Goteborg', 'IFK Norrköping': 'Norrkoping', 'IFK Värnamo': 'Varnamo', 'Kalmar FF': 'Kalmar', 'Malmö': 'Malmo FF', 'Mjällby AIF': 'Mjallby'},
+    'SWE2': {'Falkenberg': 'Falkenbergs FF', 'Landskrona': 'Landskrona Bois', 'Sundsvall': 'GIF Sundsvall', 'Varberg': 'Varbergs BoIS', 'Värnamo': 'IFK Varnamo', 'Öster': 'Östers IF'},
+    'UKR': {'Chornomorets': 'Chornomorets Odesa', 'Epitsentr': 'Epicentr', 'FC Polissya Zhytomyr': 'Polissya', 'FK Kolos': 'Kolos Kovalivka', 'Kryvbas Kryvyi Rih': 'Kryvbas', 'Obolon-Brovar Kyiv': 'Obolon Kyiv', 'Shakhtar': 'Shakhtar Donetsk'},
+    'URU': {'Defensor': 'Defensor Sporting', 'Juventud de Las Piedras': 'Juventud', 'Liverpool': 'Liverpool Montevideo', 'Maldonado': 'Deportivo Maldonado', 'Racing': 'Racing Club Montevideo', 'Torque': 'Montevideo City Torque', 'Wanderers': 'Montevideo Wanderers'},
+    'USA': {'Dallas Burn': 'FC Dallas', 'Dynamo FC': 'Houston Dynamo', 'Dynamo': 'Houston Dynamo', 'Montreal Impact': 'CF Montreal', 'NY Red Bulls': 'New York Red Bulls', 'New England': 'New England Revolution', 'Philadelphia': 'Philadelphia Union', 'SJ Earthquakes': 'San Jose Earthquakes', 'San Jose': 'San Jose Earthquakes', 'Seattle': 'Seattle Sounders', 'St. Louis': 'St. Louis City', 'Vancouver': 'Vancouver Whitecaps'},
+    'USL': {'Birmingham': 'Birmingham Legion FC', 'CS Switchbacks': 'Colorado Springs Switchbacks', 'Switchbacks': 'Colorado Springs Switchbacks', 'Charleston': 'Charleston Battery', 'New Mexico Utd': 'New Mexico', 'Pittsburgh': 'Pittsburgh Riverhounds', 'Roots': 'Oakland Roots', 'Sacramento': 'Sacramento Republic', 'Tampa Bay': 'Tampa Bay Rowdies'},
+    'VEN': {'Dep Anzoátegui': 'Anzoategui Futbol Club', 'Deportivo Rayo Zuliano': 'Rayo Zuliano', 'Petare': 'Deportivo Petare', 'Universidad Central de Venezuela FC': 'Universidad Central'},
+}
+for _d, _m in _ALIAS2_2309.items():
+    for _k, _v in _m.items():
+        ALIAS2.setdefault(_d, {}).setdefault(_k, _v)   # istniejacy wpis wygrywa
+
 TOK_POMIN = {'fc', 'cf', 'ac', 'sc', 'if', 'is', 'ik', 'bk', 'sk', 'cd', 'ud', 'sd', 'kaa', 'krc', 'kv', 'kvc', 'rsc', 'ogc', 'club',
-             'calcio', 'de', 'la', 'el', 'cp', 'afc', 'cfc', 'the', 'fbc', 'ssc', 'as', 'us'}
+             'calcio', 'de', 'la', 'el', 'cp', 'afc', 'cfc', 'the', 'fbc', 'ssc', 'as', 'us',
+             # 23.09.2026: formy prawne z nazw 365scores (CS Emelec, FK Rostov, Deportes La Serena)
+             'cs', 'fk', 'nk', 'sv', 'ca', 'ec', 'sad', 'clube', 'klub', 'deportes'}
 TOK_ROZW = {'man': 'manchester', 'utd': 'united', 'sp': 'sporting', 'st': 'saint', 'ath': 'athletic', 'nott': 'nottingham',
             'nottm': 'nottingham', 'weds': 'wednesday', 'wed': 'wednesday', 'ein': 'eintracht', 'dep': 'deportivo',
             'a': 'austria', 'jrs': 'juniors', 'ind': 'independiente'}
@@ -262,7 +311,7 @@ def match_one(n, pool, div, zwroc_sile=False):
 def canon(df, kb):
     """Ujednolica nazwy do nazw kb (tylko drużyny aktywne od 07.2022, żeby nie łapać starych nazw), nowe drużyny —
     do pierwszej napotkanej wersji."""
-    out, mapping = [], {}
+    out, mapping, sklejone = [], {}, {}
     rec = kb[kb.MatchDate >= '2022-07-01']
     for div, g in df.groupby('Division'):
         base = sorted(set(rec.loc[rec.Division == div, 'HomeTeam']) | set(rec.loc[rec.Division == div, 'AwayTeam']))
@@ -284,6 +333,28 @@ def canon(df, kb):
         # Przy konflikcie klub zostaje przy nazwie o NAJWYZSZEJ sile dopasowania;
         # pozostale zachowuja wlasna nazwe i wchodza jako osobne kluby. Tracimy wtedy
         # powiazanie z historia, ale NIE psujemy historii cudzej — a to jest gorszy blad.
+        # 23.09.2026, USTERKA U1. Regula roznowartosciowosci ponizej rozcinala KAZDA pare nazw
+        # wskazujacych jeden klub — takze warianty pisowni TEGO SAMEGO klubu z dwoch zrodel:
+        # "Brondby" (fbref) i "Brøndby IF" (365scores), "OB" i "Odense", "Colo-Colo" i "Colo Colo".
+        # 231 rozciec w jednym przebiegu: klub dostawal dwa wpisy, historia zostawala pod jednym,
+        # swieze mecze pod drugim, a model bral stary i oznaczal druzyne jako nieswieza.
+        # Podobienstwo nazw tego nie rozstrzyga (przerabiane 22.09) — rozstrzyga STRUKTURA:
+        #   dwie nazwy, ktore graly ZE SOBA, to dwa kluby (Melbourne Victory i Melbourne City);
+        #   dwie nazwy, ktore w JEDNYM zrodle graly TEGO SAMEGO DNIA, to dwa kluby;
+        #   w przeciwnym razie to ten sam klub zapisany roznie w roznych zrodlach — sklejamy.
+        _gd = g[g.MatchDate.notna()] if 'MatchDate' in g.columns else g.iloc[0:0]
+
+        def _dwa_kluby(x, y):
+            if (((g.HomeTeam == x) & (g.AwayTeam == y)) | ((g.HomeTeam == y) & (g.AwayTeam == x))).any():
+                return 'graly ze soba'
+            for _src, _gs in _gd.groupby('src'):
+                dx = set(_gs.loc[(_gs.HomeTeam == x) | (_gs.AwayTeam == x), 'MatchDate'])
+                if not dx: continue
+                dy = set(_gs.loc[(_gs.HomeTeam == y) | (_gs.AwayTeam == y), 'MatchDate'])
+                if dx & dy:
+                    return f'w zrodle {_src} graly tego samego dnia ({min(dx & dy).date()})'
+            return None
+
         zajete = {}
         # Kolejnosc ma znaczenie i pierwszenstwo jest BEZWZGLEDNE dla nazwy, ktora wskazuje
         # sama siebie. Bez tego "W Sydney" (Western Sydney Wanderers) zajmowalo nazwe
@@ -292,21 +363,37 @@ def canon(df, kb):
         # meczem klubu z samym soba. Nazwa zawsze ma prawo do siebie.
         for n in sorted(known, key=lambda x: (0 if known[x] == x else 1, -sila.get(x, 0), x)):
             cel = known[n]
-            if cel not in base:          # nowa druzyna, nie zabiera nikomu miejsca
-                if cel in zajete and zajete[cel] != n:
-                    known[n] = n
-                else:
-                    zajete.setdefault(cel, n)
+            if cel not in zajete:
+                zajete[cel] = [n]
                 continue
-            if cel in zajete:
-                print(f'  UZUPELNIJ_LIGI [{div}]: "{n}" i "{zajete[cel]}" wskazuja na ten sam klub '
-                      f'"{cel}". Zostaje "{zajete[cel]}" (dopasowanie pewniejsze); "{n}" wchodzi '
-                      f'jako osobny klub. Jesli to ta sama druzyna, dopisz ja do ALIAS2["{div}"].')
-                known[n] = n
-            else:
-                zajete[cel] = n
+            if n in zajete[cel]:
+                continue
+            # Struktura NIE wystarcza, gdy nazwy pochodza z roznych lat: LDU Quito i LDU Portoviejo,
+            # Juventude i Juventus SC, Matsumoto Yamaga i Montedio Yamagata nigdy sie w danych nie
+            # spotkaly, bo nie graly w tej lidze jednoczesnie. Dlatego sklejamy TYLKO nazwy, ktore sa
+            # tym samym po zdjeciu diakrytykow i formy prawnej (sila >= 7: "Brøndby IF" = "Brondby",
+            # "Colo Colo" = "Colo-Colo") albo sa wpisane recznie w ALIAS2 (sila 9). Dopasowanie po
+            # CZESCI nazwy (sila 5: "LDU Portoviejo" -> "LDU") nigdy nie skleja.
+            _rowne = lambda x: x == cel or sila.get(x, 0) >= 7 or (bool(_tok(x)) and set(_tok(x)) == set(_tok(cel)))
+            # n jest pewne, gdy samo jest ta sama nazwa co cel ALBO jest ta sama nazwa co ktorys z
+            # juz przyjetych wariantow ("Wisła Kraków" = "Wisla Krakow", ktore jest aliasem "Wisla")
+            _pewne = (_rowne(n) or any(bool(_tok(n)) and set(_tok(n)) == set(_tok(z)) for z in zajete[cel]))                 and all(_rowne(z) or z == zajete[cel][0] for z in zajete[cel])
+            powod = None if _pewne else 'nazwy zgodne tylko czesciowo — do sklejenia potrzebny wpis w ALIAS2'
+            powod = powod or next((p for p in (_dwa_kluby(n, z) for z in zajete[cel]) if p), None)
+            if powod is None:            # ta sama nazwa, nigdy ze soba nie graly, bez kolizji w terminarzu
+                zajete[cel].append(n)
+                sklejone[div] = sklejone.get(div, 0) + 1
+                continue
+            print(f'  UZUPELNIJ_LIGI [{div}]: "{n}" i "{zajete[cel][0]}" wskazuja na ten sam klub '
+                  f'"{cel}", ale to DWA kluby ({powod}). "{n}" wchodzi jako osobny klub.')
+            known[n] = n
+            zajete.setdefault(n, [n])
         mapping[div] = known
         g = g.copy(); g['HomeTeam'] = g.HomeTeam.map(known); g['AwayTeam'] = g.AwayTeam.map(known); out.append(g)
+    if sklejone:
+        print(f'  UZUPELNIJ_LIGI: sklejono {sum(sklejone.values())} wariantow nazw tego samego klubu '
+              f'(nigdy ze soba nie graly, bez kolizji w terminarzu): '
+              + ', '.join(f'{d} {n}' for d, n in sorted(sklejone.items(), key=lambda x: -x[1])))
     return pd.concat(out, ignore_index=True), mapping
 
 
@@ -363,9 +450,15 @@ def main():
     for (div, s), g in grupy:
         lo, hi = season_range(s)
         lo = pd.Timestamp(WIKI_START.get((div, s), lo)); hi = pd.Timestamp(WIKI_END.get((div, s), hi))
-        dd = dated[(dated.Division == div) & (dated.MatchDate >= lo - pd.Timedelta(days=30)) & (dated.MatchDate <= hi)]
+        # 23.09.2026, USTERKA U2: (a) mecze z datą PRAWDZIWA szukalismy tylko do WIKI_END, a matryca
+        # bywa pobrana pozniej niz WIKI_END mowi — wiec mecz, ktory 365scores ma z data po WIKI_END,
+        # nie byl rozpoznany i wchodzil DRUGI RAZ z data wymyslona. Wynik w matrycy oznacza mecz
+        # rozegrany, wiec szukamy do DZIS (ale nie dalej niz koniec sezonu).
+        dzis_ = pd.Timestamp.today().normalize()
+        granica = min(season_range(s)[1], dzis_)
+        dd = dated[(dated.Division == div) & (dated.MatchDate >= lo - pd.Timedelta(days=30)) & (dated.MatchDate <= granica)]
         dd_src = dd[dd.src != 'wiki']
-        kbs = kb[(kb.Division == div) & (kb.MatchDate >= lo - pd.Timedelta(days=30)) & (kb.MatchDate <= hi)]
+        kbs = kb[(kb.Division == div) & (kb.MatchDate >= lo - pd.Timedelta(days=30)) & (kb.MatchDate <= granica)]
         have = {}
         for h, aw in list(zip(dd.HomeTeam, dd.AwayTeam)) + list(zip(kbs.HomeTeam, kbs.AwayTeam)):
             have[(norm(h), norm(aw))] = have.get((norm(h), norm(aw)), 0) + 1
@@ -376,6 +469,18 @@ def main():
             rest.append(r)
         if not rest: continue
         start = max(lo, dd_src.MatchDate.max() + pd.Timedelta(days=1) if len(dd_src) else lo, kbs.MatchDate.max() + pd.Timedelta(days=1) if len(kbs) else lo)
+        # (b) Brakujace mecze trafialy ZAWSZE za ostatni mecz z data prawdziwa. Gdy prawdziwe daty
+        # zaczynaja sie w polowie sezonu (365scores zbiera od 07.2026), brakujace sa z POCZATKU
+        # sezonu — a ladowaly na koncu: CHN 2026 dostala mecze z lutego-czerwca w datach
+        # 07.09-02.10, czyli wyniki sprzed pol roku liczyly sie jako najswiezsza forma.
+        # Brakujace mecze kladziemy tam, gdzie NIE MA pokrycia prawdziwymi datami.
+        _pokr = pd.concat([dd_src.MatchDate, kbs.MatchDate])
+        _pokr = _pokr[(_pokr >= lo) & (_pokr <= granica)]
+        koniec_max = granica - pd.Timedelta(days=1)          # (c) nigdy w przyszlosci ani dzisiaj
+        if len(_pokr) and (_pokr.min() - lo).days > 14:
+            start, hi = lo, _pokr.min() - pd.Timedelta(days=1)
+            koniec_max = min(koniec_max, hi)
+        hi = min(hi, koniec_max)
         order = {'regular': 0, 'regional-east': 0, 'regional-west': 0}
         rng = np.random.default_rng(19)
         rest = [rest[i] for i in rng.permutation(len(rest))]          # przemieszaj (matryca nie jest chronologiczna)
@@ -398,8 +503,8 @@ def main():
                 zajete.add((div, norm(_h), _d)); zajete.add((div, norm(_a), _d))
 
         koniec = max(hi, start)
-        dni = list(pd.date_range(start, koniec).normalize()) or [start]
-        przydzial, rozszerzono = [], False
+        dni = [d for d in pd.date_range(start, koniec).normalize() if d <= koniec_max]   # (c) bez przyszlosci
+        przydzial, rozszerzono, odrzucone_przyszlosc = [], False, 0
         for r in rest:
             kh, ka = norm(r.HomeTeam), norm(r.AwayTeam)
             wybrany = None
@@ -407,7 +512,10 @@ def main():
                 if (div, kh, d) not in zajete and (div, ka, d) not in zajete:
                     wybrany = d; break
             if wybrany is None:                      # okno wyczerpane — dokladamy dni na koncu
-                wybrany = dni[-1] + pd.Timedelta(days=1)
+                wybrany = (dni[-1] + pd.Timedelta(days=1)) if dni else start
+                if wybrany > koniec_max:             # ale NIGDY poza ostatni dozwolony dzien (przyszlosc)
+                    odrzucone_przyszlosc += 1
+                    continue
                 dni.append(wybrany); rozszerzono = True
             zajete.add((div, kh, wybrany)); zajete.add((div, ka, wybrany))
             przydzial.append((r, wybrany))
@@ -417,7 +525,12 @@ def main():
         for r, d in przydzial:
             add.append(dict(Division=div, MatchDate=d, HomeTeam=r.HomeTeam, AwayTeam=r.AwayTeam, FTHome=r.FTHome,
                             FTAway=r.FTAway, src='wiki'))
-        print(f'  wiki {div} {s}: {len(g)} meczów w matrycy, dopisano {len(rest)} (daty przybliżone {start.date()}–{hi.date()})')
+        if odrzucone_przyszlosc:
+            print(f'  wiki {div} {s}: POMINIETO {odrzucone_przyszlosc} meczow — nie ma dla nich dnia przed '
+                  f'{koniec_max.date() + pd.Timedelta(days=1)} bez kolizji w terminarzu (data z przyszlosci jest niedopuszczalna).')
+        print(f'  wiki {div} {s}: {len(g)} meczów w matrycy, dopisano {len(przydzial)} '
+              f'(daty przybliżone {min((d for _, d in przydzial), default=start).date()}–'
+              f'{max((d for _, d in przydzial), default=start).date()})')
     out = pd.concat([dated.drop(columns=['k', 'k2', 'season', 'phase'], errors='ignore'), pd.DataFrame(add)], ignore_index=True)
     out['MatchDate'] = out.MatchDate.dt.strftime('%Y-%m-%d')
     out = out.sort_values(['Division', 'MatchDate'])

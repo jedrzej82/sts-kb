@@ -28,8 +28,63 @@ def load():
     d = d.dropna(subset=['date', 'winner_name', 'loser_name'])
     d = d[~d.score.astype(str).str.contains('W/O|RET|DEF|Walkover|w/o|Ret', na=False)]
     d['surface'] = d.surface.fillna('Hard').replace({'Carpet': 'Hard'})
+    d = _scal_warianty(d)
     return d.sort_values('date', kind='stable').reset_index(drop=True)
 
+
+
+def _scal_warianty(d):
+    """23.09.2026, USTERKA U3: ten sam zawodnik zapisany roznie w roznych zrodlach
+    ("J J Wolf" w historii do 2024, "Jeffrey John Wolf" i "J.J. Wolf" z 365scores w 2026).
+    Kazdy wariant mial osobne Elo, a resolve() slusznie odmawial przy trzech kandydatach.
+    Sklejamy warianty TYLKO gdy wszystkie warunki sa spelnione:
+      - ten sam tour i to samo nazwisko (ostatni czlon),
+      - te same inicjaly imion ("J J" = "Jeffrey John"), a pelne imiona — jesli sa — identyczne,
+      - nigdy nie grali ze soba i nigdy nie maja meczu tego samego dnia (dwie osoby by mialy),
+      - przerwa miedzy okresami aktywnosci najwyzej 3 lata (Jan Kowalski z 1975 i z 2025 to dwie osoby).
+    Zostaje nazwa z NAJPELNIEJSZYM imieniem — takiej uzywa oferta."""
+    def rozbior(n):
+        t = [x for x in re.split(r'[\s.]+', str(n)) if x]
+        if len(t) < 2: return None
+        return norm(t[-1]), ''.join(norm(x)[:1] for x in t[:-1]), tuple(norm(x) for x in t[:-1] if len(norm(x)) > 1)
+    w = d[['date', 'winner_name', 'loser_name', 'src']]
+    dl = pd.concat([w.rename(columns={'winner_name': 'n', 'loser_name': 'r'}), w.rename(columns={'loser_name': 'n', 'winner_name': 'r'})])
+    tour = d.groupby('winner_name').src.first().to_dict(); tour.update(d.groupby('loser_name').src.first().to_dict())
+    grupy = {}
+    for n in dl.n.unique():
+        r = rozbior(n)
+        if r and r[1]:
+            grupy.setdefault((tour.get(n), r[0], r[1]), []).append(n)
+    info = dl.groupby('n').agg(od=('date', 'min'), do=('date', 'max'), ile=('date', 'size'))
+    dni = dl.groupby('n').date.apply(set).to_dict()
+    rywale = dl.groupby('n').r.apply(set).to_dict()
+    mapa = {}
+    for (_, _, _), ns in grupy.items():
+        if len(ns) < 2: continue
+        pelne = {rozbior(n)[2] for n in ns if rozbior(n)[2]}
+        if len(pelne) > 1: continue                     # "Jordan Wolf" i "Jeffrey Wolf" to dwie osoby
+        ns = sorted(ns, key=lambda n: info.loc[n, 'od'])
+        ok = True
+        for i, a in enumerate(ns):
+            for b in ns[i + 1:]:
+                if b in rywale.get(a, ()) or (dni[a] & dni[b]):
+                    ok = False; break
+                przerwa = max(info.loc[a, 'od'], info.loc[b, 'od']) - min(info.loc[a, 'do'], info.loc[b, 'do'])
+                if przerwa.days > 3 * 365:
+                    ok = False; break
+            if not ok: break
+        if not ok: continue
+        # tylko zawodnicy aktywni w ostatnich latach — dla archiwum z lat 70. nie ma czym tego sprawdzic,
+        # a Elo tamtych nazwisk i tak nie wplywa na dzisiejsze mecze
+        if max(info.loc[n, 'do'] for n in ns) < pd.Timestamp('2015-01-01'): continue
+        cel = max(ns, key=lambda n: (len(''.join(rozbior(n)[2])), info.loc[n, 'ile']))
+        for n in ns:
+            if n != cel: mapa[n] = cel
+    if mapa:
+        d = d.assign(winner_name=d.winner_name.replace(mapa), loser_name=d.loser_name.replace(mapa))
+        print(f'  tenis: sklejono {len(mapa)} wariantow nazwisk tego samego zawodnika '
+              f'(np. {", ".join(f"{a} -> {b}" for a, b in list(sorted(mapa.items()))[:3])})')
+    return d
 
 def k(n): return 250 / (n + 5) ** 0.4
 
