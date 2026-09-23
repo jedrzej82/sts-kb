@@ -66,6 +66,30 @@ def _znaczniki(s):
 # 23.09.2026, USTERKA U5: Asociacion Deportivo Cali jest w bazie jako 'AD Cali'.
 ALIASES.setdefault('deportivocali', 'AD Cali')
 ALIASES.setdefault('asociaciondeportivocali', 'AD Cali')
+# 23.09.2026, USTERKI U2/U3 z 12:00: nazwy z oferty STS dla klubow, ktorych rdzen maja tez kluby
+# z innych krajow (build_kb rozdziela je przyrostkiem kraju, patrz kluby.py).
+for _k, _v in {'libertadasuncion': 'Libertad', 'clublibertad': 'Libertad',
+               'sportivosanlorenzo': 'CS San Lorenzo', 'clubsportivosanlorenzo': 'CS San Lorenzo',
+               'cafenixmontevideo': 'Fénix', 'fenixmontevideo': 'Fénix', 'centroatleticofenix': 'Fénix',
+               'colonfc': 'Colon', 'colonfcmontevideo': 'Colon', 'santoslaguna': 'Santos Laguna',
+               'clubsantoslaguna': 'Santos Laguna'}.items():
+    ALIASES.setdefault(_k, _v)
+
+# 23.09.2026: warianty nazw z recznej listy kluby.py (ten sam klub, inny zapis w zrodlach) — oferta STS moze
+# uzyc DOWOLNEGO z nich ("Jeju SK" albo "Jeju United"). Uzywane DOPIERO, gdy nazwa nie jest dokladnie nazwa
+# innego klubu w bazie ("San Lorenzo" zostaje argentynskim San Lorenzo), i tylko dla nazw z co najmniej
+# dwoch czlonow — pojedyncze "Sparta", "Colon", "Lommel" sa niejednoznaczne i aliasu nie dostaja.
+ALIASES_KLUBY = {'slaviapraga': 'Slavia Prague', 'spartapraga': 'Sparta Prague', 'bohemianspraga': 'Bohemians 1905',
+                 'bohemianspraga1905': 'Bohemians 1905', 'independientemedellin': 'Independiente',
+                 'deportivoindependientemedellin': 'Independiente', 'lduquito': 'LDU', 'ligadeportivauniversitaria': 'LDU',
+                 # A-League: w bazie skroty z historii, oferta pisze pelne nazwy
+                 'melbournevictory': 'Melb Victory', 'melbournecity': 'Melb City', 'westernsydneywanderers': 'W Sydney',
+                 'westernsydney': 'W Sydney', 'centralcoastmariners': 'Central Coast', 'wellingtonphoenix': 'Wellington',
+                 'perthglory': 'Perth Glory FC', 'macarthurfc': 'Macarthur Fc', 'macarthur': 'Macarthur Fc',
+                 # "Red Star" (bez przyrostka) to francuski Red Star FC (clubelo); Crvena zvezda ma przyrostek
+                 'crvenazvezda': 'Red Star [serbia]', 'fkcrvenazvezda': 'Red Star [serbia]',
+                 'redstarbelgrade': 'Red Star [serbia]', 'crvenazvezdabeograd': 'Red Star [serbia]',
+                 'lommel': 'Lommel SK', 'klommelsk': 'Lommel SK'}
 
 def _rezerwa(zrodlo, kandydat):
     """Blokuje "Inter Milan" -> "Inter Milan U23" i pierwsza druzyne -> zespol kobiecy/mlodziezowy.
@@ -242,6 +266,40 @@ _KRAJ_KANON = {'turk': 'turkey', 'turkiye': 'turkey', 'turkey': 'turkey', 'saudi
 def _ten_sam_kraj(a, b):
     return _KRAJ_KANON.get(a, a) == _KRAJ_KANON.get(b, b)
 
+try:
+    from kluby import SCAL_RECZNIE as _SR
+    for _kl, _b in _SR.items():
+        _a = _kl[1]
+        if len(_kl) == 2 and len(_tokeny(_a)) >= 2:   # wpis z data dzieli nazwe na dwa kluby — nie jest aliasem
+            ALIASES_KLUBY.setdefault(norm(_a), _b)
+except ImportError:
+    pass
+
+
+_WARIANTY = {}
+
+
+def wczytaj_warianty(con):
+    """Tabela warianty_nazw z build_kb: nazwa zrodlowa (np. "Hertha Berlin") -> nazwa klubu w bazie ("Hertha").
+    Klucz po norm(); klucz wskazujacy dwa rozne kluby jest pomijany."""
+    try:
+        w = pd.read_sql('select wariant, klub from warianty_nazw', con)
+    except Exception:
+        return
+    # warianty z samych slow ogolnych ("Atletico", "Santa Fe", "Real") pasuja do wielu klubow — pomijamy
+    ogolne = {'atletico', 'deportivo', 'sporting', 'real', 'union', 'nacional', 'independiente', 'santa', 'fe', 'san',
+              'racing', 'city', 'united', 'athletic', 'dynamo', 'dinamo', 'olimpia', 'universidad', 'universitario',
+              'juventud', 'alianza', 'america', 'sport', 'sports', 'rovers', 'town', 'county', 'wanderers', 'deportes'}
+    d = {}
+    for a, b in zip(w.wariant, w.klub):
+        k = norm(a)
+        t = set(_tokeny(a))
+        if not k or not t or t <= ogolne: continue
+        d.setdefault(k, set()).add(b)
+    _WARIANTY.clear()
+    _WARIANTY.update({k: v.pop() for k, v in d.items() if len(v) == 1})
+
+
 def resolve(name, pool):
     """Zwraca nazwe z bazy albo None. None jest POPRAWNYM wynikiem — wolacz ma sie wtedy zatrzymac.
     21.09.2026: naprawiony blad, przez ktory zwracalo ZAWSZE cos, takze dla nieznanych druzyn.
@@ -271,6 +329,8 @@ def resolve(name, pool):
         print(f'  UWAGA: "{name}" pasuje do {len(_kol[k])} roznych wpisow w bazie '
               f'({", ".join(sorted(_kol[k]))}) — sprawdz, ktory to.')
     if k in by: return by[k]
+    if k in ALIASES_KLUBY and ALIASES_KLUBY[k] in pool: return ALIASES_KLUBY[k]
+    if k in _WARIANTY and _WARIANTY[k] in pool: return _WARIANTY[k]   # nazwa zrodlowa sklejonego klubu (build_kb)
     c = [p for p in by.values() if _zaw_nazwy(name, p)]
     if c:
         if len(c) == 1:
@@ -333,13 +393,110 @@ def venue_stats(m, team, where, since):
                 strzela_pierwszy_HT=(((t.HTHome if where == 'dom' else t.HTAway) > 0)).mean())
 
 
+_PRZYR = re.compile(r'^(.*) \[([a-z]+)\]$')
+
+
+def _jawny_kraj(name, pool, m):
+    """"Nacional [portugal]" dla klubu, ktory w bazie ma nazwe BEZ przyrostka: gdy nazwa z przyrostkiem nie
+    istnieje, a klub bez przyrostka jest z tego kraju — zwraca nazwe bez przyrostka. Inaczej None."""
+    mm = _PRZYR.match(str(name).strip())
+    if not mm or name in pool: return None
+    base, kr = mm.group(1), mm.group(2)
+    if base not in pool: return None
+    w = m[(m.HomeTeam == base) | (m.AwayTeam == base)]
+    if w.empty: return None
+    k = _kraj_ligi(w.sort_values('MatchDate').Division.iloc[-1])
+    return base if k and _KRAJ_KANON.get(k, k) == kr else None
+
+
+def _wariant_kraju(h, a, m, pool, jawne=(False, False)):
+    """23.09.2026: jedna nazwa bywa uzywana przez kluby z ROZNYCH krajow ("Santos": Brazylia i Meksyk,
+    "Nacional": Portugalia i Urugwaj). build_kb zostawia nazwe jednemu klubowi (kluby.KRAJ_NAZWY / clubelo),
+    reszcie dodaje przyrostek kraju ("Nacional [uruguay]").
+    Recenzja 23.09: automatyczny wybor wariantu "z kraju rywala" byl bledem — w pucharze (Libertad - LDU,
+    Copa Sudamericana) przerabial paragwajski Libertad na ekwadorski i omijal kontrole ROZNE KRAJE; przy dwoch
+    niejednoznacznych nazwach wybral pare z ligi Aruby. Dlatego NICZEGO nie zamieniamy: gdy kraje sie nie
+    zgadzaja, a istnieje wariant z przyrostkiem, zatrzymujemy i podajemy dokladna nazwe do uzycia."""
+    niejedn = []
+    for t, jaw in zip((h, a), jawne):
+        if t is None: continue
+        mm = _PRZYR.match(t); base = mm.group(1) if mm else t
+        inne = sorted(p for p in pool if p != t and (p == base or (p.startswith(base + ' [') and _PRZYR.match(p))))
+        if inne and not jaw:
+            niejedn.append((t, inne))
+            print(f'  UWAGA: nazwa "{base}" oznacza kilka klubow z roznych krajow ({", ".join([t] + inne)}). '
+                  f'Wybrano "{t}". Jesli chodzi o inny klub, podaj jego nazwe z przyrostkiem, np. "{inne[0]}".')
+    if h is None or a is None:
+        return h, a
+    if '--kontynentalny' in sys.argv:
+        # Recenzja 23.09: w pucharze nie ma kraju rywala do porownania, wiec "Nacional" - "Bolivar" liczylo
+        # po cichu portugalski Nacional. Nazwa wspolna bez jawnego kraju = stop.
+        if niejedn:
+            t, inne = niejedn[0]
+            sys.exit(f'NAZWA WSPOLNA DLA KLUBOW Z ROZNYCH KRAJOW w meczu miedzynarodowym: "{t}" (inne: {", ".join(inne)}). '
+                     f'Nie zgaduje. Podaj nazwe z krajem, np. "{inne[0]}" albo "{t} [<kraj>]" dla klubu bez przyrostka.')
+        return h, a
+
+    def warianty(t):
+        mm = _PRZYR.match(t); base = mm.group(1) if mm else t
+        return ([base] if base in pool else []) + sorted(p for p in pool if p.startswith(base + ' [') and _PRZYR.match(p))
+
+    def kraj(t):
+        mm = _PRZYR.match(t)
+        if mm: return mm.group(2)
+        w = m[(m.HomeTeam == t) | (m.AwayTeam == t)]
+        if w.empty: return None
+        k = _kraj_ligi(w.sort_values('MatchDate').Division.iloc[-1])
+        return _KRAJ_KANON.get(k, k) if k else None
+
+    wh, wa = warianty(h), warianty(a)
+    if len(wh) <= 1 and len(wa) <= 1: return h, a
+    kh, ka = kraj(h), kraj(a)
+    if kh and ka and kh == ka: return h, a
+    zgodne = [(x, y) for x in wh for y in wa if kraj(x) and kraj(x) == kraj(y)]
+    ile = lambda t: int(((m.HomeTeam == t) | (m.AwayTeam == t)).sum())
+    zgodne.sort(key=lambda p: -(ile(p[0]) + ile(p[1])))
+    if zgodne:
+        prop = '; '.join(f'"{x}" "{y}"' for x, y in zgodne[:3])
+        sys.exit(f'NAZWA WSPOLNA DLA KLUBOW Z ROZNYCH KRAJOW: "{h}" ({kh}) i "{a}" ({ka}). Nie zgaduje, ktory to klub. '
+                 f'Mecz ligi krajowej: uruchom ponownie z dokladnymi nazwami, np. {prop}. '
+                 f'Puchar miedzynarodowy: dodaj --kontynentalny (wtedy "{h}" i "{a}" zostaja jak sa).')
+    return h, a
+
+
+def _z_meczami(t, m):
+    """Nazwa bez meczow w bazie (sam wpis clubelo, np. "Nott'm Forest"), a obok ten sam zapis po kluczu
+    Z meczami ("Nottm Forest") — bierzemy ten z meczami. Klucz = te same litery i cyfry, wiec to ten sam klub."""
+    if t is None or ((m.HomeTeam == t) | (m.AwayTeam == t)).any(): return t
+    al = ALIASES_KLUBY.get(norm(t))   # "Lommel": sam wpis clubelo, mecze sa pod "Lommel SK"
+    if al and ((m.HomeTeam == al) | (m.AwayTeam == al)).any():
+        print(f'  "{t}" nie ma meczow w bazie (tylko wpis clubelo) — uzyto "{al}" (kluby.py / aliasy).')
+        return al
+    try:
+        from kluby import klucz
+    except ImportError:
+        return t
+    k = klucz(t)
+    kand = sorted({n for n in pd.unique(pd.concat([m.HomeTeam, m.AwayTeam])) if klucz(n) == k})
+    if len(kand) == 1:
+        print(f'  "{t}" nie ma meczow w bazie — uzyto zapisu "{kand[0]}" (ten sam klub, inna pisownia).')
+        return kand[0]
+    return t
+
+
 def club(home, away, kursy, live=None):
     con = db()
     m = pd.read_sql('select * from matches', con, parse_dates=['MatchDate'])
     elo = pd.read_sql('select club, country, elo, date from clubelo', con)
     elo = elo.sort_values('date').groupby('club').last()
     pool = set(m.HomeTeam) | set(m.AwayTeam) | set(elo.index)
-    h, a = resolve(home, pool), resolve(away, pool)
+    wczytaj_warianty(con)
+    jh, ja = _jawny_kraj(home, pool, m), _jawny_kraj(away, pool, m)
+    h = jh or resolve(home, pool)
+    a = ja or resolve(away, pool)
+    h, a = _z_meczami(h, m), _z_meczami(a, m)
+    jawne = (bool(jh) or bool(_PRZYR.match(str(home).strip())), bool(ja) or bool(_PRZYR.match(str(away).strip())))
+    h, a = _wariant_kraju(h, a, m, pool, jawne)
     if h is not None and h == a:
         # patrz komentarz w sporty.py: dwie rozne nazwy z oferty wskazujace jeden wpis
         # w bazie daja mecz druzyny z sama soba i P okolo 50% dla obu stron — liczby

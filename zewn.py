@@ -36,7 +36,7 @@ SOFA_DIV = [('england', r'^premier league$', 'E0'), ('england', r'^championship$
             ('japan', r'^j1 league$', 'JAP'), ('japan', r'^j2 league$', 'JAP2'), ('china', r'super league', 'CHN'),
             ('czech', r'(1\. liga|chance liga)$', 'CZE'), ('croatia', r'hnl$', 'CRO'), ('serbia', r'super ?liga', 'SRB'),
             ('ukraine', r'^premier league$', 'UKR'), ('korea', r'^k league 1$', 'KOR'), ('saudi', r'pro league|^saudi league$', 'KSA'),
-            ('australia', r'a-league men', 'AUS'), ('bulgaria', r'(parva liga|efbet liga|first league)', 'BUL'),
+            ('australia', r'^a-league( men)?$', 'AUS'), ('india', r'^indian super league$', 'IND'), ('bulgaria', r'(parva liga|efbet liga|first league)', 'BUL'),
             ('hungary', r'^nb i$|otp bank liga', 'HUN'), ('chile', r'liga de primera|primera divisi|^first division$', 'CHI'), ('colombia', r'primera a|^liga betplay$', 'COL'),
             ('ecuador', r'^liga ?pro$', 'ECU'), ('uruguay', r'primera divisi|^uruguayan championship$', 'URU'), ('peru', r'^liga 1', 'PER'),
             ('paraguay', r'primera divisi|^copa de primera$', 'PAR'), ('bolivia', r'divisi[oó]n profesional', 'BOL'), ('venezuela', r'^(liga futve|primera divisi[oó]n)$', 'VEN'),
@@ -271,7 +271,9 @@ def inne():
     """Sporty drużynowe i indywidualne (bez tenisa) → wiersze w formacie sporty_hist (data,sport,liga,gosp,gosc,pg,pa,dogrywka)."""
     s = czytaj('wyniki_*_inne_*.csv')
     if not len(s): return pd.DataFrame()
-    s = s[~(s.kraj + ' ' + s.turniej).str.contains(r'\b(?:NHL|NBA|WNBA|MLB)\b')]   # te ligi są z GitHuba
+    # te ligi sa z GitHuba (hist_import: nhl/espn/mlb/nfl/kbo_npb). 23.09.2026: NFL, KBO i NPB nie byly
+    # wykluczone i wchodzily DRUGI raz pod innymi nazwami druzyn ("USA | NFL" obok "NFL", "Japan | NPB" obok "NPB").
+    s = s[~(s.kraj + ' ' + s.turniej).str.contains(r'\b(?:NHL|NBA|WNBA|MLB|NFL|KBO|NPB)\b')]
     rows = []
     s = s.assign(sport=s.sport.map(lambda x: ALIAS_SPORT.get(x, x)))
     kt = s.kraj + ' ' + s.turniej

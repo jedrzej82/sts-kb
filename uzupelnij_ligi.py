@@ -212,6 +212,12 @@ _ALIAS2_2309 = {
 for _d, _m in _ALIAS2_2309.items():
     for _k, _v in _m.items():
         ALIAS2.setdefault(_d, {}).setdefault(_k, _v)   # istniejacy wpis wygrywa
+# 23.09.2026 (audyt po 12:00): reczna lista tozsamosci klubow z kluby.py — ta sama co w build_kb.py.
+# Bez niej archiwum 365scores 2025 i fbref wchodzily jako DWA mecze ("B'ham Legion" / "Birmingham Legion FC").
+from kluby import SCAL_RECZNIE as _SR, zakazane as _zakazane
+for _kl, _v in _SR.items():
+    if len(_kl) == 2:   # wpisy z data (3 elementy) obsluguje tylko build_kb — tu nie ma czym ich zawezic
+        ALIAS2.setdefault(_kl[0], {}).setdefault(_kl[1], _v)
 
 TOK_POMIN = {'fc', 'cf', 'ac', 'sc', 'if', 'is', 'ik', 'bk', 'sk', 'cd', 'ud', 'sd', 'kaa', 'krc', 'kv', 'kvc', 'rsc', 'ogc', 'club',
              'calcio', 'de', 'la', 'el', 'cp', 'afc', 'cfc', 'the', 'fbc', 'ssc', 'as', 'us',
@@ -233,6 +239,30 @@ def _tok(s):
     s = str(s).translate(ZNAKI)
     t = re.findall(r'[a-z0-9]+', _u.normalize('NFKD', s).encode('ascii', 'ignore').decode().lower().replace("'", ''))
     return [TOK_ROZW.get(x, x) for x in t if x not in TOK_POMIN]
+
+
+# 23.09.2026 (audyt po 12:00): "UD Ourense" i "Ourense CF" to DWA kluby (UD awansowal do Primera RFEF
+# w 05.2026, Ourense CF gral tam 2025/26). Po zdjeciu form prawnych obie nazwy to "ourense", nie graly ze
+# soba (rozne sezony), wiec byly sklejane w jeden klub. Zasada: gdy OBIE nazwy maja forme prawna i sa to
+# formy ROZNE (UD/CF, CD/SD, FC/AC), to nie jest ta sama nazwa. "Brøndby IF" = "Brondby" zostaje
+# (forme ma tylko jedna), "FC Lausanne-Sport" = "Lausanne-Sport" tez.
+FORMY = frozenset(TOK_POMIN) - {'de', 'la', 'el', 'the', 'calcio', 'club', 'clube', 'klub', 'deportes'}
+
+
+# FC/FK/CF/KF i SC/SK/KS to ta sama forma w roznych jezykach/transliteracjach ("FK Sochi" = "FC Sochi",
+# "SK Poltava" = "SC Poltava") — recenzja 23.09.
+_FORMA_KANON = {'fk': 'fc', 'cf': 'fc', 'kf': 'fc', 'sk': 'sc', 'ks': 'sc'}
+
+
+def _formy(s):
+    import unicodedata as _u
+    s = str(s).translate(ZNAKI)
+    return {_FORMA_KANON.get(x, x) for x in re.findall(r'[a-z0-9]+', _u.normalize('NFKD', s).encode('ascii', 'ignore').decode().lower()) if x in FORMY}
+
+
+def _rozne_formy(a, b):
+    fa, fb = _formy(a), _formy(b)
+    return bool(fa) and bool(fb) and not (fa & fb)
 
 
 def _sprzeczne(zrodlo, baza):
@@ -283,17 +313,17 @@ def match_one(n, pool, div, zwroc_sile=False):
     if n in ALIAS_ZEWN and ALIAS_ZEWN[n] in pool: return w(ALIAS_ZEWN[n], 9)
     k = norm(str(n).translate(ZNAKI))
     base = {norm(str(b).translate(ZNAKI)): b for b in pool}
-    if k in base: return w(base[k], 8)
+    if k in base and not _rozne_formy(n, base[k]): return w(base[k], 8)
     if len(k) >= 5:
         cand = {b for kb_, b in base.items() if len(kb_) >= 5 and (k.startswith(kb_) or kb_.startswith(k) or kb_.endswith(k)
                                                                    or (len(kb_) >= 8 and k.endswith(kb_)))}
-        cand = {b for b in cand if not _sprzeczne(n, b)}
+        cand = {b for b in cand if not _sprzeczne(n, b) and not _rozne_formy(n, b)}
         if len(cand) == 1: return w(cand.pop(), 5)
     # tokeny bez dopisków (FC, KAA, OGC…) i z rozwinięciami skrótów (Man→Manchester, Sp→Sporting)
     tn = _tok(n)
     if tn:
         st = set(tn)
-        eq = [b for b in pool if set(_tok(b)) == st]
+        eq = [b for b in pool if set(_tok(b)) == st and not _rozne_formy(n, b)]
         if len(eq) == 1: return w(eq[0], 7)
         # nazwa w bazie krótsza (AIK ⊂ AIK Solna, Hull ⊂ Hull City) — ale nie same ogólniki (United, Athletic…)
         def _goly(b):   # „FC Lviv”, „SC Paderborn”: po odrzuceniu FC zostaje samo miasto — to za mało
@@ -366,6 +396,13 @@ def canon(df, kb):
         # meczem klubu z samym soba. Nazwa zawsze ma prawo do siebie.
         for n in sorted(known, key=lambda x: (0 if known[x] == x else 1, -sila.get(x, 0), x)):
             cel = known[n]
+            # 23.09.2026 (recenzja): pary z kluby.NIE_SKLEJAJ to rozne kluby — bez wyjatkow, takze gdy n
+            # jako pierwsze "zajmuje" nazwe (ta sciezka nie miala zadnej kontroli: "SK Dnipro-1" -> "Dnipro")
+            if n != cel and (_zakazane(div, n, cel) or any(_zakazane(div, n, z) for z in zajete.get(cel, []))):
+                print(f'  UZUPELNIJ_LIGI [{div}]: "{n}" i "{cel}" to rozne kluby (kluby.NIE_SKLEJAJ) — osobno.')
+                known[n] = n
+                zajete.setdefault(n, [n])
+                continue
             if cel not in zajete:
                 zajete[cel] = [n]
                 continue
@@ -377,10 +414,11 @@ def canon(df, kb):
             # tym samym po zdjeciu diakrytykow i formy prawnej (sila >= 7: "Brøndby IF" = "Brondby",
             # "Colo Colo" = "Colo-Colo") albo sa wpisane recznie w ALIAS2 (sila 9). Dopasowanie po
             # CZESCI nazwy (sila 5: "LDU Portoviejo" -> "LDU") nigdy nie skleja.
-            _rowne = lambda x: x == cel or sila.get(x, 0) >= 7 or (bool(_tok(x)) and set(_tok(x)) == set(_tok(cel)))
+            _rowne = lambda x: x == cel or ((sila.get(x, 0) >= 7 or (bool(_tok(x)) and set(_tok(x)) == set(_tok(cel))))
+                                            and (sila.get(x, 0) >= 9 or not _rozne_formy(x, cel)))
             # n jest pewne, gdy samo jest ta sama nazwa co cel ALBO jest ta sama nazwa co ktorys z
             # juz przyjetych wariantow ("Wisła Kraków" = "Wisla Krakow", ktore jest aliasem "Wisla")
-            _pewne = (_rowne(n) or any(bool(_tok(n)) and set(_tok(n)) == set(_tok(z)) for z in zajete[cel]))                 and all(_rowne(z) or z == zajete[cel][0] for z in zajete[cel])
+            _pewne = (_rowne(n) or any(bool(_tok(n)) and set(_tok(n)) == set(_tok(z)) and not _rozne_formy(n, z) for z in zajete[cel]))                 and all(_rowne(z) or z == zajete[cel][0] for z in zajete[cel])
             powod = None if _pewne else 'nazwy zgodne tylko czesciowo — do sklejenia potrzebny wpis w ALIAS2'
             powod = powod or next((p for p in (_dwa_kluby(n, z) for z in zajete[cel]) if p), None)
             if powod is None:            # ta sama nazwa, nigdy ze soba nie graly, bez kolizji w terminarzu

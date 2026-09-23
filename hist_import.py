@@ -288,7 +288,21 @@ def main():
     t = tenis()
     try:
         import zewn; z = zewn.tenis(max_tcl=t.date.max())
-        if len(z): z['date'] = pd.to_datetime(z.date); t = pd.concat([t, z], ignore_index=True).sort_values('date', kind='stable')
+        if len(z):
+            z['date'] = pd.to_datetime(z.date)
+            # 23.09.2026: mecze Pucharu Davisa i czesci WTA 250 sa i w danych glownych, i w 365scores. Usuwamy
+            # WYLACZNIE wiersze 365scores, dla ktorych dane glowne maja te sama pare (zwyciezca, przegrany) w oknie
+            # turnieju: w danych glownych 'date' to START turnieju, wiec mecz z 365 wypada 0-16 dni pozniej.
+            # Danych glownych nie ruszamy (recenzja: drop_duplicates na calosci kasowal np. final Sinner-Fritz
+            # z ATP Finals 2024 jako "dubel" meczu grupowego tej samej pary).
+            tk = t[['zwyciezca', 'przegrany', 'date']].rename(columns={'date': 'd_t'})
+            zz = z.reset_index(drop=True).reset_index().merge(tk, on=['zwyciezca', 'przegrany'], how='inner')
+            dz = (zz.date - zz.d_t).dt.days
+            dub = set(zz.loc[(dz >= -1) & (dz <= 16), 'index'])
+            if dub:
+                print(f'  tenis: pominieto {len(dub)} meczow z 365scores obecnych juz w danych glownych')
+                z = z.reset_index(drop=True).drop(index=list(dub))
+            t = pd.concat([t, z], ignore_index=True).sort_values('date', kind='stable')
     except Exception as ex: print('UWAGA: zewn.tenis nie wczytany:', ex)
     t.to_csv(os.path.join(HERE, 'tenis_hist.csv'), index=False)
     print(t.groupby('tour').agg(mecze=('zwyciezca', 'size'), od=('date', 'min'), do=('date', 'max')).to_string())

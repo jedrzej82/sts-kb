@@ -392,46 +392,250 @@ def wymus_jeden_mecz_dziennie(allm):
     return allm.drop(index=[i for _, _, _, _, _, _, i in usun if i in allm.index])
 
 
+_KRAJ_OSTRZ = []
+
+
+def _kraj_kanon(div):
+    """Kraj ligi w postaci kanonicznej (typuj._kraj_ligi + _KRAJ_KANON) albo None."""
+    try:
+        from typuj import _kraj_ligi, _KRAJ_KANON
+    except Exception as e:
+        if not _KRAJ_OSTRZ:   # recenzja 23.09: blad importu wylaczal po cichu grupowanie po kraju
+            _KRAJ_OSTRZ.append(1)
+            print(f'  BUILD_KB: UWAGA — nie da sie ustalic krajow lig ({e}); sklejanie po kraju i rozdzielanie '
+                  f'nazw z roznych krajow WYLACZONE w tym przebiegu.')
+        return None
+    if not isinstance(div, str) or not div: return None
+    k = _kraj_ligi(div)
+    return _KRAJ_KANON.get(k, k) if k else None
+
+
+_ELO_CACHE = {}
+
+
+def _elo_nazwy():
+    """clubelo: nazwa -> (kod kraju, data OSTATNIEJ ZMIANY Elo). Recenzja 23.09: clubelo trzyma czesc klubow pod
+    dwiema pisowniami, z ktorych jedna jest martwa — "Nottm Forest" i "MGladbach" maja od 15.12.2024 te sama
+    wartosc przepisywana z biezaca data, zywe sa "Nott'm Forest" i "M'gladbach". Data ostatniej zmiany to odroznia."""
+    if 'e' in _ELO_CACHE: return _ELO_CACHE['e']
+    wyn = {}
+    try:
+        e = pd.read_csv(os.path.join(RAW, 'EloRatings.csv'), usecols=['club', 'country', 'date', 'elo'])
+        e = e.dropna(subset=['club']).sort_values(['club', 'date'])
+        zm = e[e.groupby('club').elo.diff().fillna(1) != 0]
+        ost = zm.groupby('club').date.max()
+        kr = e.groupby('club').country.last()
+        wyn = {c: (kr.get(c), pd.Timestamp(ost.get(c))) for c in kr.index}
+    except Exception:
+        pass
+    _ELO_CACHE['e'] = wyn
+    return wyn
+
+
+def _elo_klucz(n, gr, elo):
+    """Klucz sortowania: najpierw nazwa z clubelo Z TEGO SAMEGO KRAJU (recenzja: "Newcastle" z clubelo ENG
+    przejmowal australijski Newcastle Jets), wsrod nich ta z najswiezsza zmiana Elo."""
+    from kluby import ELO_KRAJ
+    v = elo.get(n)
+    if v is None or ELO_KRAJ.get(v[0]) != gr: return (1, 0)
+    return (0, -(v[1].value if pd.notna(v[1]) else 0))
+
+
 def scal_zapis_nazw(allm):
     """23.09.2026, audyt: ten sam klub jako dwa wpisy rozniace sie tylko ZAPISEM — spacja na koncu
-    ('Ajax' i 'Ajax ' w Eredivisie, lacznie 9 klubow N1), apostrofem ("M'gladbach" / "MGladbach"),
-    wielkoscia liter ("Colon Santa FE" / "Colon Santa Fe"). Klucz: same litery i cyfry po zdjeciu
-    diakrytykow — BEZ usuwania slow (FC, CA, SV), bo to one potrafia odrozniac kluby. Sklejamy tylko,
-    gdy dwa zapisy nigdy nie graly ze soba i nie maja meczu tego samego dnia."""
+    ('Ajax' i 'Ajax ' w Eredivisie), apostrofem ("M'gladbach" / "MGladbach"), wielkoscia liter, diakrytykami
+    albo 'ß'/'ss'. Klucz: same litery i cyfry (kluby.klucz) — BEZ usuwania slow (FC, CA, SV), bo to one potrafia
+    odrozniac kluby. Do tego reczna lista kluby.SCAL_RECZNIE (ten sam klub pod INNA nazwa w zrodlach).
+    Zasady po recenzji 23.09:
+      - grupujemy w obrebie KRAJU (awans/spadek), liga bez kraju tworzy wlasna grupe;
+      - nazwa wynikowa: ta, ktora ma clubelo (inaczej model traci Elo: "Hornchurch", "VVV Venlo"),
+        potem ta z najwieksza liczba meczow;
+      - pary z kluby.NIE_SKLEJAJ nigdy nie sa sklejane; dwa zapisy, ktore GRALY ZE SOBA, to dwa kluby;
+      - wspolne dni meczowe: 0; wyjatkiem sa dni, na ktore przypada wiersz z xgabora (daty w ligach spoza
+        Europy bywaja tam przesuniete) — wtedy najwyzej 2 i <= 2% meczow mniejszego."""
+    from kluby import SCAL_RECZNIE, SCAL_TYLKO_LIGA, klucz, zakazane
     for c in ('HomeTeam', 'AwayTeam'):
         allm[c] = allm[c].astype(str).str.strip().str.replace(r'\s+', ' ', regex=True)
-    # Kluby, ktore wrocily do ligi po latach pod inna nazwa w 365scores (historia do 2021, swieze od 2026):
-    # canon() w uzupelnij_ligi.py widzi tylko druzyny aktywne od 07.2022, wiec sam ich nie polaczy.
-    for (div_, a_), b_ in {('BRA', 'Chapecoense'): 'Chapecoense-SC', ('SUI', 'FC Vaduz'): 'Vaduz'}.items():
-        w_ = allm.Division == div_
-        gra = ((allm.HomeTeam == a_) & (allm.AwayTeam == b_)) | ((allm.HomeTeam == b_) & (allm.AwayTeam == a_))
-        if (w_ & gra).any(): continue
+    _d = allm['Division']
+    allm['Division'] = _d.where(_d.isna(), _d.astype(str).str.strip().str.replace(r'\s+', ' ', regex=True))
+    elo = _elo_nazwy()
+    kraj = {d: _kraj_kanon(d) for d in allm.Division.dropna().unique()}
+    grupa = allm.Division.map(lambda d: (kraj.get(d) or ('liga:' + d)) if isinstance(d, str) else 'liga:?')
+    daty = pd.to_datetime(allm.MatchDate, errors='coerce')
+
+    # (1) NAJPIERW reczna lista, po KLUCZU ("Würzburger Kickers" = "Wurzburger Kickers").
+    rr = 0
+    for kl, b_ in SCAL_RECZNIE.items():
+        div_, a_ = kl[0], kl[1]
+        ligi_kr = {d for d in kraj if (kraj.get(d) or ('liga:' + d)) == (kraj.get(div_) or ('liga:' + div_))} | {div_}
+        od_ = kl[2] if len(kl) > 2 else None   # 'RRRR-MM-DD' (od) albo '<RRRR-MM-DD' (przed)
+        if not (allm.Division == div_).any(): continue
+        gr_ = kraj.get(div_) or ('liga:' + div_)
+        zakres = (allm.Division == div_) if kl in SCAL_TYLKO_LIGA else (grupa == gr_)
+        if od_ is not None:
+            zakres = zakres & ((daty < pd.Timestamp(od_[1:])) if od_.startswith('<') else (daty >= pd.Timestamp(od_)))
+        ka, kb_ = klucz(a_), klucz(b_)
+        w_kr = grupa == gr_
+        nazwy_kr = pd.unique(pd.concat([allm.loc[w_kr, 'HomeTeam'], allm.loc[w_kr, 'AwayTeam']]))
+        zrodlowe = {n for n in pd.unique(pd.concat([allm.loc[zakres, 'HomeTeam'], allm.loc[zakres, 'AwayTeam']])) if klucz(n) == ka}
+        if not zrodlowe: continue
+        cele = {n for n in nazwy_kr if klucz(n) == kb_}
+        if od_ is None and (zrodlowe & cele): zrodlowe -= cele
+        gra = ((allm.HomeTeam.isin(zrodlowe) & allm.AwayTeam.isin(cele)) | (allm.HomeTeam.isin(cele) & allm.AwayTeam.isin(zrodlowe)))
+        if (w_kr & gra).any() or any(zakazane(d, x, y) for d in ligi_kr for x in zrodlowe for y in cele | {b_}):
+            print(f'  BUILD_KB [{div_}]: NIE sklejam {sorted(zrodlowe)} z "{b_}" mimo wpisu w kluby.py — graly ze soba albo NIE_SKLEJAJ.')
+            continue
+        # nazwa wynikowa: z clubelo, jesli ktorys zapis ja ma (inaczej wpis w clubelo zostaje bez meczow)
+        # (wpis z data wydziela CZESC meczow pod nowa nazwe — tam cel jest zawsze nazwa z listy)
+        kandydaci = sorted(zrodlowe | cele | {b_}, key=lambda n: (_elo_klucz(n, gr_, elo), n != b_, n))
+        cel = b_ if od_ is not None else kandydaci[0]
         for c in ('HomeTeam', 'AwayTeam'):
-            allm.loc[w_ & (allm[c] == a_), c] = b_
-    klucz = lambda x: re.sub(r'[^a-z0-9]', '', unicodedata.normalize('NFKD', str(x)).encode('ascii', 'ignore').decode().lower())
+            allm.loc[zakres & allm[c].isin(zrodlowe - {cel}), c] = cel
+            if cel != b_:
+                allm.loc[w_kr & allm[c].isin(cele - {cel}), c] = cel
+        rr += 1
+    if rr:
+        print(f'  BUILD_KB: {rr} nazw sklejonych z recznej listy kluby.SCAL_RECZNIE (ten sam klub, inny zapis w zrodlach).')
+
+    # (2) automatycznie: zapisy rowne po kluczu w obrebie KRAJU.
+    xg = (allm['src'] == 'xgabora') if 'src' in allm.columns else pd.Series(False, index=allm.index)
     mapa, ile = {}, 0
-    for div, g in allm.groupby('Division'):
-        t = pd.concat([g[['MatchDate', 'HomeTeam']].rename(columns={'HomeTeam': 'n'}), g[['MatchDate', 'AwayTeam']].rename(columns={'AwayTeam': 'n'})])
+    for gr, g in allm.assign(_gr=grupa, _xg=xg).groupby('_gr'):
+        t = pd.concat([g[['Division', 'MatchDate', 'HomeTeam', '_xg']].rename(columns={'HomeTeam': 'n'}),
+                       g[['Division', 'MatchDate', 'AwayTeam', '_xg']].rename(columns={'AwayTeam': 'n'})])
         licz = t.n.value_counts()
         grupy = {}
         for n in licz.index: grupy.setdefault(klucz(n), []).append(n)
         dni = t.groupby('n').MatchDate.apply(set).to_dict()
+        dni_pewne = t[~t._xg].groupby('n').MatchDate.apply(set).to_dict()
+        dni_xg = t[t._xg].groupby('n').MatchDate.apply(set).to_dict()
+        ligi = t.groupby('n').Division.apply(set).to_dict()
         pary = set(zip(g.HomeTeam, g.AwayTeam))
+
+        def _zgodne(a, b):
+            if (a, b) in pary or (b, a) in pary: return False
+            if any(zakazane(d, a, b) for d in ligi.get(a, set()) | ligi.get(b, set())): return False
+            if dni_pewne.get(a, set()) & dni_pewne.get(b, set()): return False
+            wsp = dni[a] & dni[b]
+            # wspolny dzien dopuszczalny tylko, gdy po JEDNEJ stronie jest wylacznie wiersz z xgabora (data
+            # przesunieta), a po drugiej prawdziwy mecz — dwa wiersze xgabora tego dnia to dwa kluby
+            only_xg = lambda n, d: d in dni_xg.get(n, set()) and d not in dni_pewne.get(n, set())
+            if any(only_xg(a, d) == only_xg(b, d) for d in wsp): return False
+            w = len(wsp)
+            return w == 0 or (w <= 2 and w <= 0.02 * min(licz[a], licz[b]))
         for k_, ns in grupy.items():
             if len(ns) < 2 or not k_: continue
-            ok = all(not ((a, b) in pary or (b, a) in pary or (dni[a] & dni[b])) for i, a in enumerate(ns) for b in ns[i + 1:])
+            ok = all(_zgodne(a, b) for i, a in enumerate(ns) for b in ns[i + 1:])
             if not ok:
-                print(f'  BUILD_KB [{div}]: zapisy {ns} roznia sie tylko znakami, ale graly ze soba albo tego samego dnia — zostaja osobno.')
+                print(f'  BUILD_KB [{gr}]: zapisy {ns} roznia sie tylko znakami, ale graly ze soba, tego samego dnia albo sa na liscie NIE_SKLEJAJ — zostaja osobno.')
                 continue
-            cel = max(ns, key=lambda n: licz[n])
+            cel = min(ns, key=lambda n: (_elo_klucz(n, gr, elo), -licz[n], n))
             for n in ns:
-                if n != cel: mapa[(div, n)] = cel; ile += 1
+                if n != cel: mapa[(gr, n)] = cel; ile += 1
     if mapa:
         for c in ('HomeTeam', 'AwayTeam'):
-            allm[c] = [mapa.get((d, n), n) for d, n in zip(allm.Division, allm[c])]
-        print(f'  BUILD_KB: sklejono {ile} zapisow nazw rozniacych sie tylko spacja/apostrofem/wielkoscia liter '
+            allm[c] = [mapa.get((g_, n), n) for g_, n in zip(grupa, allm[c])]
+        print(f'  BUILD_KB: sklejono {ile} zapisow nazw rozniacych sie tylko znakami '
               f'(np. {", ".join(f"{n!r}->{c!r}" for (d, n), c in list(mapa.items())[:3])}).')
     return allm
+
+
+def warianty_nazw(allm):
+    """23.09.2026 (regresja nazw): po sklejeniu klub ma w bazie JEDNA nazwe, a oferta STS pisze czesto ta, ktora
+    zniknela ("Hertha Berlin" -> "Hertha", "Red Bull Salzburg" -> "Salzburg", "Los Chankas" -> "CDC Santa Rosa").
+    Zapisujemy wszystkie nazwy zrodlowe klubu: z wierszy (_oH/_oA -> nazwa koncowa) i z mapy uzupelnij_ligi
+    (ligi_extra_nazwy.json: nazwa zrodla -> nazwa w ligi_extra -> nazwa koncowa). Wariant wskazujacy DWA rozne
+    kluby (w roznych ligach) jest pomijany — typuj.py uzywa tabeli tylko tam, gdzie wynik jest jednoznaczny."""
+    par = pd.concat([allm[['Division', '_oH', 'HomeTeam']].set_axis(['div', 'z', 'k'], axis=1),
+                     allm[['Division', '_oA', 'AwayTeam']].set_axis(['div', 'z', 'k'], axis=1)]).dropna().drop_duplicates()
+    kon = {(d, z): k for d, z, k in par.itertuples(index=False)}
+    wyn = set((z, k) for _, z, k in par.itertuples(index=False))
+    try:
+        mapa = json.load(open(os.path.join(HERE, 'ligi_extra_nazwy.json'), encoding='utf-8'))
+        for d, m in mapa.items():
+            for z, k in m.items():
+                if (d, k) in kon: wyn.add((z, kon[(d, k)]))
+    except Exception:
+        pass
+    w = pd.DataFrame(sorted(wyn), columns=['wariant', 'klub'])
+    koncowe = set(allm.HomeTeam) | set(allm.AwayTeam)
+    w = w[(w.wariant != w.klub) & w.klub.isin(koncowe) & ~w.wariant.isin(koncowe)]
+    ile = w.groupby('wariant').klub.nunique()
+    w = w[w.wariant.isin(ile[ile == 1].index)].drop_duplicates()
+    print(f'  BUILD_KB: tabela warianty_nazw: {len(w)} nazw zrodlowych sklejonych klubow (dla typuj.py).')
+    return w
+
+
+def usun_dubel_miedzy_ligami(allm):
+    """23.09.2026 (recenzja): ten sam mecz w DWOCH ligach jednego kraju — 365scores zapisywal kolejke
+    Regionalligi raz jako "Regionalliga", raz jako "Regional League North" (ok. 211 meczow podwojnie),
+    baraze trafialy i do KOR, i do "K League 2", i do SWE, i do SWE2. Ten sam gospodarz, gosc i wynik,
+    data +-1 dzien, kraj ten sam -> zostaje jeden wiersz: z ligi z kodem (E0, SWE), a miedzy ligami
+    "Kraj | Liga" — z ligi o mniejszej liczbie druzyn (bardziej szczegolowej)."""
+    if not len(allm): return allm
+    kraj = {d: _kraj_kanon(d) for d in allm.Division.dropna().unique()}
+    a = allm.assign(_k=allm.Division.map(kraj), _dt=pd.to_datetime(allm.MatchDate, errors='coerce').dt.normalize())
+    a = a[a._k.notna() & a._dt.notna()]
+    druz = pd.concat([allm[['Division', 'HomeTeam']].rename(columns={'HomeTeam': 'n'}),
+                      allm[['Division', 'AwayTeam']].rename(columns={'AwayTeam': 'n'})]).groupby('Division').n.nunique()
+    a = a.assign(_pr=[(0 if '|' not in str(d) else 1, druz.get(d, 0)) for d in a.Division])
+    a = a.sort_values(['_k', 'HomeTeam', 'AwayTeam', 'FTHome', 'FTAway', '_dt'])
+    klucz = ['_k', 'HomeTeam', 'AwayTeam', 'FTHome', 'FTAway']
+    poprz_dt = a.groupby(klucz, dropna=False)._dt.shift()
+    poprz_idx = a.index.to_series().groupby([a[c] for c in klucz], dropna=False).shift()
+    poprz_div = a.groupby(klucz, dropna=False).Division.shift()
+    dub = ((a._dt - poprz_dt).dt.days.le(1)) & poprz_div.notna() & (poprz_div != a.Division)
+    usun = set()
+    for i in a.index[dub.values]:
+        j = poprz_idx.at[i]
+        usun.add(i if a.at[i, '_pr'] >= a.at[j, '_pr'] else j)
+    if usun:
+        pr = allm.loc[list(usun)].Division.value_counts().head(4).to_dict()
+        print(f'  BUILD_KB: usunieto {len(usun)} meczow zapisanych w DWOCH ligach jednego kraju (np. {pr}).')
+    allm = allm.drop(index=list(usun))
+    # Recenzja 23.09: po sklejeniu "Cuiaba" (BRA, xgabora) z "Cuiabá" (BRA2, 365scores) klub mial dwa mecze
+    # 11.01.2021 — wiersz xgabora z Serie A to widmo (klub gral wtedy w Serie B). Klub nie gra dwoch meczow
+    # jednego dnia: gdy w dwoch ligach kraju jeden wiersz jest z xgabora, a drugi z innego zrodla, xgabora odpada.
+    if 'src' not in allm.columns: return allm
+    b = allm.assign(_k=allm.Division.map(kraj), _dt=pd.to_datetime(allm.MatchDate, errors='coerce').dt.normalize())
+    b = b[b._k.notna() & b._dt.notna()]
+    dl = pd.concat([b[['_k', '_dt', 'Division', 'src', 'HomeTeam']].rename(columns={'HomeTeam': 't'}).assign(_i=b.index),
+                    b[['_k', '_dt', 'Division', 'src', 'AwayTeam']].rename(columns={'AwayTeam': 't'}).assign(_i=b.index)])
+    gg = dl.groupby(['_k', '_dt', 't'])
+    # wiersz spoza xgabora musi miec PRAWDZIWA date (wiki ma daty przyblizone — nie moze niczego wypierac)
+    wiki = b['src_zrodlo'].astype(str).eq('wiki') if 'src_zrodlo' in b.columns else pd.Series(False, index=b.index)
+    dl = dl.assign(_p=(dl.src.ne('xgabora') & ~dl._i.map(wiki).fillna(False).astype(bool)).values)
+    konf = dl[(gg.Division.transform('nunique') > 1) & (dl.groupby(['_k', '_dt', 't'])._p.transform('any')) &
+              (gg.src.transform(lambda x: (x == 'xgabora').any()))]
+    kolid = sorted(set(konf.loc[konf.src == 'xgabora', '_i']))
+    if not kolid: return allm
+    # Recenzja 23.09: czesc takich wierszy to NIE widma, tylko mecze z zamienionym dniem i miesiacem w xgabora
+    # (BRA 2021: Cuiaba - Bragantino "2021-01-11" to 01.11.2021). Dlatego: (a) ten sam mecz (rywal i wynik)
+    # jest juz w innej lidze kraju w ciagu 1 dnia od daty albo od daty z zamienionym dniem/miesiacem -> dubel,
+    # usuwamy; (b) dzien <= 12 -> zamieniamy dzien z miesiacem; (c) inaczej usuwamy (daty nie da sie ustalic).
+    from kluby import klucz as _kl
+    reszta = allm.drop(index=kolid)
+    rdt = pd.to_datetime(reszta.MatchDate, errors='coerce').dt.normalize()
+    usun2, zamien = [], {}
+    for i in kolid:
+        r = allm.loc[i]; d0 = pd.to_datetime(r.MatchDate).normalize()
+        daty = [d0] + ([pd.Timestamp(year=d0.year, month=d0.day, day=d0.month)] if d0.day <= 12 else [])
+        h, a = _kl(r.HomeTeam), _kl(r.AwayTeam)
+        blizniak = False
+        for dd in daty:
+            w = reszta[(rdt - dd).abs().dt.days.le(1) & (reszta.FTHome == r.FTHome) & (reszta.FTAway == r.FTAway)]
+            for x in w.itertuples():
+                xh, xa = _kl(x.HomeTeam), _kl(x.AwayTeam)
+                if (xh.startswith(h) or h.startswith(xh)) and (xa.startswith(a) or a.startswith(xa)):
+                    blizniak = True
+        if blizniak or d0.day > 12: usun2.append(i)
+        else: zamien[i] = daty[1]
+    for i, d in zamien.items():
+        allm.at[i, 'MatchDate'] = d.strftime('%Y-%m-%d') if isinstance(allm.at[i, 'MatchDate'], str) else d
+    if usun2 or zamien:
+        print(f'  BUILD_KB: wiersze xgabora kolidujace z meczem klubu tego samego dnia w innej lidze: usunieto {len(usun2)} '
+              f'(dubel albo data nie do ustalenia), {len(zamien)} przestawiono (zamieniony dzien z miesiacem).')
+    return allm.drop(index=usun2)
 
 
 def usun_dubel_meczu(allm):
@@ -485,19 +689,35 @@ def main():
         except Exception: pass
     allm = pd.concat(parts, ignore_index=True)
     allm = allm.drop_duplicates(subset=['Division', 'MatchDate', 'HomeTeam', 'AwayTeam'], keep='first')
+    allm['_oH'], allm['_oA'] = allm.HomeTeam.astype(str).str.strip(), allm.AwayTeam.astype(str).str.strip()   # do tabeli warianty_nazw
+    from kluby import LIGI_POMIN, WIERSZE_POMIN_DRUZYNA, WIERSZE_POMIN
+    _d10 = pd.to_datetime(allm.MatchDate, errors='coerce').dt.strftime('%Y-%m-%d')
+    _pom = allm.Division.isin(LIGI_POMIN)
+    for _dv, _t in WIERSZE_POMIN_DRUZYNA:
+        _pom |= (allm.Division == _dv) & ((allm.HomeTeam == _t) | (allm.AwayTeam == _t))
+    for _dv, _dd, _h, _a in WIERSZE_POMIN:
+        _pom |= (allm.Division == _dv) & (_d10 == _dd) & (allm.HomeTeam == _h) & (allm.AwayTeam == _a)
+    if _pom.any():
+        print(f'  BUILD_KB: pominieto {int(_pom.sum())} wierszy z bledem zrodla (kluby.WIERSZE_POMIN*: zle podpisany klub, odwrocony wynik).')
+        allm = allm[~_pom]
     allm = scal_zapis_nazw(allm)
     allm = aliasy_z_terminarza(allm)
     allm = przesun_daty_przyblizone(allm)
     allm = wymus_jeden_mecz_dziennie(allm)
     allm = usun_dubel_meczu(allm)
+    allm = usun_dubel_miedzy_ligami(allm)
+    from kluby import rozdziel_kraje
+    allm = rozdziel_kraje(allm, _kraj_kanon, {n: v[0] for n, v in _elo_nazwy().items()})
     allm = allm.drop_duplicates(subset=['Division', 'MatchDate', 'HomeTeam', 'AwayTeam'], keep='first')
     DIV_NAME.update({d: d for d in allm.Division.dropna().unique() if d not in DIV_NAME})  # ligi z Sofascore: „Kraj | Liga”
-    allm = allm.drop(columns=['src_zrodlo'], errors='ignore')
+    warianty = warianty_nazw(allm)
+    allm = allm.drop(columns=['src_zrodlo', '_oH', '_oA'], errors='ignore')
     allm = allm.sort_values(['MatchDate', 'Division']).reset_index(drop=True)
     intl = pd.read_csv(os.path.join(RAW, 'intl_results.csv')).dropna(subset=['home_score', 'away_score'])
     elo = pd.read_csv(os.path.join(RAW, 'EloRatings.csv'))
     db = sqlite3.connect(os.path.join(HERE, 'kb.sqlite'))
     allm.to_sql('matches', db, if_exists='replace', index=False)
+    warianty.to_sql('warianty_nazw', db, if_exists='replace', index=False)
     intl.to_sql('intl', db, if_exists='replace', index=False)
     elo.to_sql('clubelo', db, if_exists='replace', index=False)
     pd.DataFrame(list(DIV_NAME.items()), columns=['Division', 'Name']).to_sql('divisions', db, if_exists='replace', index=False)
