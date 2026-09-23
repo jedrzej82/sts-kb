@@ -32,13 +32,13 @@ SOFA_DIV = [('england', r'^premier league$', 'E0'), ('england', r'^championship$
             ('switzerland', r'^super league$', 'SUI'), ('austria', r'^bundesliga$', 'AUT'), ('russia', r'^premier (league|liga)$', 'RUS'),
             ('romania', r'^(superliga|liga i|liga 1)$', 'ROM'), ('poland', r'^ekstraklasa$', 'POL'), ('poland', r'^(i liga|1\. liga|betclic 1\. liga)$', 'POL2'),
             ('mexico', r'^liga mx', 'MEX'), ('usa', r'^mls$', 'USA'), ('usa', r'usl championship', 'USL'),
-            ('argentina', r'liga profesional', 'ARG'), ('brazil', r's[eé]rie a$', 'BRA'), ('brazil', r's[eé]rie b$', 'BRA2'),
+            ('argentina', r'liga profesional', 'ARG'), ('brazil', r'^(brasileir[aã]o\W+)?s[eé]rie a$', 'BRA'), ('brazil', r'^(brasileir[aã]o\W+)?s[eé]rie b$', 'BRA2'),
             ('japan', r'^j1 league$', 'JAP'), ('japan', r'^j2 league$', 'JAP2'), ('china', r'super league', 'CHN'),
             ('czech', r'(1\. liga|chance liga)$', 'CZE'), ('croatia', r'hnl$', 'CRO'), ('serbia', r'super ?liga', 'SRB'),
             ('ukraine', r'^premier league$', 'UKR'), ('korea', r'^k league 1$', 'KOR'), ('saudi', r'pro league|^saudi league$', 'KSA'),
             ('australia', r'a-league men', 'AUS'), ('bulgaria', r'(parva liga|efbet liga|first league)', 'BUL'),
             ('hungary', r'^nb i$|otp bank liga', 'HUN'), ('chile', r'liga de primera|primera divisi|^first division$', 'CHI'), ('colombia', r'primera a|^liga betplay$', 'COL'),
-            ('ecuador', r'liga ?pro', 'ECU'), ('uruguay', r'primera divisi|^uruguayan championship$', 'URU'), ('peru', r'^liga 1', 'PER'),
+            ('ecuador', r'^liga ?pro$', 'ECU'), ('uruguay', r'primera divisi|^uruguayan championship$', 'URU'), ('peru', r'^liga 1', 'PER'),
             ('paraguay', r'primera divisi|^copa de primera$', 'PAR'), ('bolivia', r'divisi[oó]n profesional', 'BOL'), ('venezuela', r'^(liga futve|primera divisi[oó]n)$', 'VEN'),
             ('south africa', r'premiership|^premier league$', 'RSA'), ('iran', r'pro league', 'IRN'), ('canada', r'canadian premier league', 'CAN'),
             ('israel', r'premier league', 'ISR'), ('cyprus', r'1st division|first division|cyta championship', 'CYP'),
@@ -87,11 +87,36 @@ def _scal_nazwy_rozgrywek(d):
 
     wezly = list(zip(d.sport, d.kraj, d.turniej))
     d = d.assign(_wez=wezly)
+    # 23.09.2026 (recenzja): JEDEN wspolny mecz wystarczal, zeby skleic dwie ligi — baraz zapisany
+    # w II i I lidze przenosil CALA II lige do I, a mecz ligowy zapisany tez jako sparing przemianowywal
+    # cala lige na sparingi (i filtr PUCHAR ja kasowal). Teraz sklejamy tylko gdy:
+    #   ten sam sport i TEN SAM KRAJ, obie nazwy po tej samej stronie filtra PUCHAR,
+    #   i wspolne mecze to co najmniej POLOWA meczow mniejszej z nazw (przemianowanie, nie baraz).
+    licz = d['_wez'].value_counts()
+    wspolne = {}
     for _, g in d.groupby(mecz, sort=False)['_wez']:
         u = sorted(set(g))
-        for w in u[1:]:
-            a, b = znajdz(u[0]), znajdz(w)
-            if a != b: rodzic[b] = a
+        for i_, a_ in enumerate(u):
+            for b_ in u[i_ + 1:]:
+                wspolne[(a_, b_)] = wspolne.get((a_, b_), 0) + 1
+    kraw = []
+    for (a_, b_), n_ in wspolne.items():
+        if a_[0] != b_[0] or _n(a_[1]) != _n(b_[1]): continue
+        if bool(PUCHAR.search(str(a_[2]))) != bool(PUCHAR.search(str(b_[2]))): continue
+        if n_ < 0.5 * min(licz.get(a_, 0), licz.get(b_, 0)): continue
+        kraw.append((a_, b_))
+    # Druga recenzja: sklejanie jest PRZECHODNIE — mala nazwa ('Liguilla', 1 mecz wspolny z I liga i 1 z II)
+    # laczyla I i II lige w jedna. Przemianowanie to relacja JEDEN-DO-JEDNEGO: sklejamy tylko pary,
+    # w ktorych KAZDA z nazw ma dokladnie jednego partnera.
+    stopien = {}
+    for a_, b_ in kraw:
+        stopien[a_] = stopien.get(a_, 0) + 1; stopien[b_] = stopien.get(b_, 0) + 1
+    for a_, b_ in kraw:
+        if stopien[a_] != 1 or stopien[b_] != 1:
+            print(f'  zewn: NIE sklejam "{a_[1]} | {a_[2]}" z "{b_[1]} | {b_[2]}" — jedna z nazw laczy sie z kilkoma innymi.')
+            continue
+        ra, rb = znajdz(a_), znajdz(b_)
+        if ra != rb: rodzic[rb] = ra
 
     if not any(znajdz(w) != w for w in set(wezly)):
         return d.drop(columns='_wez')
@@ -139,12 +164,54 @@ def czytaj(wzor):
     # wiec dalej jest odsiewana — a tych bylo duzo: 17-19.09 kazdy mecz siedzial w pliku 2-4 razy.
     d = _scal_nazwy_rozgrywek(d)   # jedna liga pod dwiema nazwami -> jedna nazwa, ZANIM odsiejemy
 
-    klucz = [c for c in ('data', 'sport', 'liga', 'turniej', 'gosp', 'gosc',
-                         'wg', 'wa', 'gg', 'ga', 'pg', 'pa') if c in d.columns]
+    # 23.09.2026 (recenzja): wynik w kluczu przepuszczal DUPLIKATY meczow, ktore Apps Script zapisal
+    # z roznym wynikiem (Shams Azar - Aluminium Arak 1:2 i 2:2, Liverpool - Como 0:0 i 2:0). Dwa mecze
+    # tej samej pary jednego dnia sa realne tylko w baseballu (dwumecze MLB i LMB) — tylko tam wynik
+    # rozroznia mecze. W pozostalych sportach zostaje JEDEN wiersz: pelniejszy, a przy rownych ostatni.
+    _kw = [c for c in ('wg', 'wa', 'gg', 'ga', 'pg', 'pa') if c in d.columns]
+    if 'sport' in d.columns and _kw:
+        _dw = d.sport.astype(str).str.lower().isin({'baseball'})
+        d = d.assign(_wyn=d[_kw].astype(str).agg(':'.join, axis=1).where(_dw, ''))
+    else:
+        d = d.assign(_wyn='')
+    klucz = [c for c in ('data', 'sport', 'liga', 'turniej', 'gosp', 'gosc', '_wyn') if c in d.columns]
     if 'okresy_g' in d.columns:   # ten sam mecz pobrany ponownie: zostaje wiersz z pełniejszymi danymi (okresy/nawierzchnia)
         d = d.assign(_pel=(d.okresy_g != '').astype(int) + (d.get('nawierzchnia', '') != '').astype(int)).sort_values('_pel', kind='stable')
         d = d.drop(columns='_pel')
-    return d.drop_duplicates(klucz, keep='last').reset_index(drop=True)
+    # Druga recenzja: przy RÓZNYCH wynikach tego samego meczu keep='last' bralo wiersz pozniejszy w PLIKU,
+    # a nie wynik koncowy (Shams Azar - Aluminium Arak: zostawalo 1:2, koncowy byl 2:2). Punkty/gole nie
+    # maleja w trakcie meczu, wiec wynik koncowy to ten, ktory jest >= wszystkim pozostalym w OBU skladowych.
+    # Gdy takiego nie ma (Chertsey 1:2 i 2:1 — sprzeczne), mecz odrzucamy: brak meczu jest lepszy niz zly wynik.
+    if len(_kw) >= 2 and len(d):
+        g1, g2 = _kw[0], _kw[1]
+        v1, v2 = pd.to_numeric(d[g1], errors='coerce'), pd.to_numeric(d[g2], errors='coerce')
+        d = d.assign(_v1=v1, _v2=v2)
+        wynik_kl = list(klucz)   # z '_wyn': w baseballu rozne wyniki to rozne mecze (dwumecz), nie sprzecznosc
+        rozne = d.groupby(wynik_kl, dropna=False)[[g1, g2]].transform(lambda s_: s_.nunique()).max(axis=1) > 1
+        if rozne.any():
+            zostaw, sprzeczne = [], 0
+            for _, gr in d[rozne].groupby(wynik_kl, dropna=False):
+                if gr[['_v1', '_v2']].isna().any().any():
+                    zostaw.append(gr.index[-1]); continue            # wynik nieliczbowy (np. boks KO/TKO)
+                dom = gr[(gr._v1 >= gr._v1.max()) & (gr._v2 >= gr._v2.max())]
+                if len(dom): zostaw.append(dom.index[-1])
+                else: sprzeczne += 1
+            d = pd.concat([d[~rozne], d.loc[zostaw]])
+            if sprzeczne:
+                print(f'  zewn: odrzucono {sprzeczne} meczow ze SPRZECZNYM wynikiem w zrodle (np. 1:2 i 2:1) — nie da sie ustalic koncowego.')
+        if 'sport' in d.columns:   # baseball: wynik w kluczu, wiec migawka w trakcie meczu nie jest odsiewana — ostrzegamy
+            b = d[d.sport.astype(str).str.lower() == 'baseball']
+            if len(b):
+                pod = 0
+                for _, gr in b.groupby(['data', 'gosp', 'gosc']):
+                    if len(gr) > 1 and gr._v1.notna().all():
+                        x = gr[['_v1', '_v2']].values
+                        pod += sum(1 for i in range(len(x)) for j in range(len(x)) if i != j and (x[i] <= x[j]).all())
+                if pod:
+                    print(f'  zewn: baseball — {pod} par meczow tego samego dnia, w ktorych jeden wynik jest <= drugiemu w obu skladowych '
+                          f'(moze to byc migawka w trakcie meczu, a nie drugi mecz dwumeczu).')
+        d = d.drop(columns=['_v1', '_v2'])
+    return d.drop_duplicates(klucz, keep='last').drop(columns='_wyn').reset_index(drop=True)
 
 
 def sofa_div(kraj, turniej):

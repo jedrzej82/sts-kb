@@ -163,7 +163,9 @@ ALIAS_ZEWN.update({'Inter Milan': 'Inter', 'Internazionale': 'Inter', 'Amed SK':
                    'Osters IF': 'Oster', 'Stabæk': 'Stabaek', 'Deportivo Cuenca': 'CD Cuenca'})
 NIE_MAPUJ = {'Cerro Largo', 'NK Zagreb', 'FSV Frankfurt', 'Bury Town', 'Bayern Munich II', 'Bayern München II',
              'Felixstowe & Walton Utd.', 'Redditch Utd', 'Welling Utd', 'Ath Paranaense', 'Paraná', 'Remo', 'Clube do Remo',
-             'Naft Tehran', 'Sanat Naft', 'Rukh Lviv', 'Esteghlal Ahvaz', 'Esteghlal Khuz', 'Wieczysta Krakow'}
+             'Naft Tehran', 'Sanat Naft', 'Rukh Lviv', 'Esteghlal Ahvaz', 'Esteghlal Khuz', 'Wieczysta Krakow',
+             # 23.09 (recenzja): rozne kluby o nazwie rozniacej sie tylko forma prawna
+             'CS Dinamo București', 'CS Dinamo Bucuresti', 'Ec São Bernardo', 'EC São Bernardo', 'Belenenses SAD'}
 # 23.09.2026, USTERKA U1: reczne aliasy wariantow nazw TEGO SAMEGO klubu (przejrzane pojedynczo).
 # Rozne kluby o podobnej nazwie CELOWO tu nie weszly — patrz lataj_alias2 w historii commitow.
 _ALIAS2_2309 = {
@@ -171,7 +173,7 @@ _ALIAS2_2309 = {
     'AUS': {'Adelaide United': 'Adelaide', 'Brisbane Roar': 'Brisbane', 'Central Coast Mariners': 'Central Coast', 'Newcastle United Jets': 'Newcastle', 'Wellington Phoenix': 'Wellington'},
     'AUT': {'LASK Linz': 'LASK', 'RB Salzburg': 'Salzburg', 'Red Bull Salzburg': 'Salzburg', 'FC Salzburg': 'Salzburg', 'Rapid Wien': 'SK Rapid', 'Rapid Vienna': 'SK Rapid', 'TSV Hartberg': 'Hartberg'},
     'B2': {'Beerschot': 'K. Beerschot V.A.', 'Eupen': 'KAS Eupen', 'FC Seraing': 'RFC Seraing', 'Seraing': 'RFC Seraing', 'K. Patro Eisden Maasmechelen': 'Patro Eisden', 'KMSK Deinze': 'Deinze', 'Lokeren-Temse': 'K.S.C. Lokeren-Temse', 'Virton': 'Royal Excelsior Virton'},
-    'BRA': {'Chapecoense AF': 'Chapecoense', 'Grêmio FBPA': 'Gremio', 'SC Corinthians Paulista': 'Corinthians', 'SC Recife': 'Sport Recife', 'SE Palmeiras': 'Palmeiras'},
+    'BRA': {'EC Vitória': 'Vitoria', 'EC Vitoria': 'Vitoria', 'Chapecoense AF': 'Chapecoense', 'Grêmio FBPA': 'Gremio', 'SC Corinthians Paulista': 'Corinthians', 'SC Recife': 'Sport Recife', 'SE Palmeiras': 'Palmeiras'},
     'BRA2': {'Brusque Futebol Clube': 'Brusque', 'Grêmio Novorizontino': 'Novorizontino', 'Mirassol Futebol Clube': 'Mirassol'},
     'BUL': {'Cherno More': 'Cherno More Varna', 'Loko Plovdiv': 'Lokomotiv Plovdiv', 'Pirin Blagoevgrad': 'Blagoevgrad', 'Vitosha Bistritsa': 'Vitosha'},
     'CHI': {'CD Everton': 'Everton De Vina', 'Everton': 'Everton De Vina', 'La Calera': 'U. La Calera', 'San Marcos de Arica': 'San Marcos'},
@@ -180,7 +182,7 @@ _ALIAS2_2309 = {
     'CRO': {'Gorica': 'HNK Gorica', 'Hajduk Split': 'HNK Hajduk Split', 'Lokomotiva': 'NK Lokomotiva Zagreb', 'Rijeka': 'HNK Rijeka'},
     'CZE': {'Fastav Zlín': 'Zlin', 'České Budějovice': 'České Budĕjov.'},
     'D3': {'Großaspach': 'Sonnenhof Großaspach', 'Havelse': 'TSV Havelse', 'SV Waldhof': 'SV Waldhof Mannheim 07 e.V.'},
-    'ECU': {'CD Cuenca': 'Deportivo Cuenca', 'Técnico Univ.': 'Tecnico Universitario', 'LDU de Quito': 'LDU'},
+    'ECU': {'Emelec': 'CS Emelec', 'CD Cuenca': 'Deportivo Cuenca', 'Técnico Univ.': 'Tecnico Universitario', 'LDU de Quito': 'LDU'},
     'FIN': {'FF Jaro': 'Jaro', 'HJK Helsinki': 'HJK', 'SJK Seinajoki': 'SJK'},
     'HUN': {'Debrecen': 'Debreceni VSC', 'Honvéd': 'Kispest Honvéd', 'Paks': 'Paksi', 'Puskás': 'Puskas FC Academy', 'Zalaegerszeg': 'Zalaegerszegi TE'},
     'IRL': {'Drogheda Utd': 'Drogheda', 'Shamrock': 'Shamrock Rovers', "St Patrick's Athletic": 'St. Patricks'},
@@ -214,7 +216,8 @@ for _d, _m in _ALIAS2_2309.items():
 TOK_POMIN = {'fc', 'cf', 'ac', 'sc', 'if', 'is', 'ik', 'bk', 'sk', 'cd', 'ud', 'sd', 'kaa', 'krc', 'kv', 'kvc', 'rsc', 'ogc', 'club',
              'calcio', 'de', 'la', 'el', 'cp', 'afc', 'cfc', 'the', 'fbc', 'ssc', 'as', 'us',
              # 23.09.2026: formy prawne z nazw 365scores (CS Emelec, FK Rostov, Deportes La Serena)
-             'cs', 'fk', 'nk', 'sv', 'ca', 'ec', 'sad', 'clube', 'klub', 'deportes'}
+             # 23.09 po recenzji BEZ 'cs','ec','sad','ca': utozsamialy ROZNE kluby (CS Dinamo / Dinamo Bucuresti)
+             'fk', 'nk', 'sv', 'clube', 'klub', 'deportes'}
 TOK_ROZW = {'man': 'manchester', 'utd': 'united', 'sp': 'sporting', 'st': 'saint', 'ath': 'athletic', 'nott': 'nottingham',
             'nottm': 'nottingham', 'weds': 'wednesday', 'wed': 'wednesday', 'ein': 'eintracht', 'dep': 'deportivo',
             'a': 'austria', 'jrs': 'juniors', 'ind': 'independiente'}
@@ -474,49 +477,62 @@ def main():
         # sezonu — a ladowaly na koncu: CHN 2026 dostala mecze z lutego-czerwca w datach
         # 07.09-02.10, czyli wyniki sprzed pol roku liczyly sie jako najswiezsza forma.
         # Brakujace mecze kladziemy tam, gdzie NIE MA pokrycia prawdziwymi datami.
+        # 23.09.2026 (recenzja): luki w pokryciu prawdziwymi datami bywaja na POCZATKU, w SRODKU
+        # i na KONCU sezonu. Poprzednia wersja obslugiwala tylko poczatek: luka w srodku ladowala
+        # za ostatnim meczem (stara forma jako najswiezsza), a liga z meczem wczoraj tracila
+        # WSZYSTKIE brakujace mecze, bo lista dni byla pusta. Teraz: dni okna [lo, wczoraj] dzielimy
+        # na lezace w luce (>= 4 dni od najblizszego meczu z data prawdziwa) i pozostale; mecze
+        # z matrycy rozkladamy ROWNO po dniach luk, a gdy ich zabraknie — po pozostalych dniach
+        # okna. Nigdy poza okno (przyszlosc), nigdy dwa mecze klubu jednego dnia.
         _pokr = pd.concat([dd_src.MatchDate, kbs.MatchDate])
-        _pokr = _pokr[(_pokr >= lo) & (_pokr <= granica)]
-        koniec_max = granica - pd.Timedelta(days=1)          # (c) nigdy w przyszlosci ani dzisiaj
-        if len(_pokr) and (_pokr.min() - lo).days > 14:
-            start, hi = lo, _pokr.min() - pd.Timedelta(days=1)
-            koniec_max = min(koniec_max, hi)
-        hi = min(hi, koniec_max)
+        _pokr = pd.to_datetime(_pokr[(_pokr >= lo) & (_pokr <= granica)]).dt.normalize()
+        koniec_max = granica - pd.Timedelta(days=1)
+        # okno konczy sie na KONCU SEZONU (WIKI_END albo koniec roku ligowego) — przerwa po sezonie
+        # nie jest luka w danych, tylko okresem bez meczow
+        _kon = min(hi, koniec_max)
+        okno = list(pd.date_range(lo, _kon).normalize()) if _kon >= lo else []
+        if len(_pokr):
+            _p = np.unique(_pokr.to_numpy().astype('datetime64[D]'))
+
+            def _odl(dz):
+                x = np.datetime64(dz, 'D'); i = int(np.searchsorted(_p, x))
+                return min(abs(int((x - _p[j]).astype(int))) for j in (i - 1, i) if 0 <= j < len(_p))
+            luka = [dz for dz in okno if _odl(dz) >= 4]
+        else:
+            luka = list(okno)
+        _wluce = set(luka)
+        reszta = [dz for dz in okno if dz not in _wluce]
         order = {'regular': 0, 'regional-east': 0, 'regional-west': 0}
         rng = np.random.default_rng(19)
         rest = [rest[i] for i in rng.permutation(len(rest))]          # przemieszaj (matryca nie jest chronologiczna)
         rest.sort(key=lambda r: order.get(r.phase, 1))                # fazy końcowe na koniec sezonu
-        # 22.09.2026, druga poprawka. Najpierw bylo date_range(start, max(hi, start), ...),
-        # ktore przy start za koncem okna zwracalo N KOPII JEDNEJ DATY (143 mecze CHN
-        # z 2026-09-07). Rownomierne rozlozenie to naprawilo tylko polowicznie: daty
-        # przestaly sie stakowac, ale KLUB nadal trafial dwa razy na ten sam dzien,
-        # bo rozkladalismy mecze po LICZBIE, nie ogladajac, kto w nich gra.
-        # Teraz przydzielamy daty tak, zeby zaden klub nie gral dwa razy jednego dnia.
-        # To nie jest zgadywanie na sile: te daty sa z zalozenia przyblizone (matryca
-        # wiki nie zawiera dat), wiec wybranie sposrod nich takiego wariantu, ktory
-        # spelnia oczywista regule terminarza, jest BLIZEJ prawdy niz wariant, ktory
-        # jej lamie. Zajete dni zaczytujemy tez z meczow, ktore juz maja prawdziwa date,
-        # zeby dopisane nie wpadaly na nie.
+        # Zajete dni zaczytujemy z meczow, ktore juz maja prawdziwa date, zeby dopisane nie wpadaly
+        # na nie — zaden klub nie gra dwa razy jednego dnia (22.09: "Inter Turku 1:0 KuPS" i
+        # "KuPS 1:1 Inter Turku" wrzucone na 31.08).
         zajete = zajete_globalnie
         for _df in (dd, kbs):
             for _h, _a, _d in zip(_df.HomeTeam, _df.AwayTeam, _df.MatchDate):
                 _d = pd.Timestamp(_d).normalize()
                 zajete.add((div, norm(_h), _d)); zajete.add((div, norm(_a), _d))
-
-        koniec = max(hi, start)
-        dni = [d for d in pd.date_range(start, koniec).normalize() if d <= koniec_max]   # (c) bez przyszlosci
         przydzial, rozszerzono, odrzucone_przyszlosc = [], False, 0
-        for r in rest:
+        for i, r in enumerate(rest):
             kh, ka = norm(r.HomeTeam), norm(r.AwayTeam)
             wybrany = None
-            for d in dni:
-                if (div, kh, d) not in zajete and (div, ka, d) not in zajete:
-                    wybrany = d; break
-            if wybrany is None:                      # okno wyczerpane — dokladamy dni na koncu
-                wybrany = (dni[-1] + pd.Timedelta(days=1)) if dni else start
-                if wybrany > koniec_max:             # ale NIGDY poza ostatni dozwolony dzien (przyszlosc)
-                    odrzucone_przyszlosc += 1
-                    continue
-                dni.append(wybrany); rozszerzono = True
+            # Druga recenzja: fazy koncowe (mistrzowska, spadkowa) tylko w ostatniej czesci okna — inaczej
+            # trafialy do luki na poczatku sezonu i kolejnosc formy sie odwracala.
+            _konc = order.get(r.phase, 1) == 1 and len(okno) > 5
+            _cut = okno[int(0.8 * len(okno))] if _konc else None
+            for pula in ((luka, reszta) if not _konc else ([x for x in luka if x >= _cut], [x for x in reszta if x >= _cut])):
+                if not pula: continue
+                t = min(int(i * len(pula) / max(len(rest), 1)), len(pula) - 1)
+                for j in list(range(t, len(pula))) + list(range(t - 1, -1, -1)):
+                    dz = pula[j]
+                    if (div, kh, dz) not in zajete and (div, ka, dz) not in zajete:
+                        wybrany = dz; break
+                if wybrany is not None: break
+            if wybrany is None:
+                odrzucone_przyszlosc += 1
+                continue
             zajete.add((div, kh, wybrany)); zajete.add((div, ka, wybrany))
             przydzial.append((r, wybrany))
         if rozszerzono:
@@ -526,8 +542,8 @@ def main():
             add.append(dict(Division=div, MatchDate=d, HomeTeam=r.HomeTeam, AwayTeam=r.AwayTeam, FTHome=r.FTHome,
                             FTAway=r.FTAway, src='wiki'))
         if odrzucone_przyszlosc:
-            print(f'  wiki {div} {s}: POMINIETO {odrzucone_przyszlosc} meczow — nie ma dla nich dnia przed '
-                  f'{koniec_max.date() + pd.Timedelta(days=1)} bez kolizji w terminarzu (data z przyszlosci jest niedopuszczalna).')
+            print(f'  UWAGA KRYTYCZNA wiki {div} {s}: POMINIETO {odrzucone_przyszlosc} meczow — w oknie '
+                  f'{lo.date()}..{koniec_max.date()} nie ma dnia bez kolizji w terminarzu. Te wyniki NIE weszly do bazy.')
         print(f'  wiki {div} {s}: {len(g)} meczów w matrycy, dopisano {len(przydzial)} '
               f'(daty przybliżone {min((d for _, d in przydzial), default=start).date()}–'
               f'{max((d for _, d in przydzial), default=start).date()})')

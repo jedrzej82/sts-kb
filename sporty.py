@@ -365,9 +365,12 @@ def _skrot_albo_nic(name, wyn, pula):
               f'w bazie tez: {", ".join(inne[:4])}{" ..." if len(inne) > 4 else ""}. '
               f'Nie da sie ustalic, ktory to klub — noga MNIEJ.')
         return None
-    print(f'  UWAGA: "{name}" dopasowane do KROTSZEJ nazwy "{wyn}" — pominieto czlon '
-          f'rozrozniajacy. Rdzen jest w bazie jednoznaczny, ale sprawdz, czy to ten sam klub.')
-    return wyn
+    # 23.09.2026 (recenzja): w typuj.py taki przypadek lapie kontrola KRAJU, w sporty.py jej nie ma —
+    # "Independiente Yumbo" -> "Independiente" przeszloby tu z samym ostrzezeniem. Bez drugiego
+    # zabezpieczenia skrot gubiacy czlon rozrozniajacy jest niedopuszczalny: noga MNIEJ.
+    print(f'  ODRZUCONO: "{name}" -> "{wyn}" gubi czlon rozrozniajacy, a w tym sporcie nie ma kontroli '
+          f'kraju, ktora by potwierdzila, ze to ten sam klub — noga MNIEJ.')
+    return None
 
 
 def resolve(name, pool):

@@ -392,6 +392,73 @@ def wymus_jeden_mecz_dziennie(allm):
     return allm.drop(index=[i for _, _, _, _, _, _, i in usun if i in allm.index])
 
 
+def scal_zapis_nazw(allm):
+    """23.09.2026, audyt: ten sam klub jako dwa wpisy rozniace sie tylko ZAPISEM — spacja na koncu
+    ('Ajax' i 'Ajax ' w Eredivisie, lacznie 9 klubow N1), apostrofem ("M'gladbach" / "MGladbach"),
+    wielkoscia liter ("Colon Santa FE" / "Colon Santa Fe"). Klucz: same litery i cyfry po zdjeciu
+    diakrytykow — BEZ usuwania slow (FC, CA, SV), bo to one potrafia odrozniac kluby. Sklejamy tylko,
+    gdy dwa zapisy nigdy nie graly ze soba i nie maja meczu tego samego dnia."""
+    for c in ('HomeTeam', 'AwayTeam'):
+        allm[c] = allm[c].astype(str).str.strip().str.replace(r'\s+', ' ', regex=True)
+    # Kluby, ktore wrocily do ligi po latach pod inna nazwa w 365scores (historia do 2021, swieze od 2026):
+    # canon() w uzupelnij_ligi.py widzi tylko druzyny aktywne od 07.2022, wiec sam ich nie polaczy.
+    for (div_, a_), b_ in {('BRA', 'Chapecoense'): 'Chapecoense-SC', ('SUI', 'FC Vaduz'): 'Vaduz'}.items():
+        w_ = allm.Division == div_
+        gra = ((allm.HomeTeam == a_) & (allm.AwayTeam == b_)) | ((allm.HomeTeam == b_) & (allm.AwayTeam == a_))
+        if (w_ & gra).any(): continue
+        for c in ('HomeTeam', 'AwayTeam'):
+            allm.loc[w_ & (allm[c] == a_), c] = b_
+    klucz = lambda x: re.sub(r'[^a-z0-9]', '', unicodedata.normalize('NFKD', str(x)).encode('ascii', 'ignore').decode().lower())
+    mapa, ile = {}, 0
+    for div, g in allm.groupby('Division'):
+        t = pd.concat([g[['MatchDate', 'HomeTeam']].rename(columns={'HomeTeam': 'n'}), g[['MatchDate', 'AwayTeam']].rename(columns={'AwayTeam': 'n'})])
+        licz = t.n.value_counts()
+        grupy = {}
+        for n in licz.index: grupy.setdefault(klucz(n), []).append(n)
+        dni = t.groupby('n').MatchDate.apply(set).to_dict()
+        pary = set(zip(g.HomeTeam, g.AwayTeam))
+        for k_, ns in grupy.items():
+            if len(ns) < 2 or not k_: continue
+            ok = all(not ((a, b) in pary or (b, a) in pary or (dni[a] & dni[b])) for i, a in enumerate(ns) for b in ns[i + 1:])
+            if not ok:
+                print(f'  BUILD_KB [{div}]: zapisy {ns} roznia sie tylko znakami, ale graly ze soba albo tego samego dnia — zostaja osobno.')
+                continue
+            cel = max(ns, key=lambda n: licz[n])
+            for n in ns:
+                if n != cel: mapa[(div, n)] = cel; ile += 1
+    if mapa:
+        for c in ('HomeTeam', 'AwayTeam'):
+            allm[c] = [mapa.get((d, n), n) for d, n in zip(allm.Division, allm[c])]
+        print(f'  BUILD_KB: sklejono {ile} zapisow nazw rozniacych sie tylko spacja/apostrofem/wielkoscia liter '
+              f'(np. {", ".join(f"{n!r}->{c!r}" for (d, n), c in list(mapa.items())[:3])}).')
+    return allm
+
+
+def usun_dubel_meczu(allm):
+    """23.09.2026, audyt: ten sam mecz dwa razy, przesuniety o 1-2 dni — zrodla zapisuja date w innych
+    strefach czasowych, a filtr 'tylko mecze nowsze niz baza' przepuszcza kopie z dnia nastepnego
+    (BRA 2026: Coritiba - Cruzeiro 0:1 z 30 i 31.07, i cztery kolejne). Ten sam gospodarz, ten sam gosc
+    i ten sam wynik w odstepie <= 2 dni to fizycznie jeden mecz (rewanz ma ZAMIENIONE strony).
+    Zostaje wiersz ze zrodla podstawowego (nie 'extra'), a przy remisie zrodel — wczesniejszy."""
+    a = allm.assign(_pr=(allm.src == 'extra').astype(int)).sort_values(['Division', 'HomeTeam', 'AwayTeam', 'MatchDate'])
+    klucz = ['Division', 'HomeTeam', 'AwayTeam', 'FTHome', 'FTAway']
+    _dt = pd.to_datetime(a.MatchDate, errors='coerce')
+    grp = [a[c] for c in klucz]
+    poprz = _dt.groupby(grp, dropna=False).shift()
+    # Druga recenzja: poprzedni wiersz brano z CALEJ ramki (idx[pos-1]), a mogl miec inny wynik —
+    # usuwal sie wtedy prawdziwy mecz, a dubel zostawal. Poprzednik musi byc z TEJ SAMEJ grupy.
+    poprz_idx = a.index.to_series().groupby(grp, dropna=False).shift()
+    dub = (_dt - poprz).dt.days.le(2)
+    if not dub.any():
+        return allm
+    usun = set()
+    for i_cur in a.index[dub.values]:
+        i_prev = poprz_idx.at[i_cur]
+        usun.add(i_cur if a.at[i_cur, '_pr'] >= a.at[i_prev, '_pr'] else i_prev)
+    print(f'  BUILD_KB: usunieto {len(usun)} duplikatow meczu przesunietych o 1-2 dni (ten sam gospodarz, gosc i wynik).')
+    return allm.drop(index=list(usun))
+
+
 def main():
     fetch('--refresh' in sys.argv)
     cols = ['Division', 'MatchDate', 'MatchTime', 'HomeTeam', 'AwayTeam', 'HomeElo', 'AwayElo', 'FTHome', 'FTAway',
@@ -418,9 +485,11 @@ def main():
         except Exception: pass
     allm = pd.concat(parts, ignore_index=True)
     allm = allm.drop_duplicates(subset=['Division', 'MatchDate', 'HomeTeam', 'AwayTeam'], keep='first')
+    allm = scal_zapis_nazw(allm)
     allm = aliasy_z_terminarza(allm)
     allm = przesun_daty_przyblizone(allm)
     allm = wymus_jeden_mecz_dziennie(allm)
+    allm = usun_dubel_meczu(allm)
     allm = allm.drop_duplicates(subset=['Division', 'MatchDate', 'HomeTeam', 'AwayTeam'], keep='first')
     DIV_NAME.update({d: d for d in allm.Division.dropna().unique() if d not in DIV_NAME})  # ligi z Sofascore: „Kraj | Liga”
     allm = allm.drop(columns=['src_zrodlo'], errors='ignore')

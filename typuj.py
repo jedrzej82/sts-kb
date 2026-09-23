@@ -230,9 +230,17 @@ def _kraj_ligi(div):
     return None
 
 
+# 23.09.2026 (recenzja): porownanie przez podciag uznawalo za ten sam kraj oman/romania, niger/nigeria,
+# northernireland/ireland, sudan/southsudan, congo/drcongo. Fragmenty z SOFA_DIV sprowadzamy do pelnej
+# nazwy JAWNA mapa i porownujemy dokladnie.
+_KRAJ_KANON = {'turk': 'turkey', 'turkiye': 'turkey', 'turkey': 'turkey', 'saudi': 'saudiarabia',
+               'saudiarabia': 'saudiarabia', 'czech': 'czechia', 'czechia': 'czechia', 'czechrepublic': 'czechia',
+               'korea': 'southkorea', 'southkorea': 'southkorea', 'korearepublic': 'southkorea',
+               'usa': 'usa', 'unitedstates': 'usa', 'unitedstatesofamerica': 'usa'}
+
+
 def _ten_sam_kraj(a, b):
-    """'turk' (kod T1) i 'turkey' ('Turkey | 1. Lig') to ten sam kraj — fragmenty w SOFA_DIV sa skrocone."""
-    return a == b or a in b or b in a
+    return _KRAJ_KANON.get(a, a) == _KRAJ_KANON.get(b, b)
 
 def resolve(name, pool):
     """Zwraca nazwe z bazy albo None. None jest POPRAWNYM wynikiem — wolacz ma sie wtedy zatrzymac.
