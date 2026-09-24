@@ -106,6 +106,13 @@ def _warianty(nazwa):
     return [list(k) for k in itertools.product(*opcje)][:64]
 
 
+# 24.09.2026 (Poprawka 50): kluby z Ameryki Pld. z przedrostkiem prawnym, ktorego ogolna regula NIE usuwa
+# (ca/cd/cs sa celowo poza _OGOLNE — recenzja: „CA”/„CD” rozrozniaja kluby). Kazda para sprawdzona recznie:
+# ta sama liga i miasto. Zapis STS -> zapis arkusza statystyki_druzyn.
+_ALIASY_PILKA = {'capenarol': 'Peñarol', 'cacerro': 'Cerro', 'cdohiggins': "O'Higgins",
+                 'cscienciano': 'Cienciano', 'cdrecoleta': 'Recoleta FC'}
+
+
 def _alias(nazwa):
     """Reczne pary z sporty.py (Poprawki 42–45, zapis 365scores — ten sam co w arkuszach):
     "SE Melbourne Phoenix" -> "South East Melbourne". Aliasow z typuj.py NIE uzywamy: ich cele sa zapisem
@@ -114,7 +121,7 @@ def _alias(nazwa):
     k_ = ''.join(ch for ch in norm(nazwa) if ch.isalnum())
     try:
         import sporty
-        v = getattr(sporty, '_ALIASY_RECZNE', {}).get(k_)
+        v = _ALIASY_PILKA.get(k_) or getattr(sporty, '_ALIASY_RECZNE', {}).get(k_)
         return [v] if v else []
     except Exception:
         return []

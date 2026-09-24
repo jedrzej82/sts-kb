@@ -154,9 +154,24 @@ def main():
 
     zd = os.path.join(HERE, 'zewn')
     if os.path.isdir(zd):
+        # 24.09.2026 (Poprawka 50): wczesniej wiek plikow brany z mtime. Plik swiezo sklonowany z repo
+        # (stan z 21.09) mial mtime = dzis i swiezosc pisala „0 d ok”, choc wyniki konczyly sie 20.09.
+        # Teraz liczy sie NAJPOZNIEJSZA DATA MECZU w plikach biezacego miesiaca (wyniki_*_RRRR-MM).
         pl = sorted(os.listdir(zd))
-        naj = max((dt.date.fromtimestamp(os.path.getmtime(os.path.join(zd, p))) for p in pl), default=None)
-        w.append((f'pliki zewn/ ({len(pl)} szt.)', naj, wiek(naj) if naj else None, PROG['zewn'], ''))
+        mies = DZIS.strftime('%Y-%m')
+        biez = [p for p in pl if mies in p and 'archiwum' not in p]
+        naj = None
+        for p in biez:
+            try:
+                d = pd.read_csv(os.path.join(zd, p), usecols=['data'], low_memory=False).data.astype(str).str[:10].max()
+                d = dt.date.fromisoformat(d)
+                print(f'  zewn/{p}: ostatni mecz {d}')
+                if 'lol' not in p:
+                    naj = d if naj is None else min(naj, d)      # najstarszy z plikow = waskie gardlo
+            except Exception as e:
+                print(f'  zewn/{p}: NIE DA SIE ODCZYTAC ({e})')
+        uw = '' if biez else f'brak plikow z biezacego miesiaca ({mies}) — pobierz z Dysku'
+        w.append((f'pliki zewn/ biezacy miesiac ({len(biez)} szt.)', naj or 'BRAK', wiek(naj) if naj else None, PROG['zewn'], uw))
     else:
         w.append(('zewn/', 'BRAK', None, None, 'nie pobrano wynikow 365scores'))
 
