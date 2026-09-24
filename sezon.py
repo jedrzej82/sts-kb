@@ -58,13 +58,6 @@ def wczytaj(sport, plik=None):
         return list(csv.DictReader(fh))
 
 
-def _osoba(nazwa):
-    """Czy nazwa wyglada na nazwisko zawodnika, a nie na klub. Rozstrzyga inicjal:
-    "Mensik J.", "Coton F.", "Wang X." maja czlon jednoliterowy albo kropke."""
-    s = str(nazwa)
-    return '.' in s or any(len(t) == 1 for t in norm(s).split())
-
-
 def _zaw_czlony(a, b):
     """Zawieranie po CALYCH czlonach, na poczatku albo koncu — jak w typuj.py i sporty.py."""
     ta, tb = a.split(), b.split()
@@ -74,13 +67,68 @@ def _zaw_czlony(a, b):
     return d[:len(k)] == k or d[-len(k):] == k
 
 
-def znajdz(wiersze, nazwa, liga=None):
-    """22.09.2026: naprawione podstawianie INNEGO meczu. Przebieg 21:00 dnia 21.09 pokazal
-    "Nueva Chicago" -> "Chicago Fire" (pewnosc 0,80) i pelna tabele P dla Chicago Fire - Toronto FC.
-    Przyczyna: heurystyka od nazwisk tenisistow ("najdluzszy czlon to nazwisko") byla stosowana
-    takze do nazw KLUBOW, a "Nueva Chicago" i "Chicago Fire" dziela czlon "chicago".
-    Teraz ta sciezka dziala tylko dla nazw wygladajacych na osobe (inicjal albo kropka),
-    zawieranie idzie po calych czlonach, a prog rozmytego podniesiony z 0,75 do 0,90."""
+# 24.09.2026 (wyd. 27): WYLACZNIE formy prawne i nazwy dyscypliny — tylko takie czlony wolno "zgubic"
+# przy dopasowaniu przez zawieranie. Celowo NIE ma tu "club", "cs", "ca", "cd", "de", "la": "Club Nacional"
+# (Paragwaj) i "Nacional" (Urugwaj), "CS San Lorenzo" (Paragwaj) i "San Lorenzo" (Argentyna), "Racing Club"
+# i "Racing" to rozne kluby (recenzja 24.09).
+_OGOLNE = frozenset('fc cf sc ac afc cfc fk nk sk bk hk hc kk rk ok ks sv ss ec fbc sad bc '
+                    'basket basketball volley volleyball hockey ishockey handball calcio futbol football fussball '
+                    'county rugby ik if'.split())
+# polskie nazwy miast z oferty STS -> zapisy zrodlowe (te same co w sporty.py i typuj.py)
+_MIASTA_PL = {'madryt': ('madrid',), 'monachium': ('munich', 'munchen', 'muenchen'), 'wieden': ('wien', 'vienna'),
+              'lizbona': ('lisbon', 'lisboa'), 'mediolan': ('milan', 'milano'), 'rzym': ('roma', 'rome'),
+              'neapol': ('napoli', 'naples'), 'turyn': ('torino', 'turin'), 'ateny': ('athens', 'athina'),
+              'sewilla': ('sevilla', 'seville'), 'walencja': ('valencia',), 'stambul': ('istanbul',),
+              'kopenhaga': ('copenhagen', 'kobenhavn'), 'bruksela': ('brussels', 'bruxelles'),
+              'belgrad': ('belgrade', 'beograd'), 'moskwa': ('moscow', 'moskva'), 'praga': ('prague', 'praha'),
+              'bukareszt': ('bucharest', 'bucuresti'), 'sztokholm': ('stockholm',), 'kijow': ('kyiv', 'kiev'),
+              'lwow': ('lviv', 'lvov'), 'zagrzeb': ('zagreb',), 'genua': ('genoa', 'genova'),
+              'saloniki': ('thessaloniki',), 'pireus': ('piraeus', 'pireas'), 'kowno': ('kaunas',),
+              'wilno': ('vilnius',), 'ryga': ('riga',)}
+
+
+def _tok(s):
+    return norm(s).replace('/', ' ').split()
+
+
+def _tok_osoba(s):
+    """Czlony nazwiska: apostrof NIE dzieli nazwiska ("O'Connell" to jeden czlon)."""
+    s = unicodedata.normalize('NFKD', str(s)).encode('ascii', 'ignore').decode().lower()
+    s = s.replace("'", '').replace('-', ' ').replace('.', ' ')
+    return s.split()
+
+
+def _warianty(nazwa):
+    """Nazwa z oferty z polskimi miastami zamienionymi na kazdy zapis zrodlowy (lista list czlonow)."""
+    import itertools
+    t = _tok(nazwa)
+    opcje = [(_MIASTA_PL[x] + (x,)) if x in _MIASTA_PL else (x,) for x in t]
+    return [list(k) for k in itertools.product(*opcje)][:64]
+
+
+def _alias(nazwa):
+    """Reczne pary z sporty.py (Poprawki 42–45, zapis 365scores — ten sam co w arkuszach):
+    "SE Melbourne Phoenix" -> "South East Melbourne". Aliasow z typuj.py NIE uzywamy: ich cele sa zapisem
+    kb.sqlite (klub z innego kraju ma tam przyrostek kraju), a arkusz przyrostkow nie ma — recenzja:
+    "Independiente Medellin" -> "Independiente" trafialo w argentynskie Independiente."""
+    k_ = ''.join(ch for ch in norm(nazwa) if ch.isalnum())
+    try:
+        import sporty
+        v = getattr(sporty, '_ALIASY_RECZNE', {}).get(k_)
+        return [v] if v else []
+    except Exception:
+        return []
+
+
+def znajdz(wiersze, nazwa, liga=None, sport=None):
+    """22.09.2026: naprawione podstawianie INNEGO meczu ("Nueva Chicago" -> "Chicago Fire").
+    24.09.2026 (wyd. 27, po dwoch recenzjach): kolejnosc prob — (1) dokladnie; (2) reczny alias z sporty.py;
+    (3) te same czlony w DOWOLNEJ kolejnosci, polskie miasta przetlumaczone ("Cerundolo Juan Manuel",
+    "Bayern Monachium"); (3b) polska nazwa miasta pominieta, gdy reszta jest sama rozpoznawalna;
+    (4) zawieranie TYLKO gdy odpadly formy prawne (FC, SK, Basket...); (5) wylacznie w tenisie: nazwisko
+    + WSZYSTKIE inicjaly. Dopasowania rozmytego (difflib) juz nie ma: "Australia (W)"~"Austria (W)",
+    "Andrej Martin"~"Andres Martin" to rozne druzyny/osoby. Brak trafienia = None (noga mniej).
+    Gdy podano lige, kandydat musi byc TA SAMA druzyna co przy szukaniu w calym arkuszu (patrz pilka())."""
     cel = norm(nazwa)
     if not cel: return None, 0.0
     kand = [w for w in wiersze if not liga or w.get('liga') == liga]
@@ -88,28 +136,59 @@ def znajdz(wiersze, nazwa, liga=None):
     dokl = sorted([w for w in kand if norm(w['druzyna']) == cel], key=mec, reverse=True)
     if dokl:   # v5p: ta sama drużyna w lidze i w pucharach → wiersz z największą liczbą meczów (liga krajowa)
         return dokl[0], 1.0
-    zaw = [w for w in kand if _zaw_czlony(cel, norm(w['druzyna']))]
-    if zaw and len({norm(w['druzyna']) for w in zaw}) == 1:
-        return max(zaw, key=mec), 0.9
-    if _osoba(nazwa):   # tenis: „Mensik J.” vs „Jakub Mensik” — porównaj nazwisko
-        naz = max(cel.split(), key=len)                 # nazwisko = najdłuższy człon
-        ini = [t[0] for t in cel.split() if t != naz]
-        nazw = [w for w in kand if naz in norm(w['druzyna']).split()]
-        if len(nazw) > 1 and ini:                       # kilku o tym nazwisku — sprawdź inicjał
-            nazw = [w for w in nazw if any(t[0] == ini[0] for t in norm(w['druzyna']).split() if t != naz)]
-        if len(nazw) == 1:
-            return nazw[0], 0.8
-    nazwy = {norm(w['druzyna']): w for w in sorted(kand, key=lambda w: str(w.get('druzyna', '')))}
-    if len(cel) >= 8:
-        m = difflib.get_close_matches(cel, list(nazwy), n=1, cutoff=0.90)
-        m = [x for x in m if x[:3] == cel[:3]]
-        if m:
-            return nazwy[m[0]], difflib.SequenceMatcher(None, cel, m[0]).ratio()
+    for al in _alias(nazwa):
+        tr = sorted([w for w in kand if norm(w['druzyna']) == norm(al)], key=mec, reverse=True)
+        if tr:
+            print(f'  „{nazwa}” → „{al}” (para reczna, sporty.py)')
+            return tr[0], 1.0
+    # (3) te same czlony, dowolna kolejnosc, miasta przetlumaczone
+    for war in _warianty(nazwa):
+        ws = sorted(war)
+        tr = [w for w in kand if sorted(_tok(w['druzyna'])) == ws]
+        if len({norm(w['druzyna']) for w in tr}) == 1:
+            return max(tr, key=mec), 0.95
+        if tr: return None, 0.0                       # kilka roznych druzyn — nie zgadujemy
+    # (3b) polska nazwa miasta, ktorej w arkuszu nie ma wcale ("Panathinaikos Ateny" -> "Panathinaikos")
+    t0 = [x for x in cel.split() if x not in _MIASTA_PL]
+    if len(t0) < len(cel.split()) and (len(t0) >= 2 or (len(t0) == 1 and len(t0[0]) >= 9)):
+        tr = [w for w in kand if sorted(_tok(w['druzyna'])) == sorted(t0)]
+        if len({norm(w['druzyna']) for w in tr}) == 1:
+            return max(tr, key=mec), 0.9
+        if tr: return None, 0.0
+    # (4) zawieranie: wolno zgubic tylko formy prawne / nazwe dyscypliny
+    zaw = []
+    for w in kand:
+        tw = _tok(w['druzyna'])
+        if not _zaw_czlony(cel, ' '.join(tw)): continue
+        tc = cel.split()
+        dluzsze, krotsze = (tc, tw) if len(tc) >= len(tw) else (tw, tc)
+        odp = list(dluzsze)
+        for x in krotsze:
+            if x in odp: odp.remove(x)
+        if odp and all(x in _OGOLNE for x in odp): zaw.append(w)
+    if zaw:
+        if len({norm(w['druzyna']) for w in zaw}) == 1: return max(zaw, key=mec), 0.9
+        return None, 0.0
+    # (5) tenis: „Mensik J.” vs „Jakub Mensik” — nazwisko i WSZYSTKIE inicjaly imion
+    if sport == 'tenis':
+        tq = _tok_osoba(nazwa)
+        if len(tq) >= 2:
+            tr = []
+            for w in kand:
+                tw = _tok_osoba(w['druzyna'])
+                if len(tw) < 2: continue
+                for naz_q, ini_q in ((tq[:1], tq[1:]), (tq[-1:], tq[:-1])):      # "Nazwisko I." albo "I. Nazwisko"
+                    for naz_w, im_w in ((tw[-1:], tw[:-1]), (tw[:1], tw[1:])):
+                        if naz_q == naz_w and len(ini_q) == len(im_w) and \
+                                all(len(i) <= 2 and im.startswith(i) for i, im in zip(ini_q, im_w)):
+                            tr.append(w)
+            if len({norm(w['druzyna']) for w in tr}) == 1:
+                return tr[0], 0.8
     return None, 0.0
 
 
-def wymagaj(wiersze, nazwa, liga=None):
-    w, pew = znajdz(wiersze, nazwa, liga)
+def wymagaj(wiersze, nazwa, liga=None, sport=None):
+    w, pew = znajdz(wiersze, nazwa, liga, sport)
     if not w:
         sys.exit(f'NIE ZNALEZIONO: „{nazwa}” — sprawdź: python3 sezon.py druzyny <plik> '
                  f'{max(str(nazwa).split(), key=len) if str(nazwa).split() else nazwa}')
@@ -133,20 +212,23 @@ def phi(x):
 # ------------------------------------------------------------------ piłka
 def pilka(a, b):
     W = wczytaj('pilka')
-    h = wymagaj(W, a)
-    g0 = znajdz(W, b)[0]
-    # v5p: wybierz wspólną ligę obu drużyn z największą liczbą meczów (nie puchar z 1 meczem)
+    # p27: najpierw ustal OBIE druzyny globalnie, potem szukaj wspolnej ligi tylko dla TYCH samych nazw
+    h0 = wymagaj(W, a)
+    g0 = wymagaj(W, b)
+    nh, ng = norm(h0['druzyna']), norm(g0['druzyna'])
+    if nh == ng:
+        raise SystemExit(f'NIE ZNALEZIONO: {a!r} i {b!r} wskazuja te sama druzyne ({h0["druzyna"]}) — pomijam')
     wsp = []
     for lg in {w['liga'] for w in W}:
-        hh, ph = znajdz(W, a, lg); gg, pg = znajdz(W, b, lg)
-        if hh and gg and min(ph, pg) >= 0.75 and hh is not gg:
-            wsp.append((min(f(hh.get('mecze'), 0), f(gg.get('mecze'), 0)), hh, gg))
+        hh = [w for w in W if w['liga'] == lg and norm(w['druzyna']) == nh]
+        gg = [w for w in W if w['liga'] == lg and norm(w['druzyna']) == ng]
+        if len(hh) == 1 and len(gg) == 1:
+            wsp.append((min(f(hh[0].get('mecze'), 0), f(gg[0].get('mecze'), 0)), hh[0], gg[0]))
     if wsp:
         _, h, g = max(wsp, key=lambda x: x[0])
     else:
-        g = wymagaj(W, b, h['liga']) if g0 is None or g0.get('liga') == h['liga'] else g0
-        if g.get('liga') != h['liga']:
-            print(f'  UWAGA: drużyny w różnych ligach w arkuszu ({h["liga"]} vs {g["liga"]}) — P_sezon tylko informacyjnie')
+        h, g = h0, g0
+        print(f'  UWAGA: drużyny w różnych ligach w arkuszu ({h["liga"]} vs {g["liga"]}) — P_sezon tylko informacyjnie')
     liga = [w for w in W if w['liga'] == h['liga']]
     sd = lambda k: sum(f(w.get(k), 0) for w in liga)
     dm, wm = sd('dom_mecze'), sd('wyj_mecze')
@@ -254,7 +336,7 @@ def mecz(ps, do):
 
 def tenis(a, b, bo5=False):
     W = wczytaj('tenis')
-    A, B = wymagaj(W, a), wymagaj(W, b)
+    A, B = wymagaj(W, a, sport='tenis'), wymagaj(W, b, sport='tenis')
     zserw = [f(w.get('proc_st_service_points')) for w in W if f(w.get('proc_st_service_points')) and f(w.get('mecze_ze_statami'), 0) >= 3]
     t = (sum(zserw) / len(zserw) / 100) if zserw else 0.62
     K = 5.0

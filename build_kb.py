@@ -628,7 +628,8 @@ def usun_dubel_miedzy_ligami(allm):
                 xh, xa = _kl(x.HomeTeam), _kl(x.AwayTeam)
                 if (xh.startswith(h) or h.startswith(xh)) and (xa.startswith(a) or a.startswith(xa)):
                     blizniak = True
-        if blizniak or d0.day > 12: usun2.append(i)
+        # w ligach z XGABORA_DZIEN_MIESIAC data jest juz poprawiona — druga zamiana cofnelaby poprawke
+        if blizniak or d0.day > 12 or r.Division in XGABORA_DZIEN_MIESIAC: usun2.append(i)
         else: zamien[i] = daty[1]
     for i, d in zamien.items():
         allm.at[i, 'MatchDate'] = d.strftime('%Y-%m-%d') if isinstance(allm.at[i, 'MatchDate'], str) else d
@@ -663,6 +664,31 @@ def usun_dubel_meczu(allm):
     return allm.drop(index=list(usun))
 
 
+# 24.09.2026 (wyd. 27): w 16 ligach "dodatkowych" xgabora (Ameryki, Skandynawia, Azja, Europa Wsch.) data
+# jest zapisana jako RRRR-DD-MM dla kazdego meczu z dniem <= 12. Dowod: Allsvenskan ma w xgabora 142 mecze
+# w styczniu i 86 w grudniu (liga gra od kwietnia do listopada), Seattle - Portland 3:0 stoi pod "2012-08-10",
+# a naprawde grali 07.10.2012 (w pliku jest godzina UTC 02:00 = wieczor czasu pacyficznego); "Malmo FF - Mjallby
+# 2012-01-09" to 01.09.2012. Po zamianie dnia z miesiacem liczba sytuacji "klub gra dwa razy w ciagu 2 dni"
+# spada w tych ligach z 220–700 do 0–170 w KAZDYM sezonie 2012–2024 (jedyny wyjatek AUT 2019: 1 -> 1).
+# W ligach europejskich (E0–E3, SP1, I1, D1, F1, SC0–SC3, ...) zamiana PSULA terminarz (np. E1: 680 -> 3137),
+# wiec tam daty sa poprawne i nie sa ruszane. Wczesniej poprawialismy tylko wiersze kolidujace z inna liga
+# (3 wiersze); reszta (~35% meczow tych lig do 2024) miala zla date — forma, H2H i Elo liczyly sie w zlej
+# kolejnosci, a wagi czasowe modelu DC byly przesuniete o miesiace.
+XGABORA_DZIEN_MIESIAC = frozenset('ARG MEX USA ROM JAP POL SWE CHN FIN SUI RUS DEN NOR IRL AUT BRA'.split())
+
+
+def zamien_dzien_miesiac(m):
+    dt = pd.to_datetime(m.MatchDate, errors='coerce')
+    mask = m.Division.isin(XGABORA_DZIEN_MIESIAC) & dt.notna() & (dt.dt.day <= 12) & (dt.dt.day != dt.dt.month)
+    if not mask.any(): return m
+    nowe = pd.to_datetime(dict(year=dt[mask].dt.year, month=dt[mask].dt.day, day=dt[mask].dt.month))
+    m = m.copy()
+    m.loc[mask, 'MatchDate'] = nowe.dt.strftime('%Y-%m-%d').values
+    print(f'  BUILD_KB: xgabora — w {int(mask.sum())} meczach 16 lig (ARG, BRA, USA, SWE, JAP...) zamieniono dzien '
+          f'z miesiacem (zrodlo zapisuje RRRR-DD-MM dla dni 1–12).')
+    return m
+
+
 def main():
     fetch('--refresh' in sys.argv)
     cols = ['Division', 'MatchDate', 'MatchTime', 'HomeTeam', 'AwayTeam', 'HomeElo', 'AwayElo', 'FTHome', 'FTAway',
@@ -671,6 +697,7 @@ def main():
     m = pd.read_csv(os.path.join(RAW, 'Matches.csv'), usecols=cols, low_memory=False)  # kursy celowo pominięte
     m = m.dropna(subset=['FTHome', 'FTAway'])
     m['src'] = 'xgabora'
+    m = zamien_dzien_miesiac(m)
     of, unmatched = openfootball_rows(m)
     parts = [m, of]
     delta = os.path.join(HERE, 'delta.csv')  # wyniki dopisywane przez zadania 12/15/18/21 (z Drive)
