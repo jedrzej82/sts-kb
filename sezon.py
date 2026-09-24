@@ -358,10 +358,15 @@ def tenis(a, b, bo5=False):
     pm = mecz(ps, do)
     print(f'SEZON (30 dni)  {A["druzyna"]} – {B["druzyna"]}  (mecze ze statystykami {int(na)}/{int(nb)}; bo{2 * do - 1})')
     print(f'  punkty serwisowe {proc(sa)} / {proc(sb)}; returny {proc(ra)} / {proc(rb)}; forma {A.get("forma_10")} / {B.get("forma_10")}')
-    print(f'  P(punkt przy serwisie) A {pa:.3f}, B {pb:.3f}; utrzymanie gema A {proc(gem(pa))}, B {proc(gem(pb))}')
-    print(f'  P(set) A {proc(ps)}   P(mecz) A {proc(pm)}   B {proc(1 - pm)}')
+    # 24.09.2026 (Poprawka 49): wczesniej „A”/„B” — przebieg 18:10 przypisal P(mecz) A (Caniato 88,8%)
+    # rywalowi (Gentzschowi) i wpuscil sprzeczna noge na kupon. Teraz zawsze pelne nazwiska.
+    na_, nb_ = A['druzyna'], B['druzyna']
+    print(f'  P(punkt przy serwisie) {na_} {pa:.3f}, {nb_} {pb:.3f}; utrzymanie gema {na_} {proc(gem(pa))}, {nb_} {proc(gem(pb))}')
+    print(f'  P(set) {na_} {proc(ps)}   WYGRA MECZ: {na_} {proc(pm)}  |  {nb_} {proc(1 - pm)}')
+    fav, pf = (na_, pm) if pm >= 0.5 else (nb_, 1 - pm)
+    print(f'  FAWORYT WG SEZONU: {fav} {proc(pf)}  (porownuj z faworytem z tenis.py PO NAZWISKU, nie po kolejnosci)')
     if do == 2:
-        print(f'  2:0 A {proc(ps ** 2)}  2:1 A {proc(2 * ps ** 2 * (1 - ps))}  O2.5 seta {proc(2 * ps * (1 - ps))}')
+        print(f'  2:0 {na_} {proc(ps ** 2)}  2:1 {na_} {proc(2 * ps ** 2 * (1 - ps))}  O2.5 seta {proc(2 * ps * (1 - ps))}')
     print(f'  N (do łączenia) = {int(min(na, nb))}')
 
 
