@@ -319,7 +319,24 @@ _DRUZYNA_FS = {('Finland | Liiga', 'IFK Helsinki'): 'HIFK',
                ('Austria | ICE Hockey League', 'Graz99ers'): 'Graz 99ers',
                ('Sweden | HockeyAllsvenskan', 'AIK'): 'AIK IF',
                ('Sweden | HockeyAllsvenskan', 'Leksand'): 'Leksands IF',   # spadek z SHL 2026
-               ('Sweden | SHL', 'Leksand'): 'Leksands IF'}
+               ('Sweden | SHL', 'Leksand'): 'Leksands IF',
+               # 24.09: pelny tydzien 17-23.09 (kazda para sprawdzona)
+               ('Canada | OHL', 'Ottawa 67s'): "Ottawa 67's",
+               ('Czechia | Extraliga', 'Mountfield HK'): 'HC Mountfield Hradec Kralove',
+               ('Czechia | Extraliga', 'Sparta Prague'): 'Sparta Praha',
+               ('Finland | Liiga', 'JYP'): 'Jyvaskyla',
+               ('Finland | Liiga', 'Hameenlinna'): 'HPK',              # Hameenlinnan Pallokerho
+               ('Germany | DEL', 'Grizzly Wolfsburg'): 'Grizzlys Wolfsburg',
+               ('Germany | DEL', 'Nurnberg Ice Tigers'): 'Thomas Sabo Ice Tigers',
+               ('Germany | DEL2', 'Bietigheim/Bissingen'): 'Bietigheim Steelers',
+               ('Sweden | SHL', 'Djurgarden'): 'Djurgardens IF',
+               ('Sweden | SHL', 'Farjestad'): 'Farjestads BK',
+               ('Sweden | SHL', 'Linkoping'): 'Linkopings HC',
+               ('Sweden | SHL', 'IF Bjorkloven'): 'Björklöven',        # awans z Allsvenskan
+               ('Switzerland | National League', 'EHC Kloten'): 'Kloten Flyers',
+               ('Switzerland | National League', 'Langnau Tigers'): 'SCL Tigers',
+               ('Switzerland | National League', 'Zug'): 'EV Zug',
+               ('Switzerland | National League', 'Zurich'): 'ZSC Lions'}
 
 
 def _nrm(x):
@@ -346,6 +363,10 @@ def _hokej_fs_nazwy(s, maska_fs):
         zawiera = [k for k in kand if nt and _nrm(k) and (set(nt) <= set(_nrm(k)) or set(_nrm(k)) <= set(nt))
                    and max(len(w) for w in nt) >= 4]
         wyb = rowne if len(rowne) == 1 else (zawiera if len(zawiera) == 1 else [])
+        if not wyb:
+            # awans/spadek: identyczny zapis (bez diakrytykow) w innej lidze TEGO SAMEGO kraju = ten sam klub
+            rowne_kraj = sorted(k for k in w_kraju if _nrm(k) == nt)
+            if len(rowne_kraj) == 1: wyb = rowne_kraj
         if wyb: mapa[(lg, t)] = wyb[0]
         elif kand: nowe.add((lg, t))
     if mapa:
