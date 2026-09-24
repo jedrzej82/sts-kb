@@ -61,7 +61,37 @@ ALIAS = {'Athletic Club': 'Ath Bilbao', 'Borussia Mönchengladbach': "M'gladbach
          # wiec te przypadki zapisujemy WPROST, zamiast obnizac prog i wpuszczac bledne.
          'Crewe Alexandra': 'Crewe', 'Olympique Lyonnais': 'Lyon', 'Stade Brestois 29': 'Brest',
          'Stade Lavallois': 'Laval', 'AZ': 'AZ Alkmaar', 'PSV': 'PSV Eindhoven',
-         'Sport Lisboa e Benfica': 'Benfica'}
+         'Sport Lisboa e Benfica': 'Benfica',
+         # 24.09.2026 (Poprawka 52): 27 par, ktore przechodzily tylko przez niski prog podobienstwa
+         # (ostrzezenie „dopasowanie slabe” w kazdym przebiegu). Kazda sprawdzona recznie — ten sam klub.
+         'Borussia Dortmund': 'Dortmund',
+         'Tottenham Hotspur FC': 'Tottenham',
+         'Hull City AFC': 'Hull',
+         'Leeds United FC': 'Leeds',
+         'Brighton & Hove Albion FC': 'Brighton',
+         'Stoke City FC': 'Stoke',
+         'West Ham United FC': 'West Ham',
+         'Charlton Athletic FC': 'Charlton',
+         'West Bromwich Albion FC': 'West Brom',
+         'Preston North End FC': 'Preston',
+         'Derby County FC': 'Derby',
+         'Bolton Wanderers FC': 'Bolton',
+         'RC Celta de Vigo': 'Celta',
+         'Real Betis Balompié': 'Betis',
+         'Club Atlético de Madrid': 'Ath Madrid',
+         'RC Deportivo La Coruña': 'La Coruna',
+         'Real Racing Club de Santander': 'Santander',
+         'Deportivo Alavés': 'Alaves',
+         'Rayo Vallecano de Madrid': 'Vallecano',
+         'Olympique de Marseille': 'Marseille',
+         'Racing Club de Lens': 'Lens',
+         'Willem II Tilburg': 'Willem II',
+         'Feyenoord Rotterdam': 'Feyenoord',
+         'SC Cambuur-Leeuwarden': 'Cambuur',
+         'Vitória Guimarães': 'Guimaraes',
+         'CF Estrela da Amadora': 'Estrela',
+         'GD Estoril Praia': 'Estoril',
+         }
 
 
 def _czlony(s):
