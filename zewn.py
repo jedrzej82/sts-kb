@@ -3,7 +3,7 @@
 Pliki z Drive (folder baza-wiedzy) kładzie się do kb/zewn/:
   wyniki_espn_RRRR-MM.csv, wyniki_sofa_pilka_RRRR-MM.csv, wyniki_sofa_inne_RRRR-MM.csv
 Funkcje używane przez uzupelnij_ligi.py (piłka) i hist_import.py / tenis.py (reszta). Kursy nie są pobierane."""
-import os, re, glob, unicodedata, pandas as pd, numpy as np
+import os, re, glob, unicodedata, functools, pandas as pd, numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__)); ZD = os.path.join(HERE, 'zewn')
 
 ESPN_DIV = {'nor.1': 'NOR', 'swe.1': 'SWE', 'swe.2': 'SWE2', 'den.1': 'DEN', 'fin.1': 'FIN', 'irl.1': 'IRL', 'sui.1': 'SUI',
@@ -137,8 +137,9 @@ def _scal_nazwy_rozgrywek(d):
     return d.drop(columns='_wez')
 
 
-def czytaj(wzor):
+def czytaj(wzor, bez=None):
     fs = sorted(glob.glob(os.path.join(ZD, wzor)) + glob.glob(os.path.join(ZD, wzor + '.gz')))
+    if bez: fs = [f for f in fs if not re.search(bez, os.path.basename(f))]
     if not fs: return pd.DataFrame()
     d = pd.concat([pd.read_csv(f, dtype=str, keep_default_na=False) for f in fs], ignore_index=True).drop_duplicates()
 
@@ -233,7 +234,9 @@ def pilka():
                                      HomeFouls=num('faule_g'), AwayFouls=num('faule_a'), HomeShots=num('strzaly_g'), AwayShots=num('strzaly_a'),
                                      HomeTarget=num('celne_g'), AwayTarget=num('celne_a'), HomeYellow=num('zolte_g'), AwayYellow=num('zolte_a'),
                                      HomeRed=num('czerwone_g'), AwayRed=num('czerwone_a'), src='espn')))
-    s = czytaj('wyniki_*_pilka_*.csv')
+    # Poprawka 46b: Apps Script zapisuje pilke z Flashscore do wyniki_fs_pilka_* — NIE moze wejsc tu jak 365scores
+    # (bez odsiewania dubli). Wchodzi wylacznie przez _pilka_fs.
+    s = czytaj('wyniki_*_pilka_*.csv', bez=r'^wyniki_fs_')
     s = _pilka_fs(s)
     if len(s):
         _puchar = s.turniej.str.contains(PUCHAR) & ~pd.Series([_liga_nie_puchar(k, t) for k, t in zip(s.kraj, s.turniej)], index=s.index, dtype=bool)
@@ -278,67 +281,128 @@ WYGRANA = {'mma', 'boks', 'krykiet'}   # liczy się zwycięzca, nie punkty
 #     wtedy to ten sam mecz pod inna nazwa ligi/druzyny;
 #  2) odpada takze cala liga FS, ktorej nazwa (kraj + liga) jest identyczna jak liga w 365 (duble lig top);
 #  3) nazwa druzyny FS zamieniana na zapis 365 TYLKO przy jednoznacznym kandydacie w tym samym kraju.
+_ZNACZNIK_FS = re.compile(r'^(?:b|c|ii|iii|u1\d|u2[0-3]|w|women|res|reserves?|youth|jun|juniors?|am)$')
+_MLODZI_KOBIETY_FS = re.compile(r'\bU-?\d{2}\b|\byouth\b|\bjunior|\bjuvenil|\bprimavera\b|\bwomen\b|\bfemin|\(W\)|'
+                                r'\bW$|\breserve|\bII$|\bB$|\bfriendl|\bu-?\d{2}$', re.I)
+
+
+@functools.lru_cache(maxsize=None)
+def _tok_fs(t):
+    n = _nrm(t)
+    return frozenset(n), frozenset(x for x in n if _ZNACZNIK_FS.match(x)), max((len(w) for w in n), default=0)
+
+
+def _znaczniki_fs(t):
+    return _tok_fs(t)[1]
+
+
 def _pilka_fs(s):
-    fs = czytaj('wyniki_fs_inne_*.csv')
+    fs = pd.concat([czytaj('wyniki_fs_pilka_*.csv'), czytaj('wyniki_fs_inne_*.csv')], ignore_index=True)
     if not len(fs): return s
-    fs = fs[fs.sport.isin(['football', 'soccer'])].copy()
+    fs = fs[fs.sport.isin(['football', 'soccer'])].drop_duplicates().copy()
     if not len(fs): return s
     n0 = len(fs)
     fs['kraj'] = fs.kraj.map(_kraj_365)
     fs['sport'] = 'football'
+    # mlodziez, kobiety, rezerwy, sparingi — tylko przez 365 (tam sa oznaczone); z FS nie wchodza wcale
+    mk = [bool(_MLODZI_KOBIETY_FS.search(f'{t}')) or bool(_MLODZI_KOBIETY_FS.search(a_.strip())) or bool(_MLODZI_KOBIETY_FS.search(b_.strip()))
+          for t, a_, b_ in zip(fs.turniej, fs.gosp, fs.gosc)]
+    fs = fs[[not x for x in mk]]
+    n_mk = sum(mk)
     ligi365 = set(zip(s.kraj.str.lower(), s.turniej.str.lower())) if len(s) else set()
     fs = fs[[(k.lower(), t.lower()) not in ligi365 for k, t in zip(fs.kraj, fs.turniej)]]
 
-    def _pasuje(nt, z):   # ten sam zapis albo jedna nazwa zawiera druga (czlon rozrozniajacy >= 4 znaki)
-        if not nt or not z: return False
+    def _pasuje(ta, tb):   # nazwy: ten sam zapis albo jedna zawiera druga; znaczniki (B, II, U19, W) MUSZA byc te same
+        nt, mt, lt = _tok_fs(ta); z, mz, lz = _tok_fs(tb)
+        if mt != mz or not nt or not z: return False
         if nt == z: return True
-        mn = nt if len(nt) <= len(z) else z
-        return (nt <= z or z <= nt) and max(len(w) for w in mn) >= 4
+        if nt <= z: return lt >= 4
+        if z <= nt: return lz >= 4
+        return False
 
-    # 1) nazwy druzyn: jednoznaczny odpowiednik w 365 w tym samym kraju
-    pula, liga_druzyny = {}, {}
+    # puchary z FS nie wchodza (w 365 tez sa odsiewane), a przed przypisaniem ligi — zeby puchar nie trafil do ligi
+    pu = fs.turniej.str.contains(PUCHAR) & ~pd.Series([_liga_nie_puchar(k, t) for k, t in zip(fs.kraj, fs.turniej)], index=fs.index, dtype=bool)
+    fs = fs[~pu]
+
+    # 1) liga FS -> liga 365 TYLKO gdy: nazwy lig maja wspolny czlon (>=4 znaki, np. "Serie D - Group A" / "Serie D",
+    #    "Kakkonen - Lohko B" / "Kakkonen") ORAZ >=2 druzyny FS maja identyczny zapis w tej lidze 365 i to >=60% trafien.
+    druzyny_ligi = {}
     if len(s):
-        for k, a_, b_, t, d in zip(s.kraj.str.lower(), s.gosp, s.gosc, s.turniej, s.data):
-            pula.setdefault(k, set()).update((a_, b_))
-            for x in (a_, b_):
-                if d >= liga_druzyny.get((k, x), ('', ''))[0]: liga_druzyny[(k, x)] = (d, t)
-    tok = {k: {c: set(_nrm(c)) for c in v} for k, v in pula.items()}
-    mapa = {}
-    for k, t in set(zip(fs.kraj.str.lower(), fs.gosp)) | set(zip(fs.kraj.str.lower(), fs.gosc)):
-        kand = tok.get(k, {})
-        if t in kand: mapa[(k, t)] = t; continue
-        nt = set(_nrm(t))
-        rowne = [c for c, z in kand.items() if z == nt]
-        zaw = [c for c, z in kand.items() if _pasuje(nt, z)]
-        wyb = rowne if len(rowne) == 1 else (zaw if len(zaw) == 1 else [])
-        if wyb: mapa[(k, t)] = wyb[0]
-    for col in ('gosp', 'gosc'):
-        fs[col] = [mapa.get((k, t), t) for k, t in zip(fs.kraj.str.lower(), fs[col])]
-
-    # 2) liga FS -> liga 365, gdy >=2 jej druzyny i >=60% z nich gra (ostatnio) w jednej lidze 365 tego kraju
+        for k, t, a_, b_ in zip(s.kraj.str.lower(), s.turniej, s.gosp, s.gosc):
+            druzyny_ligi.setdefault((k, t), set()).update((a_, b_))
+    klucz = lambda x: (_tok_fs(x)[0], _tok_fs(x)[1])
+    idx_nazw = {}
+    for (k, t), dr in druzyny_ligi.items():
+        for x in dr: idx_nazw.setdefault((k, klucz(x)), set()).add(t)
+    ogolne = {'league', 'liga', 'division', 'group', 'serie', 'primera', 'segunda', 'first', 'second', 'third', 'premier',
+              'championship', 'national', 'regional', 'stage', 'round', 'north', 'south', 'east', 'west', 'lohko', 'grupo', 'girone'}
+    czl = lambda t: {w for w in _nrm(t) if len(w) >= 4 and w not in ogolne} | ({' '.join(_nrm(t)[:2])} if len(_nrm(t)) >= 2 else set())
     lmapa = {}
     for (k, t), g in fs.groupby([fs.kraj.str.lower(), fs.turniej]):
-        dr = set(g.gosp) | set(g.gosc)
-        ligi = [liga_druzyny[(k, x)][1] for x in dr if (k, x) in liga_druzyny]
-        if len(ligi) >= 2:
-            naj = max(set(ligi), key=ligi.count)
-            if ligi.count(naj) >= 0.6 * len(ligi): lmapa[(k, t)] = naj
+        traf = [lg for x in set(g.gosp) | set(g.gosc) for lg in idx_nazw.get((k, klucz(x)), ())]
+        if len(traf) < 2: continue
+        naj = max(set(traf), key=traf.count)
+        if traf.count(naj) >= 0.6 * len(traf) and (czl(t) & czl(naj)): lmapa[(k, t)] = naj
     fs['turniej'] = [lmapa.get((k.lower(), t), t) for k, t in zip(fs.kraj, fs.turniej)]
 
-    # 3) mecz obecny w 365 (ten kraj, +-1 dzien, gospodarz lub gosc pasuje) odpada
-    idx = {}
+    # 2) nazwy druzyn: w DOCELOWEJ lidze (ta sama zasada co w pilka(): sofa_div albo "Kraj | Liga").
+    #    Druzyna FS bez jednoznacznego odpowiednika w lidze znanej z 365 -> mecz ODPADA (inaczej klub rozpadlby sie na dwa:
+    #    "Atl. Nacional" obok "Atletico Nacional"). W lidze nowej (brak w 365) nazwy zostaja jak w FS.
+    _SKR = {'atl': 'atletico', 'dep': 'deportivo', 'dyn': 'dynamo', 'utd': 'united', 'univ': 'universidad', 'r': 'real',
+            'sp': 'sporting', 'int': 'internacional', 'cd': '', 'fc': '', 'cf': '', 'sc': '', 'ac': '', 'fk': '', 'sk': ''}
+    def _luz(x):
+        return frozenset(w for w in (_SKR.get(v, v) for v in _nrm(x)) if w)
+    def _pasuje_luzno(ta, tb):
+        if _znaczniki_fs(ta) != _znaczniki_fs(tb): return False
+        a1, b1 = _luz(ta), _luz(tb)
+        if not a1 or not b1: return False
+        mn = a1 if len(a1) <= len(b1) else b1
+        return (a1 <= b1 or b1 <= a1) and max(len(w) for w in mn) >= 3
+    cel = lambda k, t: sofa_div(k, t) or f'{k} | {t}'
+    druzyny_celu = {}
+    if len(s):
+        for k, t, a_, b_ in zip(s.kraj, s.turniej, s.gosp, s.gosc):
+            druzyny_celu.setdefault(cel(k, t), set()).update((a_, b_))
+    fs_cel = [cel(k, t) for k, t in zip(fs.kraj, fs.turniej)]
+    mapa, zle = {}, set()
+    for c_, x in set(zip(fs_cel, fs.gosp)) | set(zip(fs_cel, fs.gosc)):
+        kand = druzyny_celu.get(c_, set())
+        if not kand or x in kand: continue
+        for test in (lambda c: klucz(c) == klucz(x), lambda c: _pasuje(x, c), lambda c: _pasuje_luzno(x, c)):
+            w = [c for c in kand if test(c)]
+            if len(w) == 1: mapa[(c_, x)] = w[0]; break
+            if len(w) > 1: break
+        else:
+            pass
+        if (c_, x) not in mapa: zle.add((c_, x))
+    ok = [(c_, a_) not in zle and (c_, b_) not in zle for c_, a_, b_ in zip(fs_cel, fs.gosp, fs.gosc)]
+    for col in ('gosp', 'gosc'):
+        fs[col] = [mapa.get((c_, x), x) for c_, x in zip(fs_cel, fs[col])]
+    n_zle = len(ok) - sum(ok)
+    fs = fs[ok]
+
+    # 3) dubel: (a) ten kraj, +-1 dzien, gospodarz LUB gosc pasuje; (b) dowolny kraj, +-1 dzien, OBIE druzyny pasuja
+    po_kraju, po_dniu = {}, {}
     if len(s):
         for d, k, a_, b_ in zip(s.data.str[:10], s.kraj.str.lower(), s.gosp, s.gosc):
-            idx.setdefault((k, d), []).extend((set(_nrm(a_)), set(_nrm(b_))))
-    dni = lambda d: [d, str((pd.Timestamp(d) + pd.Timedelta(days=1)).date()), str((pd.Timestamp(d) - pd.Timedelta(days=1)).date())]
+            po_kraju.setdefault((k, d), []).extend((a_, b_))
+            po_dniu.setdefault(d, []).append((a_, b_))
+    def dni(d):
+        t = pd.Timestamp(d); return [d, str((t + pd.Timedelta(days=1)).date()), str((t - pd.Timedelta(days=1)).date())]
     dubel = []
     for d, k, a_, b_ in zip(fs.data.str[:10], fs.kraj.str.lower(), fs.gosp, fs.gosc):
-        z = [x for dd in dni(d) for x in idx.get((k, dd), [])]
-        dubel.append(any(_pasuje(set(_nrm(a_)), y) for y in z) or any(_pasuje(set(_nrm(b_)), y) for y in z))
+        dd = dni(d)
+        z = [x for q in dd for x in po_kraju.get((k, q), [])]
+        jest = any(_pasuje(a_, y) or _pasuje(b_, y) for y in z)
+        if not jest:
+            jest = any((_pasuje_luzno(a_, h) and _pasuje_luzno(b_, g)) or (_pasuje_luzno(a_, g) and _pasuje_luzno(b_, h))
+                       for q in dd for h, g in po_dniu.get(q, []))
+        dubel.append(jest)
     fs = fs[~pd.Series(dubel, index=fs.index, dtype=bool)]
-    print(f'  zewn: pilka z Flashscore: {n0} meczow, po odsianiu lig i meczow obecnych w 365scores zostaje {len(fs)} '
-          f'({fs.kraj.nunique()} krajow); {sum(1 for k, v in mapa.items() if k[1] != v)} nazw druzyn i '
-          f'{len(lmapa)} lig przypisanych do zapisu 365.')
+    print(f'  zewn: pilka z Flashscore: {n0} meczow; odrzucono {n_mk} mlodziezowych/kobiecych/rezerw/sparingow; po odsianiu lig '
+          f'i meczow obecnych w 365scores zostaje {len(fs)} ({fs.kraj.nunique()} krajow); '
+          f'{len(mapa)} nazw druzyn i {len(lmapa)} lig przypisanych do zapisu 365; {n_zle} meczow odrzuconych, bo druzyna '
+          f'z ligi znanej w 365 nie ma jednoznacznego odpowiednika.')
     return pd.concat([s, fs[s.columns]], ignore_index=True) if len(s) else fs
 
 # Poprawka 44 (24.09.2026): hokej z Flashscore. 365scores nie prowadzi sezonu 2026/27 Liigi, SHL, DEL,
@@ -347,7 +411,10 @@ def _pilka_fs(s):
 # (FS_SPORTY 4: 'hockey'). Ten sam mecz z dwoch zrodel mialby rozne nazwy druzyn i liczylby sie DWA razy
 # (jak NFL/KBO/NPB przed 23.09). Zasada: wiersz hokeja z Flashscore zostaje TYLKO, gdy 365scores nie ma
 # zadnego meczu hokeja z tego kraju w tym dniu. Kraj z Flashscore ("FINLAND") ujednolicony do zapisu 365.
-_KRAJ_FS = {'czech republic': 'Czechia', 'usa': 'USA', 'south korea': 'South Korea', 'great britain': 'England'}
+_KRAJ_FS = {'czech republic': 'Czechia', 'usa': 'USA', 'south korea': 'South Korea', 'great britain': 'England',
+            # Poprawka 46b: rozbieznosci zmierzone na pilce z 17-23.09 (131 krajow FS vs zapis 365)
+            'turkey': 'Turkiye', 'bosnia and herzegovina': 'Bosnia & Herzegovina', 'philippines': 'The Phillipines',
+            'taiwan': 'Chinese Taipei', 'united arab emirates': 'UAE'}
 
 
 def _kraj_365(k):
