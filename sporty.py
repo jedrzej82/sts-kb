@@ -310,6 +310,53 @@ _KRAJE_PL = {
     'wenezuela': ('Venezuela',), 'wietnam': ('Vietnam',), 'wlochy': ('Italy',),
     'wyspyowcze': ('Faroe Islands',), 'wybrzezekoscisloniowej': ('Ivory Coast',),
     'zjednoczoneemiratyarabskie': ('United Arab Emirates',),
+    # Poprawka 42 (24.09.2026): nazwy z oferty 24.09, ktore nie trafialy w baze
+    'afganistan': ('Afghanistan',),
+    'antiguaibarbuda': ('Antigua and Barbuda',),
+    'bahrajn': ('Bahrain',),
+    'bermudy': ('Bermuda',),
+    'birma': ('Myanmar',),
+    'czad': ('Chad',),
+    'demokratycznarepublikakonga': ('DR Congo',),
+    'drkongo': ('DR Congo',),
+    'dzibuti': ('Djibouti',),
+    'erytrea': ('Eritrea',),
+    'etiopia': ('Ethiopia',),
+    'fidzi': ('Fiji',),
+    'gujana': ('Guyana',),
+    'gwatemala': ('Guatemala',),
+    'gwinea': ('Guinea',),
+    'gwineabissau': ('Guinea-Bissau',),
+    'gwinearownikowa': ('Equatorial Guinea',),
+    'hongkong': ('Hong Kong',),
+    'irak': ('Iraq',),
+    'jamajka': ('Jamaica',),
+    'jemen': ('Yemen',),
+    'jordania': ('Jordan',),
+    'kambodza': ('Cambodia',),
+    'kirgistan': ('Kyrgyzstan',),
+    'komory': ('Comoros',),
+    'kongo': ('Congo',),
+    'kuwejt': ('Kuwait',),
+    'liban': ('Lebanon',),
+    'libia': ('Libya',),
+    'madagaskar': ('Madagascar',),
+    'malezja': ('Malaysia',),
+    'mauretania': ('Mauritania',),
+    'mjanma': ('Myanmar',),
+    'mozambik': ('Mozambique',),
+    'nikaragua': ('Nicaragua',),
+    'nowakaledonia': ('New Caledonia',),
+    'palestyna': ('Palestine',),
+    'papuanowagwinea': ('Papua New Guinea',),
+    'republikasrodkowoafrykanska': ('Central African Republic',),
+    'republikazielonegoprzyladka': ('Cape Verde',),
+    'singapur': ('Singapore',),
+    'sudanpoludniowy': ('South Sudan',),
+    'surinam': ('Suriname',),
+    'tadzykistan': ('Tajikistan',),
+    'trynidaditobago': ('Trinidad and Tobago',),
+    'wyspyzielonegoprzyladka': ('Cape Verde',),
 }
 
 
@@ -405,7 +452,11 @@ _MIASTA_PL = {'madryt': ('madrid',), 'monachium': ('munich', 'munchen', 'muenche
               'belgrad': ('belgrade', 'beograd'), 'moskwa': ('moscow', 'moskva'), 'praga': ('prague', 'praha'),
               'bukareszt': ('bucharest', 'bucuresti'), 'sztokholm': ('stockholm',), 'kijow': ('kyiv', 'kiev'),
               'lwow': ('lviv', 'lvov'), 'zagrzeb': ('zagreb',), 'genua': ('genoa', 'genova'),
-              'saloniki': ('thessaloniki',), 'pireus': ('piraeus', 'pireas')}
+              'saloniki': ('thessaloniki',), 'pireus': ('piraeus', 'pireas'),
+              'kowno': ('kaunas',), 'wilno': ('vilnius',), 'ryga': ('riga',)}   # Poprawka 42
+_ALIASY_RECZNE = {'saskibaskonia': 'Baskonia Vitoria',
+                  'olympiakospireus': 'Olympiacos', 'olympiakos': 'Olympiacos',
+                  'asvellyonvilleurbanne': 'ASVEL Villeurbanne', 'ldlcasvel': 'ASVEL Villeurbanne'}
 _KOBIETY = frozenset('k w women kobiety kobiet'.split())
 # dlugie, ale OGOLNE rdzenie — wiele klubow na swiecie (recenzja: "Instituto", "Politechnika")
 _OGOLNE_DLUGIE = frozenset('instituto politechnika universidad university universitario universitatea '
@@ -483,6 +534,9 @@ def resolve(name, pool):
     k_ = norm(name)
     if not k_: return None
     pool = {p for p in pool if isinstance(p, str)}   # recenzja: NaN w puli rugby wywracal sorted()
+    # Poprawka 42 (24.09.2026): nazwy sponsorskie / inna pisownia — test przynaleznosci do puli
+    _al = _ALIASY_RECZNE.get(k_)
+    if _al and _al in pool: return _al
     _kr = _kraj_pl(name, pool)
     if _kr: return _kr
     # sorted(): pool to zbior, a kolejnosc iteracji zbioru zalezy od losowego ziarna

@@ -73,7 +73,7 @@ Zamiast pobierania 25 archiwow:
 ```bash
 git clone --depth 1 https://github.com/jedrzej82/sts-kb.git kb
 cd kb
-pip install --break-system-packages pandas scipy pyarrow tqdm pulp fsspec plotly
+pip install --break-system-packages pandas scipy pyarrow tqdm pulp fsspec plotly pyreadr
 pip install --break-system-packages --no-deps penaltyblog
 python3 build_kb.py --refresh && python3 uzupelnij_ligi.py && python3 build_kb.py
 python3 hist_import.py

@@ -110,7 +110,21 @@ ALIASES_KLUBY = {'slaviapraga': 'Slavia Prague', 'spartapraga': 'Sparta Prague',
                  # "Red Star" (bez przyrostka) to francuski Red Star FC (clubelo); Crvena zvezda ma przyrostek
                  'crvenazvezda': 'Red Star [serbia]', 'fkcrvenazvezda': 'Red Star [serbia]',
                  'redstarbelgrade': 'Red Star [serbia]', 'crvenazvezdabeograd': 'Red Star [serbia]',
-                 'lommel': 'Lommel SK', 'klommelsk': 'Lommel SK'}
+                 'lommel': 'Lommel SK', 'klommelsk': 'Lommel SK',
+                 # Poprawka 42 (24.09.2026): kluby z oferty 24.09 obecne w bazie pod innym zapisem
+                 'unionlacalera': 'U. La Calera',
+                 'universidadcatolicasantiago': 'Univ Católica [chile]',
+                 'desportessantacruz': 'Deportes Santa Cruz',
+                 'atenasdesancarlos': 'Atenas San Carlos',
+                 'hapoelacre': 'Hapoel Akko',
+                 'mskkiryatyam': 'Kiryat Yam Sc',
+                 'csdxelaju': 'Club Xelaju',
+                 'alianzafcsansalvador': 'Alianza FC [elsalvador]',
+                 'celajeadensers': 'Lajeadense',
+                 'ecpassofundo': 'Passo Fundo (RS)',
+                 'ceaimorers': 'Aimoré',
+                 'bomjesusec': 'Bom Jesus - GO',
+                 'goianiago': 'Goiânia EC',}
 
 def _rezerwa(zrodlo, kandydat):
     """Blokuje "Inter Milan" -> "Inter Milan U23" i pierwsza druzyne -> zespol kobiecy/mlodziezowy.
@@ -177,6 +191,53 @@ _KRAJE_PL = {
     'wenezuela': ('Venezuela',), 'wietnam': ('Vietnam',), 'wlochy': ('Italy',),
     'wyspyowcze': ('Faroe Islands',), 'wybrzezekoscisloniowej': ('Ivory Coast',),
     'zjednoczoneemiratyarabskie': ('United Arab Emirates',),
+    # Poprawka 42 (24.09.2026): nazwy z oferty 24.09, ktore nie trafialy w baze
+    'afganistan': ('Afghanistan',),
+    'antiguaibarbuda': ('Antigua and Barbuda',),
+    'bahrajn': ('Bahrain',),
+    'bermudy': ('Bermuda',),
+    'birma': ('Myanmar',),
+    'czad': ('Chad',),
+    'demokratycznarepublikakonga': ('DR Congo',),
+    'drkongo': ('DR Congo',),
+    'dzibuti': ('Djibouti',),
+    'erytrea': ('Eritrea',),
+    'etiopia': ('Ethiopia',),
+    'fidzi': ('Fiji',),
+    'gujana': ('Guyana',),
+    'gwatemala': ('Guatemala',),
+    'gwinea': ('Guinea',),
+    'gwineabissau': ('Guinea-Bissau',),
+    'gwinearownikowa': ('Equatorial Guinea',),
+    'hongkong': ('Hong Kong',),
+    'irak': ('Iraq',),
+    'jamajka': ('Jamaica',),
+    'jemen': ('Yemen',),
+    'jordania': ('Jordan',),
+    'kambodza': ('Cambodia',),
+    'kirgistan': ('Kyrgyzstan',),
+    'komory': ('Comoros',),
+    'kongo': ('Congo',),
+    'kuwejt': ('Kuwait',),
+    'liban': ('Lebanon',),
+    'libia': ('Libya',),
+    'madagaskar': ('Madagascar',),
+    'malezja': ('Malaysia',),
+    'mauretania': ('Mauritania',),
+    'mjanma': ('Myanmar',),
+    'mozambik': ('Mozambique',),
+    'nikaragua': ('Nicaragua',),
+    'nowakaledonia': ('New Caledonia',),
+    'palestyna': ('Palestine',),
+    'papuanowagwinea': ('Papua New Guinea',),
+    'republikasrodkowoafrykanska': ('Central African Republic',),
+    'republikazielonegoprzyladka': ('Cape Verde',),
+    'singapur': ('Singapore',),
+    'sudanpoludniowy': ('South Sudan',),
+    'surinam': ('Suriname',),
+    'tadzykistan': ('Tajikistan',),
+    'trynidaditobago': ('Trinidad and Tobago',),
+    'wyspyzielonegoprzyladka': ('Cape Verde',),
 }
 
 
@@ -750,6 +811,11 @@ def intl(home, away, neutral, kursy):
         sys.exit(f'TA SAMA DRUZYNA PO OBU STRONACH: "{home}" i "{away}" wskazuja na "{h}" '
                  f'— analiza przerwana. Sprawdz nazwy w bazie przed dalsza praca.')
     print(f'Dopasowano: {h} | {a}')
+    if h is None or a is None:
+        # Poprawka 42: wczesniej KeyError: None (Traceback) — teraz jak w meczach klubowych.
+        brak = [n for n, r in ((home, h), (away, a)) if r is None]
+        sys.exit(f'NIE ZNALEZIONO reprezentacji: {", ".join(repr(x) for x in brak)} — noga MNIEJ. '
+                 f'Dopisz polska nazwe do _KRAJE_PL tylko, gdy druzyna jest w tabeli intl.')
     df = df.assign(rh=[p[0] for p in pre], ra=[p[1] for p in pre], adv=[p[2] for p in pre])
     d = df[df.date >= '2010-01-01']
     x = ((d.rh + d.adv - d.ra) / 100).values
