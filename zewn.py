@@ -300,7 +300,63 @@ def _hokej_fs_bez_dubli(s):
     zostaje = jest_fs & ~dubel
     s = s.copy()
     s.loc[zostaje, 'kraj'] = kraj[zostaje]
-    return s[~dubel]
+    s.loc[zostaje, 'turniej'] = [_LIGA_FS.get((k, t), t) for k, t in zip(s.loc[zostaje, 'kraj'], s.loc[zostaje, 'turniej'])]
+    s = s[~dubel]
+    return _hokej_fs_nazwy(s, zostaje[~dubel])
+
+
+# Poprawka 44b: Flashscore i 365scores zapisuja inaczej te same ligi i druzyny. Bez mapowania druzyna
+# rozpadalaby sie na dwie (osobne Elo): "Leksand"/"Leksands IF", "IFK Helsinki"/"HIFK".
+_LIGA_FS = {('Slovakia', 'Tipsport liga'): 'Extraliga', ('Denmark', 'Metal Ligaen'): 'Ligaen',
+            ('Belarus', 'Extraleague'): 'Extraliga', ('Norway', 'EHL'): 'Eliteserien'}
+# nieregularne — kazda para sprawdzona recznie (ta sama liga, ten sam klub)
+_DRUZYNA_FS = {('Finland | Liiga', 'IFK Helsinki'): 'HIFK',
+               ('Austria | ICE Hockey League', 'Klagenfurt'): 'EC-KAC',
+               ('Austria | ICE Hockey League', 'Bolzano'): 'HCB Südtirol',
+               ('Austria | ICE Hockey League', 'HK Olimpija'): 'Olimpija Ljubljana',
+               ('Belarus | Extraliga', 'Baranavichy'): 'Baranovichi',
+               ('Denmark | Ligaen', 'Sonderjyske Ishockey'): 'Sonderjyske',
+               ('Austria | ICE Hockey League', 'Graz99ers'): 'Graz 99ers',
+               ('Sweden | HockeyAllsvenskan', 'AIK'): 'AIK IF',
+               ('Sweden | HockeyAllsvenskan', 'Leksand'): 'Leksands IF',   # spadek z SHL 2026
+               ('Sweden | SHL', 'Leksand'): 'Leksands IF'}
+
+
+def _nrm(x):
+    return re.sub(r'[^a-z0-9 ]', ' ', unicodedata.normalize('NFKD', str(x)).encode('ascii', 'ignore').decode().lower()).split()
+
+
+def _hokej_fs_nazwy(s, maska_fs):
+    hk = s.sport.isin(['hockey', 'ice-hockey'])
+    liga = s.kraj + ' | ' + s.turniej
+    baza = s[hk & ~maska_fs]
+    pula = {}
+    for lg, a, b in zip(liga[hk & ~maska_fs], baza.gosp, baza.gosc):
+        pula.setdefault(lg, set()).update((a, b))
+    mapa, nowe = {}, set()
+    for lg, t in set(zip(liga[maska_fs], s.gosp[maska_fs])) | set(zip(liga[maska_fs], s.gosc[maska_fs])):
+        kand = pula.get(lg, set())
+        # reczna para: cel musi istniec w 365 w tym samym KRAJU (awans/spadek zmienia lige, nie klub)
+        kraj_lg = lg.split(' | ')[0]
+        w_kraju = set().union(*[v for k, v in pula.items() if k.split(' | ')[0] == kraj_lg]) if pula else set()
+        if (lg, t) in _DRUZYNA_FS and _DRUZYNA_FS[(lg, t)] in w_kraju: mapa[(lg, t)] = _DRUZYNA_FS[(lg, t)]; continue
+        if t in kand: continue
+        nt = _nrm(t)
+        rowne = [k for k in kand if _nrm(k) == nt]
+        zawiera = [k for k in kand if nt and _nrm(k) and (set(nt) <= set(_nrm(k)) or set(_nrm(k)) <= set(nt))
+                   and max(len(w) for w in nt) >= 4]
+        wyb = rowne if len(rowne) == 1 else (zawiera if len(zawiera) == 1 else [])
+        if wyb: mapa[(lg, t)] = wyb[0]
+        elif kand: nowe.add((lg, t))
+    if mapa:
+        s = s.copy()
+        for col in ('gosp', 'gosc'):
+            s.loc[maska_fs, col] = [mapa.get((lg, t), t) for lg, t in zip(liga[maska_fs], s.loc[maska_fs, col])]
+        print(f'  zewn: hokej z Flashscore: {len(mapa)} nazw druzyn ujednoliconych do zapisu 365scores.')
+    if nowe:
+        print(f'  zewn: hokej z Flashscore: {len(nowe)} nazw bez odpowiednika w tej samej lidze 365 '
+              f'(nowa druzyna albo inny zapis — sprawdz): ' + ', '.join(f'{t} [{lg}]' for lg, t in sorted(nowe)[:12]))
+    return s
 
 def inne():
     """Sporty drużynowe i indywidualne (bez tenisa) → wiersze w formacie sporty_hist (data,sport,liga,gosp,gosc,pg,pa,dogrywka)."""
