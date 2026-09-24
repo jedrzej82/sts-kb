@@ -400,12 +400,20 @@ def _dokladnie(name, players):
     return None
 
 
+_LITEROWKI_STS = {'maroszanfabian': 'Fabian Marozsan', 'fabianmaroszan': 'Fabian Marozsan'}
+
+
 def resolve(name, players):
     """Zwraca nazwe z bazy albo None. None JEST POPRAWNYM WYNIKIEM — wolacz ma sie zatrzymac.
     21.09.2026 (POPRAWKA 11.4): STS podaje zawodnikow jako "Nazwisko Imie", a baza ma
     "Imie Nazwisko". W przebiegu 19:30 wszystkie cztery mecze tenisa zwrocily "Brak zawodnika
     w bazie" wlasnie z tego powodu. Dlatego przy braku trafienia probujemy tez odwroconej
     kolejnosci czlonow. Dolozone tez ostrzezenia tam, gdzie kod wczesniej po cichu zgadywal."""
+    # Poprawka 43 (24.09.2026): literowki w ofercie STS — tylko gdy cel jest w bazie
+    _l = _LITEROWKI_STS.get(norm(name))
+    if _l and _l in players:
+        print(f'  UWAGA: "{name}" to literowka STS -> "{_l}".')
+        return _l
     r = _dokladnie(name, players)
     if r is NIEJEDNOZNACZNE:
         print(f'  "{name}": ten sam zapis ma w bazie kilka osob — nie dopasowano.')

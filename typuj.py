@@ -124,7 +124,14 @@ ALIASES_KLUBY = {'slaviapraga': 'Slavia Prague', 'spartapraga': 'Sparta Prague',
                  'ecpassofundo': 'Passo Fundo (RS)',
                  'ceaimorers': 'Aimoré',
                  'bomjesusec': 'Bom Jesus - GO',
-                 'goianiago': 'Goiânia EC',}
+                 'goianiago': 'Goiânia EC',
+                 # Poprawka 43 (24.09.2026): jedyny kandydat w swojej lidze (sprawdzone na skladzie ligi 2026)
+                 'fcashdod': 'SC Ashdod',                 # Izrael National League: jedyny klub z Aszdodu
+                 'cebentogoncalvesrs': 'Esportivo/RS',    # Gaucho A2: Clube Esportivo Bento Goncalves
+                 'ecguaranirs': 'Guarani-VA',             # Gaucho A2: EC Guarani (Venancio Aires)
+                 'uniaofrederiquensedefutebolrs': 'União-RS', 'uniaofrederiquense': 'União-RS',  # Gaucho A2
+                 'scgauchopassofundo': 'SC Gaucho',       # Gaucho A2 (dotad przez krotsza nazwe z ostrzezeniem)
+                 'cesantacruzrs': 'Santa Cruz RS',}
 
 def _rezerwa(zrodlo, kandydat):
     """Blokuje "Inter Milan" -> "Inter Milan U23" i pierwsza druzyne -> zespol kobiecy/mlodziezowy.

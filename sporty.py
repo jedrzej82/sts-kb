@@ -398,7 +398,10 @@ def _zaw_nazwy(a, b):
 # Real/Sporting/Dinamo/Independiente (to ONE sa wspolne dla wielu klubow).
 _OGOLNE = frozenset('fc cf sc ac as ss sv fk nk sk bk hk hc mhk vk kk rk ok ks cd ca cs ud sd ec afc cfc fbc sad '
                     'club clube klub calcio futbol football fussball handball basket basketball volley volleyball '
-                    'hockey sport sports de del la el the da do'.split())
+                    'hockey sport sports de del la el the da do '
+                    # Poprawka 43 (24.09.2026): dopiski STS bez znaczenia rozrozniajacego
+                    # ("Lancashire County", "Colomiers Rugby", "Storhamar Ishockey", "Narvik IK", "IF Bjorkloven")
+                    'county rugby ishockey ik if'.split())
 
 
 def _skrot_albo_nic(name, wyn, pula):
@@ -454,7 +457,32 @@ _MIASTA_PL = {'madryt': ('madrid',), 'monachium': ('munich', 'munchen', 'muenche
               'lwow': ('lviv', 'lvov'), 'zagrzeb': ('zagreb',), 'genua': ('genoa', 'genova'),
               'saloniki': ('thessaloniki',), 'pireus': ('piraeus', 'pireas'),
               'kowno': ('kaunas',), 'wilno': ('vilnius',), 'ryga': ('riga',)}   # Poprawka 42
-_ALIASY_RECZNE = {'saskibaskonia': 'Baskonia Vitoria',
+_ALIASY_RECZNE = {
+    # Poprawka 43 (24.09.2026) — hokej: STS dokleja miasto (kazda para sprawdzona w lidze)
+    'lukkorauma': 'Lukko', 'tapparatampere': 'Tappara', 'bilitygriliberec': 'Liberec',
+    'stjernenfredrikstad': 'Stjernen', 'stavangeroilers': 'Stavanger', 'hv71jonkoping': 'HV 71',
+    'ehckloten': 'Kloten Flyers', 'hkzemgalellu': 'HK Zemgale/Jlss', 'jkhgksjastrzebie': 'GKS Jastrzêbie',
+    # koszykowka
+    'riesenludwigsburg': 'N.R. Ludwigsburg', 'mhpriesenludwigsburg': 'N.R. Ludwigsburg',
+    'semelbournephoenix': 'South East Melbourne', 'southeastmelbournephoenix': 'South East Melbourne',
+    'perthwildcats': 'Perth',
+    # WNBA: STS oznacza [K], w bazie druzyny WNBA sa bez znacznika (liga jest wylacznie kobieca)
+    'atlantadreamk': 'Atlanta Dream', 'atlantadreamw': 'Atlanta Dream',
+    'chicagoskyk': 'Chicago Sky', 'chicagoskyw': 'Chicago Sky',
+    'connecticutsunk': 'Connecticut Sun', 'connecticutsunw': 'Connecticut Sun',
+    'dallaswingsk': 'Dallas Wings', 'dallaswingsw': 'Dallas Wings',
+    'goldenstatevalkyriesk': 'Golden State Valkyries', 'goldenstatevalkyriesw': 'Golden State Valkyries',
+    'indianafeverk': 'Indiana Fever', 'indianafeverw': 'Indiana Fever',
+    'lasvegasacesk': 'Las Vegas Aces', 'lasvegasacesw': 'Las Vegas Aces',
+    'losangelessparksk': 'Los Angeles Sparks', 'losangelessparksw': 'Los Angeles Sparks',
+    'minnesotalynxk': 'Minnesota Lynx', 'minnesotalynxw': 'Minnesota Lynx',
+    'newyorklibertyk': 'New York Liberty', 'newyorklibertyw': 'New York Liberty',
+    'phoenixmercuryk': 'Phoenix Mercury', 'phoenixmercuryw': 'Phoenix Mercury',
+    'seattlestormk': 'Seattle Storm', 'seattlestormw': 'Seattle Storm',
+    'washingtonmysticsk': 'Washington Mystics', 'washingtonmysticsw': 'Washington Mystics',
+    'torontotempok': 'Toronto Tempo', 'torontotempow': 'Toronto Tempo',
+    'portlandfirek': 'Portland Fire', 'portlandfirew': 'Portland Fire',
+    'saskibaskonia': 'Baskonia Vitoria',
                   'olympiakospireus': 'Olympiacos', 'olympiakos': 'Olympiacos',
                   'asvellyonvilleurbanne': 'ASVEL Villeurbanne', 'ldlcasvel': 'ASVEL Villeurbanne'}
 _KOBIETY = frozenset('k w women kobiety kobiet'.split())
