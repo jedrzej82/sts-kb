@@ -42,6 +42,32 @@ def dekoduj_inline():
         print(f'  zdekodowano {os.path.basename(f)} -> zewn/{os.path.basename(cel)} ({len(raw)} B)')
 
 
+ARKUSZE = ('statystyki_druzyn', 'statystyki_tenis', 'statystyki_koszykowka', 'statystyki_siatkowka')
+MAKS_WIEK_ARKUSZA_H = 24
+
+
+def kontrola_arkuszy():
+    """Poprawka 53 (24.09, przebieg 21:00): arkusze statystyk to DRUGIE ZRODLO dla pilki klubowej (sezon.py),
+    tenisa, koszykowki i siatkowki. Przebieg 21:00 ich nie pobral i sezon.py konczyl sie „BRAK PLIKU”.
+    Brak arkusza = BLAD (bez niego te sporty nie maja drugiego zrodla). Arkusz starszy niz 24 h = ostrzezenie."""
+    bledy = []
+    for a in ARKUSZE:
+        f = os.path.join(HERE, a + '.csv')
+        if not os.path.exists(f):
+            bledy.append(f'brak {a}.csv — pobierz arkusz Google „{a}” z Dysku (download_file_content, '
+                         f'exportMimeType text/csv) i zapisz jako kb/{a}.csv')
+            continue
+        try:
+            d = pd.read_csv(f, usecols=['data_aktualizacji'], low_memory=False).data_aktualizacji.astype(str).max()
+            t = dt.datetime.strptime(d[:16], '%Y-%m-%d %H:%M')
+            h = (dt.datetime.now() - t).total_seconds() / 3600
+            print(f'  {a}.csv: aktualizacja {d[:16]} ({h:.0f} h)'
+                  + ('' if h <= MAKS_WIEK_ARKUSZA_H else '  UWAGA: starszy niz 24 h — sezon.py tego sportu tylko informacyjnie'))
+        except Exception as e:
+            bledy.append(f'{a}.csv nieczytelny ({e}) — pobierz ponownie jako CSV')
+    return bledy
+
+
 def kontrola_zewn():
     dekoduj_inline()
     bledy = []
@@ -117,12 +143,14 @@ def kontrola_bazy():
 def main():
     print(f'PRZEBIEG {dt.datetime.now():%Y-%m-%d %H:%M}\n1) Pliki zewn/:')
     bledy = kontrola_zewn()
+    print('   Arkusze statystyk (drugie zrodlo):')
+    bledy += kontrola_arkuszy()
     if bledy:
         for b in bledy: print('  BLAD: ' + b)
         print(f'\nPRZEBIEG BLAD: {bledy[0]} — ZADNEGO kuponu za pieniadze')
         return 2
     if '--kontrola' in sys.argv:
-        print('\nKONTROLA PLIKOW OK — uruchom: python3 przebieg.py')
+        print('\nKONTROLA PLIKOW I ARKUSZY OK — uruchom: python3 przebieg.py')
         return 0
     print('2) Budowa (5 krokow, razem ok. 15–20 min):')
     for skrypt, tag in KROKI:
