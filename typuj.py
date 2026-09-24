@@ -770,9 +770,58 @@ def club(home, away, kursy, live=None):
     hh = m[((m.HomeTeam == h) & (m.AwayTeam == a)) | ((m.HomeTeam == a) & (m.AwayTeam == h))].sort_values('MatchDate').tail(8)
     if len(hh):
         print('\nH2H (ost. 8):', ' | '.join(f"{r.MatchDate.date()} {r.HomeTeam} {int(r.FTHome)}:{int(r.FTAway)} {r.AwayTeam}" for r in hh.itertuples()))
+    _mm = m[(m.HomeTeam.isin([h, a]) | m.AwayTeam.isin([h, a])) & m.FTHome.notna() & m.FTAway.notna()].sort_values('MatchDate')
+    drugie_zrodlo([(r.MatchDate, r.HomeTeam, r.AwayTeam, int(r.FTHome), int(r.FTAway)) for r in _mm.itertuples()], h, a, rows)
     value(rows, kursy)
     if ostrz: print('\nOSTRZEŻENIA:', *ostrz, sep='\n - ')
     print('\nUwaga: model nie zna składów, kontuzji i motywacji z dnia meczu — sprawdź je osobno (korekta maks. ±6 pp).')
+
+
+# 24.09.2026 (Poprawka 48, wymog uzytkownika: „Musisz zawsze miec drugie zrodlo danych”).
+# Drugie zrodlo = FORMA z ostatnich meczow obu druzyn, liczona wprost z wynikow (czestosc zdarzenia),
+# niezalezna od modelu (Elo/DC/pi). Noga wchodzi na kupon TYLKO gdy oba zrodla sa zgodne (roznica <= 10 pp)
+# i kazda druzyna ma >= 6 meczow; do kuponu idzie MNIEJSZE z dwoch P (ostroznie). Wygladzanie (k+1)/(n+2),
+# zeby 6/6 nie dawalo 100%. To NIE zastepuje sprawdzenia nieobecnosci w sieci — to drugi, liczbowy filtr.
+def _forma_druzyny(w, t, n=10):
+    x = [r for r in w if r[1] == t or r[2] == t][-n:]
+    out = []
+    for d, hh, aa, gh, ga in x:
+        gz, gs = (gh, ga) if hh == t else (ga, gh)
+        out.append((gz, gs))
+    return out
+
+
+def drugie_zrodlo(w, h, a, rows, n=10):
+    """w: lista (data, gosp, gosc, gole_g, gole_a) posortowana rosnaco po dacie."""
+    fh, fa = _forma_druzyny(w, h, n), _forma_druzyny(w, a, n)
+    print(f'\nDRUGIE ZRODLO — forma z ostatnich meczow (N {len(fh)}/{len(fa)}), niezalezna od modelu:')
+    if min(len(fh), len(fa)) < 6:
+        print('  BRAK DRUGIEGO ZRODLA (mniej niz 6 meczow jednej z druzyn) — ZADNA noga z tego meczu NIE idzie na kupon.')
+        return {}
+    r = lambda k, m: (k + 1) / (m + 2)
+    def cz(f, war): return sum(1 for g in f if war(*g)), len(f)
+    wh, nh = cz(fh, lambda z, s: z > s); dh, _ = cz(fh, lambda z, s: z == s); lh, _ = cz(fh, lambda z, s: z < s)
+    wa, na = cz(fa, lambda z, s: z > s); da, _ = cz(fa, lambda z, s: z == s); la, _ = cz(fa, lambda z, s: z < s)
+    sr = lambda war: (r(*cz(fh, war)) + r(*cz(fa, war))) / 2
+    P = {'1': (r(wh, nh) + r(la, na)) / 2, '2': (r(wa, na) + r(lh, nh)) / 2,
+         'X': (r(dh, nh) + r(da, na)) / 2,
+         '1X': (r(wh + dh, nh) + r(la + da, na)) / 2, 'X2': (r(wa + da, na) + r(lh + dh, nh)) / 2,
+         '12': 1 - (r(dh, nh) + r(da, na)) / 2,
+         'O0.5': sr(lambda z, s: z + s >= 1), 'O1.5': sr(lambda z, s: z + s >= 2), 'O2.5': sr(lambda z, s: z + s >= 3),
+         'U2.5': sr(lambda z, s: z + s <= 2), 'U3.5': sr(lambda z, s: z + s <= 3), 'U4.5': sr(lambda z, s: z + s <= 4),
+         'BTTS_tak': sr(lambda z, s: z > 0 and s > 0), 'BTTS_nie': sr(lambda z, s: z == 0 or s == 0),
+         'gosp_O0.5': (r(*cz(fh, lambda z, s: z > 0)) + r(*cz(fa, lambda z, s: s > 0))) / 2,
+         'gość_O0.5': (r(*cz(fa, lambda z, s: z > 0)) + r(*cz(fh, lambda z, s: s > 0))) / 2}
+    wynik = {}
+    print(f'  {"Rynek":<12}{"P_model":>8}{"P_forma":>9}  werdykt')
+    for k, p, pc in sorted(rows, key=lambda x: -x[2]):
+        if k not in P or pc < 0.60: continue
+        pf = P[k]; ok = abs(pc - pf) <= 0.10
+        wynik[k] = min(pc, pf) if ok else None
+        print(f'  {k:<12}{pc:8.1%}{pf:9.1%}  ' + (f'ZGODNE → P do kuponu {min(pc, pf):.1%}' if ok
+              else f'ROZBIEZNE ({(pf - pc) * 100:+.0f} pp) → NIE NA KUPON'))
+    print('  Zasada (Poprawka 48): na kupon tylko ZGODNE; P do kuponu = mniejsze z dwoch; do tego sprawdz nieobecnosci w sieci.')
+    return wynik
 
 
 def value(rows, kursy):
@@ -863,6 +912,8 @@ def intl(home, away, neutral, kursy):
         print(f'\n{t} ost. 6:', ' | '.join(f'{r.date} {r.home_team} {int(r.home_score)}:{int(r.away_score)} {r.away_team} ({r.tournament})' for r in t10.itertuples()))
     hh = df[((df.home_team == h) & (df.away_team == a)) | ((df.home_team == a) & (df.away_team == h))].tail(6)
     if len(hh): print('\nH2H:', ' | '.join(f'{r.date} {r.home_team} {int(r.home_score)}:{int(r.away_score)} {r.away_team}' for r in hh.itertuples()))
+    drugie_zrodlo([(r.date, r.home_team, r.away_team, int(r.home_score), int(r.away_score)) for r in df.itertuples()
+                   if pd.notna(r.home_score) and pd.notna(r.away_score)], h, a, rows)
     value(rows, kursy)
 
 
