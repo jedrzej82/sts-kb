@@ -146,7 +146,7 @@ def znajdz(wiersze, nazwa, liga=None, sport=None):
     for al in _alias(nazwa):
         tr = sorted([w for w in kand if norm(w['druzyna']) == norm(al)], key=mec, reverse=True)
         if tr:
-            print(f'  „{nazwa}” → „{al}” (para reczna, sporty.py)')
+            print(f'  „{nazwa}” → „{al}” (para reczna, ' + ('sezon.py _ALIASY_PILKA' if al in _ALIASY_PILKA.values() else 'sporty.py') + ')')
             return tr[0], 1.0
     # (3) te same czlony, dowolna kolejnosc, miasta przetlumaczone
     for war in _warianty(nazwa):
