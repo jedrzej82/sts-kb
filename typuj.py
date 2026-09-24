@@ -36,7 +36,9 @@ def norm(s):
     return re.sub(r'[^a-z0-9]', '', s)
 
 
-ALIASES = {'lech': 'Lech Poznan', 'lechpoznan': 'Lech Poznan', 'legiawarszawa': 'Legia', 'legiawarsaw': 'Legia', 'rakowczestochowa': 'Rakow', 'jagielloniabialystok': 'Jagiellonia', 'zaglebielubin': 'Zaglebie', 'brukbettermalica': 'Termalica', 'termalicanieciecza': 'Termalica', 'wislaplock': 'Wisla Plock', 'athletic': 'Ath Bilbao', 'athleticbilbao': 'Ath Bilbao', 'athleticclub': 'Ath Bilbao', 'alaves': 'Alaves',
+# Poprawka 51: STS pisze te kluby inaczej niz baza; sprawdzone recznie po lidze z oferty
+# (Paragwaj Puchar: Recoleta FC z Asuncion — NIE chilijski Deportes Recoleta; Ekwador Serie B: Vinotinto del Ecuador).
+ALIASES = {'cdrecoleta': 'Recoleta FC', 'vinotintofc': 'Vinotinto del Ecuador FC', 'lech': 'Lech Poznan', 'lechpoznan': 'Lech Poznan', 'legiawarszawa': 'Legia', 'legiawarsaw': 'Legia', 'rakowczestochowa': 'Rakow', 'jagielloniabialystok': 'Jagiellonia', 'zaglebielubin': 'Zaglebie', 'brukbettermalica': 'Termalica', 'termalicanieciecza': 'Termalica', 'wislaplock': 'Wisla Plock', 'athletic': 'Ath Bilbao', 'athleticbilbao': 'Ath Bilbao', 'athleticclub': 'Ath Bilbao', 'alaves': 'Alaves',
            'atleticomadrid': 'Ath Madrid', 'atletico': 'Ath Madrid', 'realmadrid': 'Real Madrid', 'intermediolan': 'Inter',
            'internazionale': 'Inter', 'acmilan': 'Milan', 'manchesterunited': 'Man United', 'manchestercity': 'Man City',
            'psg': 'Paris SG', 'parissaintgermain': 'Paris SG', 'bayernmunich': 'Bayern Munich', 'bayernmonachium': 'Bayern Munich',

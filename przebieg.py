@@ -2,6 +2,7 @@
 """Caly przebieg budowy bazy JEDNYM poleceniem, w jedynej poprawnej kolejnosci, z twarda kontrola danych.
   python3 przebieg.py            — kontrola plikow zewn/ → build_kb → uzupelnij_ligi → build_kb → hist_import → swiezosc
   python3 przebieg.py --kontrola — tylko kontrola plikow zewn/ (sekundy), bez budowy
+  Pliki zwrocone przez Dysk W TRESCI (base64): zapisz tekst jako zewn/NAZWA.csv.gz.b64 — przebieg sam je zdekoduje.
 
 Ostatnia linia wyniku to WERDYKT:
   „PRZEBIEG OK — mozna typowac”                        → dane kompletne i swieze
@@ -22,12 +23,32 @@ MAKS_WIEK_DNI = 1             # wyniki z biezacego miesiaca musza siegac co najm
 KROKI = [('build_kb.py', 'b1'), ('uzupelnij_ligi.py', 'u'), ('build_kb.py', 'b2'), ('hist_import.py', 'h'), ('swiezosc.py', 'sw')]
 
 
+def dekoduj_inline():
+    """Poprawka 51: konektor Dysku zwraca male pliki (np. wyniki_lol_inne) W TRESCI odpowiedzi, jako base64.
+    Zapisz sam tekst base64 (albo cala odpowiedz JSON z polem content) do zewn/NAZWA.csv.gz.b64 —
+    ten krok zamieni go na zewn/NAZWA.csv.gz i sprawdzi, czy to poprawny gzip."""
+    import base64, json, gzip
+    for f in sorted(glob.glob(os.path.join(ZD, '*.b64'))):
+        t = open(f, encoding='utf-8', errors='replace').read().strip()
+        try:
+            if t.startswith('{'): t = json.loads(t)['content']
+            raw = base64.b64decode(''.join(t.split()))
+            gzip.decompress(raw)                      # test: czy to caly, poprawny gzip
+        except Exception as e:
+            print(f'  BLAD: {os.path.basename(f)} nie jest poprawnym base64 pliku gzip ({e}) — pobierz ponownie')
+            continue
+        cel = f[:-4]
+        open(cel, 'wb').write(raw); os.remove(f)
+        print(f'  zdekodowano {os.path.basename(f)} -> zewn/{os.path.basename(cel)} ({len(raw)} B)')
+
+
 def kontrola_zewn():
+    dekoduj_inline()
     bledy = []
     mies = DZIS.strftime('%Y-%m')
     if DZIS.day == 1:        # pierwszego dnia miesiaca plik nowego miesiaca moze jeszcze nie miec wczoraj
         mies = (DZIS - dt.timedelta(days=1)).strftime('%Y-%m')
-    for rodzaj in ('365_pilka', '365_inne', 'fs_inne'):
+    for rodzaj in ('365_pilka', '365_inne', 'fs_inne', 'fs_pilka'):   # fs_pilka: czyta go zewn.py (Poprawka 46b)
         f = os.path.join(ZD, f'wyniki_{rodzaj}_{mies}.csv.gz')
         if not os.path.exists(f):
             bledy.append(f'brak zewn/wyniki_{rodzaj}_{mies}.csv.gz — pobierz z Dysku (folder baza-wiedzy)')
@@ -42,6 +63,14 @@ def kontrola_zewn():
         if wiek > MAKS_WIEK_DNI:
             bledy.append(f'zewn/{os.path.basename(f)} konczy sie {d} ({wiek} dni temu) — to stara kopia '
                          f'(np. z repo); pobierz aktualny plik z Dysku i nadpisz')
+    f = os.path.join(ZD, f'wyniki_lol_inne_{mies}.csv.gz')
+    if os.path.exists(f):
+        try:
+            d = pd.read_csv(f, usecols=['data'], low_memory=False).data.astype(str).str[:10].max()
+            print(f'  zewn/{os.path.basename(f)}: ostatni mecz {d}' + ('' if (DZIS - dt.date.fromisoformat(d)).days <= 7
+                  else '  (UWAGA: stary — przy e-sporcie w ofercie pobierz z Dysku; nie blokuje przebiegu)'))
+        except Exception as e:
+            print(f'  UWAGA: zewn/{os.path.basename(f)} nieczytelny ({e}) — e-sport bez swiezych danych')
     arch = glob.glob(os.path.join(ZD, 'wyniki_365_pilka_archiwum_*.csv.gz'))
     if not arch:
         bledy.append('brak zewn/wyniki_365_pilka_archiwum_*.csv.gz (sezon 2025/26) — pobierz z Dysku; '

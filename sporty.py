@@ -589,6 +589,21 @@ def resolve(name, pool):
         print(f'  UWAGA: "{name}" pasuje do {len(_kol[k_])} roznych wpisow w bazie '
               f'({", ".join(sorted(_kol[k_]))}) — sprawdz, ktory to.')
     if k_ in by: return by[k_]
+    # Poprawka 51 (24.09.2026): rok zalozenia w nazwie ("TVB Stuttgart" w STS, "TVB 1898 Stuttgart" w bazie).
+    # Rok wolno pominac TYLKO gdy rdzen bez roku ma >= 2 czlony (chroni "Metalist 1925" != "Metalist",
+    # Poprawka 33, oraz "1860 Munich" != "Munich") i gdy pasuje DOKLADNIE jeden kandydat.
+    _rok = lambda s: re.sub(r'\b(18|19|20)\d\d\b', ' ', str(s))
+    _dwa = lambda s: len(re.findall(r'[A-Za-z0-9\u00C0-\u024F]+', _rok(s))) >= 2
+    kr_ = norm(_rok(name))
+    if kr_ and _dwa(name):
+        kand = sorted({p for p in by.values() if re.search(r'\b(18|19|20)\d\d\b', p) and _dwa(p) and norm(_rok(p)) == kr_}
+                      | ({by[kr_]} if kr_ != k_ and kr_ in by else set()))
+        if len(kand) == 1:
+            print(f'  UWAGA: "{name}" dopasowane po pominieciu roku zalozenia w nazwie -> "{kand[0]}"')
+            return kand[0]
+        if len(kand) > 1:
+            print(f'  ODRZUCONO: "{name}" po pominieciu roku pasuje do {len(kand)} druzyn ({", ".join(kand)}) — noga MNIEJ')
+            return None
     r = _rdzen_rowny(name, by.values())
     if r: return r
     c = [p for p in by.values() if _zaw_nazwy(name, p)]
@@ -662,6 +677,69 @@ def backtest(d, sport, od='2015-01-01'):
     print(f'{sport}: test {len(t)} m. od {od}, trafność faworyta {hit.mean():.1%}, Brier {((e - win) ** 2).mean():.4f}, gospodarz wygrywa {home:.1%}')
     print(cal[['p_model', 'p_kalibr', 'n']].to_string(index=False, float_format=lambda x: f'{x:.3f}'))
     return cal
+
+# ---------------------------------------------------------------------------------------------
+# Poprawka 51 (24.09.2026) — wymog uzytkownika: KAZDA noga musi miec drugie, zgodne zrodlo.
+# Dla hokeja (SHL, DEL, NL, Liiga, Liga Alpejska...), pilki recznej i innych sportow bez arkusza
+# statystyki_<sport> drugim zrodlem jest FORMA z 10 ostatnich meczow obu druzyn w tej bazie —
+# czestosc zwyciestw liczona wprost z wynikow, bez Elo. Gdy liga JEST w arkuszu, noga musi byc
+# zgodna ROWNIEZ z sezon.py (oba zrodla).
+DZ_PROG, DZ_MIN_MECZOW, DZ_OKNO = 0.10, 6, 10
+
+
+def drugie_zrodlo(d, sport, h, g, p_h):
+    """p_h = P modelu, ze wygra PIERWSZA druzyna (h) — przy hokeju „z dogrywka”."""
+    x = d[d.sport == sport]
+    def forma(t):
+        m = x[(x.gosp == t) | (x.gosc == t)].tail(DZ_OKNO)
+        w = int(((m.gosp == t) & (m.pg > m.pa)).sum() + ((m.gosc == t) & (m.pa > m.pg)).sum())
+        return w, len(m)
+    (wh, nh), (wg, ng) = forma(h), forma(g)
+    print(f'\nDRUGIE ZRODLO — forma z ostatnich meczow (N {nh}/{ng}), niezalezna od modelu:')
+    if min(nh, ng) < DZ_MIN_MECZOW:
+        print(f'  BRAK DRUGIEGO ZRODLA (mniej niz {DZ_MIN_MECZOW} meczow jednej z druzyn) — ZADNA noga z tego meczu NIE idzie na kupon.')
+        return None
+    rh, rg = (wh + 1) / (nh + 2), (wg + 1) / (ng + 2)
+    pf_h = rh * (1 - rg) / (rh * (1 - rg) + rg * (1 - rh))   # log5 (Bill James): P(h > g) z odsetkow zwyciestw
+    fm, pm = (h, p_h) if p_h >= 0.5 else (g, 1 - p_h)
+    ff, pf = (h, pf_h) if pf_h >= 0.5 else (g, 1 - pf_h)
+    pf_tego = pf_h if fm == h else 1 - pf_h
+    print(f'  bilans: {h} {wh}/{nh} wygranych, {g} {wg}/{ng}')
+    print(f'  FAWORYT WG MODELU: {fm} {pm:.1%}   |   FAWORYT WG FORMY: {ff} {pf:.1%}')
+    if fm != ff:
+        print('  ROZNI FAWORYCI → NIE NA KUPON')
+        return None
+    if abs(pm - pf_tego) > DZ_PROG:
+        print(f'  ROZBIEZNE ({(pf_tego - pm) * 100:+.0f} pp) → NIE NA KUPON')
+        return None
+    print(f'  ZGODNE → P do kuponu {min(pm, pf_tego):.1%} ({fm}; mniejsze z dwoch)')
+    print('  Zasada (Poprawka 51): gdy liga jest tez w arkuszu statystyk, noga musi byc zgodna rowniez z sezon.py.')
+    return min(pm, pf_tego)
+
+
+def _ligi_druzyny(x, t, min_m=3):
+    v = pd.concat([x.loc[x.gosp == t, 'liga'], x.loc[x.gosc == t, 'liga']]).value_counts()
+    return set(v[v >= min_m].index)
+
+
+def wspolna_skala(d, sport, h, g, dni=730):
+    """Czy ligi obu druzyn sa polaczone meczami (inaczej Elo z roznych basenow jest nieporownywalne).
+    Polaczenie: wspolna liga ALBO >= 2 ROZNE inne druzyny grajace (>= 3 mecze) w lidze h i w lidze g
+    ALBO >= 3 mecze miedzy druzynami z tych lig (puchary: CHL, EuroLiga). Jedna druzyna, ktora spadla,
+    NIE wystarcza — to ona robila falszywe polaczenie SHL–Allsvenskan."""
+    x = d[(d.sport == sport) & (d.data >= d.data.max() - pd.Timedelta(days=dni))]
+    Lh, Lg = _ligi_druzyny(x, h), _ligi_druzyny(x, g)
+    if not Lh or not Lg or Lh & Lg: return True, Lh, Lg
+    c = pd.concat([x[['liga', 'gosp']].rename(columns={'gosp': 't'}), x[['liga', 'gosc']].rename(columns={'gosc': 't'})])
+    cnt = c.groupby(['t', 'liga']).size()
+    cnt = cnt[cnt >= 3].reset_index()
+    wh = set(cnt[cnt.liga.isin(Lh)].t) - {h, g}
+    wg = set(cnt[cnt.liga.isin(Lg)].t) - {h, g}
+    if len(wh & wg) >= 2: return True, Lh, Lg
+    th, tg = set(cnt[cnt.liga.isin(Lh)].t), set(cnt[cnt.liga.isin(Lg)].t)
+    krzyz = x[((x.gosp.isin(th - tg)) & (x.gosc.isin(tg - th))) | ((x.gosp.isin(tg - th)) & (x.gosc.isin(th - tg)))]
+    return len(krzyz) >= 3, Lh, Lg
+
 
 
 def main(a):
@@ -746,6 +824,11 @@ def main(a):
             if sport in MAPOWE:
                 bo3 = ec ** 2 * (3 - 2 * ec); bo5 = ec ** 3 * (10 - 15 * ec + 6 * ec ** 2)
                 print(f'  {"1 seria Bo3":<32} {bo3:6.1%}\n  {"2 seria Bo3":<32} {1 - bo3:6.1%}\n  {"1 seria Bo5":<32} {bo5:6.1%}\n  {"2 seria Bo5":<32} {1 - bo5:6.1%}')
+        ok_, Lh_, Lg_ = wspolna_skala(d, sport, h, g)
+        if not ok_:
+            print(f'  ROZNE LIGI BEZ WSPOLNEJ SKALI: {h} ({", ".join(sorted(Lh_))}) i {g} ({", ".join(sorted(Lg_))}) — '
+                  f'Elo z rozlacznych basenow, P NIEPOROWNYWALNE; nie buduj nogi kuponu z tego meczu, takze papierowej.')
+        drugie_zrodlo(d, sport, h, g, ec)
         stale = [t for t in (h, g) if t in L_ and (pd.Timestamp.today() - L_[t]).days > 150]
         if stale: print('  OSTRZEŻENIE: ostatni mecz w bazie >150 dni temu dla:', ', '.join(stale), '— sprawdź transfery/formę w sieci, korekta maks. ±6 pp.')
         print(f'  {note}')
