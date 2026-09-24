@@ -466,6 +466,14 @@ _ALIASY_RECZNE = {
     'riesenludwigsburg': 'N.R. Ludwigsburg', 'mhpriesenludwigsburg': 'N.R. Ludwigsburg',
     'semelbournephoenix': 'South East Melbourne', 'southeastmelbournephoenix': 'South East Melbourne',
     'perthwildcats': 'Perth',
+    # Poprawka 45 (24.09.2026): hokej — Liga Alpejska (Flashscore), PHL (365: nazwa sponsora), EHL (Flashscore)
+    'stssanok': 'Ciarko PBS Bank', 'ciarkostssanok': 'Ciarko PBS Bank', 'ciarkopbsbanksanok': 'Ciarko PBS Bank',
+    'hddjesenice': 'Acroni Jesenice', 'hcasiago': 'Asiago', 'dieadlerkitzbuhel': 'Kitzbuhel', 'ecdieadlerkitzbuhel': 'Kitzbuhel',
+    'unterlandcavaliers': 'Unterland', 'wipptalbroncos': 'Vipiteno', 'hcgherdeina': 'Gherdeina', 'rittensport': 'Ritten',
+    'hcmerano': 'Merano', 'sgcortina': 'Cortina', 'sgcortinahafro': 'Cortina', 'zellereisbaren': 'Eisbaren',
+    'ringerikepanthers': 'Ringerike',
+    # koszykowka — Basketligaen (365): Bears Academy Aarhus = EBAA Aarhus (eurobasket), Holbaek-Stenhus = Bc Holbaek
+    'bearsacademyaarhus': 'EBAA Aarhus', 'ebcholbaekstenhus': 'Bc Holbæk', 'holbaekstenhus': 'Bc Holbæk',
     # WNBA: STS oznacza [K], w bazie druzyny WNBA sa bez znacznika (liga jest wylacznie kobieca)
     'atlantadreamk': 'Atlanta Dream', 'atlantadreamw': 'Atlanta Dream',
     'chicagoskyk': 'Chicago Sky', 'chicagoskyw': 'Chicago Sky',
