@@ -267,6 +267,41 @@ NAZWA_PL = {'mma': 'mma', 'boxing': 'boks', 'field-hockey': 'hokej na trawie', '
 WYGRANA = {'mma', 'boks', 'krykiet'}   # liczy się zwycięzca, nie punkty
 
 
+
+# Poprawka 44 (24.09.2026): hokej z Flashscore. 365scores nie prowadzi sezonu 2026/27 Liigi, SHL, DEL,
+# czeskiej Extraligi ani szwajcarskiej NL (zmierzone: allscores 23.09 zwraca tylko NHL, KHL, Danie, Slowacje;
+# Liiga: ostatni mecz 13.05.2026, terminarz pusty), wiec Apps Script pobiera hokej takze z Flashscore
+# (FS_SPORTY 4: 'hockey'). Ten sam mecz z dwoch zrodel mialby rozne nazwy druzyn i liczylby sie DWA razy
+# (jak NFL/KBO/NPB przed 23.09). Zasada: wiersz hokeja z Flashscore zostaje TYLKO, gdy 365scores nie ma
+# zadnego meczu hokeja z tego kraju w tym dniu. Kraj z Flashscore ("FINLAND") ujednolicony do zapisu 365.
+_KRAJ_FS = {'czech republic': 'Czechia', 'usa': 'USA', 'south korea': 'South Korea', 'great britain': 'England'}
+
+
+def _kraj_365(k):
+    k = str(k).strip()
+    return _KRAJ_FS.get(k.lower(), k.title() if k.isupper() else k)
+
+
+def _hokej_fs_bez_dubli(s):
+    fs = czytaj('wyniki_fs_inne_*.csv')
+    if not len(fs) or not len(s): return s
+    hk = lambda d: d.sport.isin(['hockey', 'ice-hockey'])
+    fs = fs[hk(fs)]
+    if not len(fs): return s
+    kol = list(s.columns)
+    klucz_fs = set(map(tuple, fs[kol].astype(str).values))
+    jest_fs = pd.Series([tuple(r) in klucz_fs for r in s[kol].astype(str).values], index=s.index) & hk(s)
+    kraj = s.kraj.map(_kraj_365)
+    dzien_365 = set(zip(s.loc[hk(s) & ~jest_fs, 'data'].str[:10], kraj[hk(s) & ~jest_fs].str.lower()))
+    dubel = jest_fs & pd.Series([(d[:10], k.lower()) in dzien_365 for d, k in zip(s.data, kraj)], index=s.index)
+    if jest_fs.any():
+        print(f'  zewn: hokej z Flashscore: {int(jest_fs.sum())} meczow, odrzucono {int(dubel.sum())} '
+              f'(ten kraj i dzien sa juz w 365scores), zostaje {int((jest_fs & ~dubel).sum())}.')
+    zostaje = jest_fs & ~dubel
+    s = s.copy()
+    s.loc[zostaje, 'kraj'] = kraj[zostaje]
+    return s[~dubel]
+
 def inne():
     """Sporty drużynowe i indywidualne (bez tenisa) → wiersze w formacie sporty_hist (data,sport,liga,gosp,gosc,pg,pa,dogrywka)."""
     s = czytaj('wyniki_*_inne_*.csv')
@@ -274,6 +309,7 @@ def inne():
     # te ligi sa z GitHuba (hist_import: nhl/espn/mlb/nfl/kbo_npb). 23.09.2026: NFL, KBO i NPB nie byly
     # wykluczone i wchodzily DRUGI raz pod innymi nazwami druzyn ("USA | NFL" obok "NFL", "Japan | NPB" obok "NPB").
     s = s[~(s.kraj + ' ' + s.turniej).str.contains(r'\b(?:NHL|NBA|WNBA|MLB|NFL|KBO|NPB)\b')]
+    s = _hokej_fs_bez_dubli(s)
     rows = []
     s = s.assign(sport=s.sport.map(lambda x: ALIAS_SPORT.get(x, x)))
     kt = s.kraj + ' ' + s.turniej
