@@ -184,15 +184,22 @@ def main():
         print("\n  To NIE jest przerwa w sezonie — to dzien pobrany w polowie.")
         print("  Najczestsza przyczyna: pliki 365 z Dysku nie zostaly odswiezone po zamknieciu dnia.")
         print("  Napisz o tym w raporcie i traktuj forme z tych dni jako niepelna.")
-        zle += len(niepelne)
 
     print()
     print("Spojnosc nazw druzyn (mecze fizycznie niemozliwe):")
-    zle += niemozliwe_mecze()
+    nm = niemozliwe_mecze()
 
+    # 23.09.2026 (wyd. 24): podsumowanie liczylo razem trzy rozne rzeczy jako "zrodla poza progiem",
+    # przez co przy tabeli z samymi "ok" wypisywalo "1 zrodel poza progiem" (to byl dzien niepelny 22.09).
+    # Kod wyjscia bez zmian (1 przy dowolnym problemie); zmienia sie tylko opis.
     print()
+    czesci = []
+    if zle: czesci.append(f"{zle} zrodel PRZETERMINOWANYCH (tabela wyzej)")
+    if niepelne: czesci.append(f"{len(niepelne)} dni NIEPELNYCH")
+    if nm: czesci.append(f"{nm} problemow spojnosci nazw")
+    zle += len(niepelne) + nm
     if zle:
-        print(f"UWAGA: {zle} zrodel poza progiem. Napisz o tym w raporcie i NIE udawaj, ze dane sa aktualne.")
+        print(f"UWAGA: {'; '.join(czesci)}. Napisz o tym w raporcie i NIE udawaj, ze dane sa aktualne.")
         print("Jesli przeterminowane sa 'pliki zewn/' — dociagnij biezacy miesiac z Dysku i powtorz hist_import.py.")
     else:
         print("Wszystkie bazy w normie — mozesz analizowac.")

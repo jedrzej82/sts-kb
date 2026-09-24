@@ -287,7 +287,7 @@ def main():
     print(s.groupby(['sport', 'grupa']).agg(mecze=('gosp', 'size'), od=('data', 'min'), do=('data', 'max')).to_string())
     t = tenis()
     try:
-        import zewn; z = zewn.tenis(max_tcl=t.date.max())
+        import zewn; z = zewn.tenis(max_tcl=t.date.max(), glowne=t)   # dane glowne z pamieci, nie z pliku wynikowego
         if len(z):
             z['date'] = pd.to_datetime(z.date)
             # 23.09.2026: mecze Pucharu Davisa i czesci WTA 250 sa i w danych glownych, i w 365scores. Usuwamy

@@ -155,8 +155,21 @@ def _znaczniki(s):
     # nawiasow token "[K]" nie pasowal do wzorca i "Club Leon [K]" dopasowywalo sie
     # do meskiego "Club Leon" — zmierzone na 5 meczach w przebiegu 21:00 dnia 21.09,
     # bez zadnego ostrzezenia. Model liczyl mecze meskie dla zdarzen kobiecych.
-    return sum(1 for t in re.split(r'[\s]+', str(s).strip())
-               if _ZNACZNIK.match(t.strip('[](){}<>.,;:')))
+    # 23.09.2026 (wyd. 24, recenzja): liczyl tylko ILE jest znacznikow, nie JAKIE — "Barcelona (K)"
+    # (kobiety) trafiala na "Barcelona B" (rezerwy), a "Real Madryt [K]" na "Real Madrid C", bo po obu
+    # stronach byl jeden znacznik. Teraz porownujemy RODZAJE: kobiety / rezerwy B / zespol C /
+    # kategoria wiekowa (z rocznikiem) / mlodziez ogolnie.
+    out = []
+    for t in re.split(r'[\s]+', str(s).strip()):
+        t = t.strip('[](){}<>.,;:')
+        if not _ZNACZNIK.match(t): continue
+        t = t.lower().rstrip('.')
+        if re.match(r'^(k|w|women|kobiet[ay]?|damen|femenino|femenil|feminin[oa]?|fem)$', t): out.append('kobiety')
+        elif re.match(r'^(b|ii|2|res|reserves?)$', t): out.append('rezerwy')
+        elif re.match(r'^(c|iii|3)$', t): out.append('zespol_c')
+        elif re.match(r'^(u|sub)-?\d+$', t): out.append('u' + re.sub(r'\D', '', t))
+        else: out.append('mlodziez')
+    return tuple(sorted(out))
 
 
 def _rezerwa_a_nie_pierwsza(zrodlo, kandydat):
@@ -373,6 +386,91 @@ def _skrot_albo_nic(name, wyn, pula):
     return None
 
 
+# 23.09.2026 (wyd. 24): STS pisze "Panathinaikos Ateny [K]" i "Emlak Konut SK [K]", baza 365scores ma
+# "Panathinaikos (W)" i "Emlak Konut (W)". Znacznik kobiet po obu stronach mial inna litere ([K] vs (W)),
+# a STS dokleja polska nazwe miasta i forme prawna — zadna sciezka nie dawala trafienia.
+# Porownujemy RDZEN: czlony bez form prawnych (_OGOLNE), z polska nazwa miasta PRZETLUMACZONA
+# (Mediolan -> milan/milano), ze znacznikiem kobiet sprowadzonym do jednego. Dwa kroki:
+#   1) rdzen rowny rdzeniowi kandydata (miasto przetlumaczone) i kandydat jeden -> trafienie;
+#   2) dopiero gdy 1) nic nie dal: miasto w ogole pominiete ("Panathinaikos Ateny" -> "Panathinaikos"),
+#      ale TYLKO gdy zaden inny wpis w puli nie zaczyna sie ani nie konczy tym samym rdzeniem — recenzja:
+#      "Real Madryt" -> "Real Club", "Sparta Praga" -> "Sparta" (Argentyna), "Olimpia Mediolan" -> "Olimpia"
+#      (Paragwaj) przy wersji, ktora miasto po prostu wycinala.
+# Znacznik kobiet jest czescia rdzenia, wiec druzyna kobieca nie trafi w meska i odwrotnie.
+_MIASTA_PL = {'madryt': ('madrid',), 'monachium': ('munich', 'munchen', 'muenchen'), 'wieden': ('wien', 'vienna'),
+              'lizbona': ('lisbon', 'lisboa'), 'mediolan': ('milan', 'milano'), 'rzym': ('roma', 'rome'),
+              'neapol': ('napoli', 'naples'), 'turyn': ('torino', 'turin'), 'ateny': ('athens', 'athina'),
+              'sewilla': ('sevilla', 'seville'), 'walencja': ('valencia',), 'stambul': ('istanbul',),
+              'kopenhaga': ('copenhagen', 'kobenhavn'), 'bruksela': ('brussels', 'bruxelles'),
+              'belgrad': ('belgrade', 'beograd'), 'moskwa': ('moscow', 'moskva'), 'praga': ('prague', 'praha'),
+              'bukareszt': ('bucharest', 'bucuresti'), 'sztokholm': ('stockholm',), 'kijow': ('kyiv', 'kiev'),
+              'lwow': ('lviv', 'lvov'), 'zagrzeb': ('zagreb',), 'genua': ('genoa', 'genova'),
+              'saloniki': ('thessaloniki',), 'pireus': ('piraeus', 'pireas')}
+_KOBIETY = frozenset('k w women kobiety kobiet'.split())
+# dlugie, ale OGOLNE rdzenie — wiele klubow na swiecie (recenzja: "Instituto", "Politechnika")
+_OGOLNE_DLUGIE = frozenset('instituto politechnika universidad university universitario universitatea '
+                           'uniwersytet independiente deportivo deportiva municipal internacional '
+                           'nacional'.split())
+
+
+def _rdzen(s, miasto=None):
+    """miasto=None: nazwy miast zostaja jak sa; 'bez': polskie nazwy miast wyciete;
+    krotka wariantow: polska nazwa miasta zamieniona na podany wariant."""
+    t = list(_tokeny(s))
+    kob = bool(t) and t[-1] in _KOBIETY
+    if kob: t = t[:-1]
+    out = []
+    for x in t:
+        if x in _OGOLNE: continue
+        if x in _MIASTA_PL and miasto is not None:
+            if miasto == 'bez': continue
+            x = miasto.get(x, x)
+        out.append(x)
+    return tuple(out) + (('#kobiety',) if kob else ())
+
+
+def _rdzen_rowny(name, kandydaci):
+    kandydaci = list(kandydaci)
+    rk = {p: _rdzen(p) for p in kandydaci}
+    miasta = [x for x in _tokeny(name) if x in _MIASTA_PL]
+    # krok 1: miasto przetlumaczone na kazdy z wariantow
+    warianty = [None] if not miasta else [dict(zip(miasta, c)) for c in
+                                          __import__('itertools').product(*[_MIASTA_PL[m] for m in miasta])]
+    traf = set()
+    for w_ in warianty:
+        r = _rdzen(name, w_) if w_ is not None else _rdzen(name)
+        if len(''.join(x for x in r if x != '#kobiety')) < 4: continue
+        traf |= {p for p in kandydaci if rk[p] == r}
+    if len(traf) == 1:
+        wyn = next(iter(traf))
+        if norm(wyn) != norm(name):
+            print(f'  UWAGA: "{name}" dopasowane po rdzeniu nazwy (forma prawna/miasto/znacznik kobiet) -> "{wyn}".')
+        return wyn
+    if len(traf) > 1 or not miasta: return None
+    # krok 2: miasto pominiete, tylko przy jednoznacznym rdzeniu
+    r = _rdzen(name, 'bez')
+    baza_ = [x for x in r if x != '#kobiety']
+    # rdzen po wycieciu miasta musi byc SAM W SOBIE rozpoznawalny: co najmniej dwa czlony albo jeden
+    # dlugi ("panathinaikos", "olympiakos"). "Sparta", "Olimpia", "Real" to nazwy wielu klubow na
+    # swiecie, a sporty.py nie ma kontroli kraju — pula moze nie miec wlasciwego klubu wcale.
+    if not (len(baza_) >= 2 or (len(baza_) == 1 and len(baza_[0]) >= 9 and baza_[0] not in _OGOLNE_DLUGIE)):
+        return None
+    traf = [p for p in kandydaci if rk[p] == r]
+    if len(traf) != 1: return None
+    baza = tuple(x for x in r if x != '#kobiety')
+    kob = '#kobiety' in r
+    def _b(p): return tuple(x for x in rk[p] if x != '#kobiety')
+    # inne druzyny TEJ SAMEJ kategorii (meskie/kobiece), ktorych rdzen zaczyna sie albo konczy tym rdzeniem
+    inne = [p for p in kandydaci if p != traf[0] and ('#kobiety' in rk[p]) == kob and len(_b(p)) > len(baza)
+            and (_b(p)[:len(baza)] == baza or _b(p)[-len(baza):] == baza)]
+    if inne:
+        print(f'  ODRZUCONO: "{name}" -> "{traf[0]}" po pominieciu nazwy miasta, ale rdzen maja tez: '
+              f'{", ".join(sorted(inne)[:4])} — noga MNIEJ.')
+        return None
+    print(f'  UWAGA: "{name}" dopasowane po pominieciu polskiej nazwy miasta -> "{traf[0]}".')
+    return traf[0]
+
+
 def resolve(name, pool):
     """Zwraca nazwe z bazy albo None. None JEST POPRAWNYM WYNIKIEM — wolacz ma sie wtedy zatrzymac.
     21.09.2026: naprawiona ta sama usterka, ktora wykryto w typuj.py. Nazwa zapisana cyrylica
@@ -384,6 +482,7 @@ def resolve(name, pool):
     dostawalo dopasowanie. Dlatego ponizej odrzucamy z puli wszystkie klucze puste."""
     k_ = norm(name)
     if not k_: return None
+    pool = {p for p in pool if isinstance(p, str)}   # recenzja: NaN w puli rugby wywracal sorted()
     _kr = _kraj_pl(name, pool)
     if _kr: return _kr
     # sorted(): pool to zbior, a kolejnosc iteracji zbioru zalezy od losowego ziarna
@@ -400,6 +499,8 @@ def resolve(name, pool):
         print(f'  UWAGA: "{name}" pasuje do {len(_kol[k_])} roznych wpisow w bazie '
               f'({", ".join(sorted(_kol[k_]))}) — sprawdz, ktory to.')
     if k_ in by: return by[k_]
+    r = _rdzen_rowny(name, by.values())
+    if r: return r
     c = [p for p in by.values() if _zaw_nazwy(name, p)]
     if c:
         if len(c) == 1:

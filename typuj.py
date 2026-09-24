@@ -59,8 +59,21 @@ def _znaczniki(s):
     # nawiasow token "[K]" nie pasowal do wzorca i "Club Leon [K]" dopasowywalo sie
     # do meskiego "Club Leon" — zmierzone na 5 meczach w przebiegu 21:00 dnia 21.09,
     # bez zadnego ostrzezenia. Model liczyl mecze meskie dla zdarzen kobiecych.
-    return sum(1 for t in re.split(r'[\s]+', str(s).strip())
-               if _ZNACZNIK.match(t.strip('[](){}<>.,;:')))
+    # 23.09.2026 (wyd. 24, recenzja): liczyl tylko ILE jest znacznikow, nie JAKIE — "Barcelona (K)"
+    # (kobiety) trafiala na "Barcelona B" (rezerwy), a "Real Madryt [K]" na "Real Madrid C", bo po obu
+    # stronach byl jeden znacznik. Teraz porownujemy RODZAJE: kobiety / rezerwy B / zespol C /
+    # kategoria wiekowa (z rocznikiem) / mlodziez ogolnie.
+    out = []
+    for t in re.split(r'[\s]+', str(s).strip()):
+        t = t.strip('[](){}<>.,;:')
+        if not _ZNACZNIK.match(t): continue
+        t = t.lower().rstrip('.')
+        if re.match(r'^(k|w|women|kobiet[ay]?|damen|femenino|femenil|feminin[oa]?|fem)$', t): out.append('kobiety')
+        elif re.match(r'^(b|ii|2|res|reserves?)$', t): out.append('rezerwy')
+        elif re.match(r'^(c|iii|3)$', t): out.append('zespol_c')
+        elif re.match(r'^(u|sub)-?\d+$', t): out.append('u' + re.sub(r'\D', '', t))
+        else: out.append('mlodziez')
+    return tuple(sorted(out))
 
 
 # 23.09.2026, USTERKA U5: Asociacion Deportivo Cali jest w bazie jako 'AD Cali'.
@@ -73,6 +86,14 @@ for _k, _v in {'libertadasuncion': 'Libertad', 'clublibertad': 'Libertad',
                'cafenixmontevideo': 'Fénix', 'fenixmontevideo': 'Fénix', 'centroatleticofenix': 'Fénix',
                'colonfc': 'Colon', 'colonfcmontevideo': 'Colon', 'santoslaguna': 'Santos Laguna',
                'clubsantoslaguna': 'Santos Laguna'}.items():
+    ALIASES.setdefault(_k, _v)
+# 23.09.2026 (wyd. 24): polskie nazwy STS dla klubow, ktorych nie ratuje zamiana nazwy miasta
+# (sprawdzone recznie na kb.sqlite 23.09.2026; kazdy cel ma setki meczow w lidze swojego kraju).
+for _k, _v in {'sportinglizbona': 'Sp Lisbon', 'sportinglisbon': 'Sp Lisbon',
+               'szachtardonieck': 'Shakhtar Donetsk', 'szachtar': 'Shakhtar Donetsk',
+               'crvenazvezdabelgrad': 'Red Star [serbia]', 'crvenazvezda': 'Red Star [serbia]',
+               'olympiakospireus': 'Olympiakos', 'olympiakos': 'Olympiakos',
+               'juventusturyn': 'Juventus', 'betissewilla': 'Betis', 'realbetissewilla': 'Betis'}.items():
     ALIASES.setdefault(_k, _v)
 
 # 23.09.2026: warianty nazw z recznej listy kluby.py (ten sam klub, inny zapis w zrodlach) — oferta STS moze
@@ -484,6 +505,28 @@ def _z_meczami(t, m):
     return t
 
 
+# 23.09.2026 (wyd. 24): STS pisze nazwy miast po polsku ("Real Madryt Castilla", "Austria Wiedeń",
+# "Panathinaikos Ateny"), a baza ma zapis zrodlowy. Zamiana calych CZLONOW nazwy, i to dopiero wtedy,
+# gdy nazwa oryginalna nie dala trafienia — dopasowanie po zamianie przechodzi przez te same
+# zabezpieczenia resolve() (znaczniki rezerw/kobiet, kontrola kraju), wiec nie omija zadnej blokady.
+EGZONIMY = {'madryt': 'Madrid', 'monachium': 'Munich', 'wieden': 'Wien', 'lizbona': 'Lisbon',
+            'mediolan': 'Milan', 'rzym': 'Roma', 'neapol': 'Napoli', 'turyn': 'Torino', 'ateny': 'Athens',
+            'sewilla': 'Sevilla', 'walencja': 'Valencia', 'stambul': 'Istanbul', 'kopenhaga': 'Copenhagen',
+            'bruksela': 'Brussels', 'belgrad': 'Belgrade', 'moskwa': 'Moscow', 'praga': 'Prague',
+            'bukareszt': 'Bucharest', 'sztokholm': 'Stockholm', 'kijow': 'Kyiv', 'lwow': 'Lviv',
+            'zagrzeb': 'Zagreb', 'genua': 'Genoa', 'saloniki': 'Thessaloniki', 'pireus': 'Piraeus'}
+
+
+def _przez_egzonim(name, pool):
+    czl = str(name).split()
+    nowe = [EGZONIMY.get(norm(c), c) for c in czl]
+    if nowe == czl: return None
+    alt = ' '.join(nowe)
+    r = resolve(alt, pool)
+    if r: print(f'  UWAGA: "{name}" dopasowane po zamianie polskiej nazwy miasta -> "{alt}" -> {r}.')
+    return r
+
+
 def club(home, away, kursy, live=None):
     con = db()
     m = pd.read_sql('select * from matches', con, parse_dates=['MatchDate'])
@@ -492,8 +535,8 @@ def club(home, away, kursy, live=None):
     pool = set(m.HomeTeam) | set(m.AwayTeam) | set(elo.index)
     wczytaj_warianty(con)
     jh, ja = _jawny_kraj(home, pool, m), _jawny_kraj(away, pool, m)
-    h = jh or resolve(home, pool)
-    a = ja or resolve(away, pool)
+    h = jh or resolve(home, pool) or _przez_egzonim(home, pool)
+    a = ja or resolve(away, pool) or _przez_egzonim(away, pool)
     h, a = _z_meczami(h, m), _z_meczami(a, m)
     jawne = (bool(jh) or bool(_PRZYR.match(str(home).strip())), bool(ja) or bool(_PRZYR.match(str(away).strip())))
     h, a = _wariant_kraju(h, a, m, pool, jawne)
@@ -547,6 +590,15 @@ def club(home, away, kursy, live=None):
     eh, ea = (elo.elo.get(h), elo.elo.get(a))
     lel = elo_lambdas(glm, eh, ea, dh if dh == da else None) if eh and ea else None
     if lel is None: ostrz.append('Brak Elo jednej z drużyn.')
+    if dh != da and lel is None:
+        # 23.09.2026 (wyd. 24): Puchar Paragwaju, Fernando de la Mora (Division Intermedia) – Libertad
+        # (Primera): bez Elo zostaje samo pi, a oceny pi z dwoch roznych lig nie sa porownywalne
+        # (kazda liga ma wlasna srednia) — wyszlo Libertad 53% przy kursie 1,20. To nie jest
+        # szacunek z szerokim przedzialem, tylko liczba bez znaczenia. Wypisujemy od razu i
+        # oznaczamy jak szacunek; nogi z takiego meczu nie budujemy (instrukcja: puchary tylko papier).
+        msg = (f'ROZNE LIGI BEZ ELO: {h} ({dh}) i {a} ({da}) — model nie zna roznicy poziomu lig, '
+               f'P NIEPOROWNYWALNE; nie buduj nogi kuponu z tego meczu.')
+        print('  ' + msg); ostrz.append(msg)
     lpi = None
     try:
         from pi import prepare, fit_pi_glm, pi_lambdas, gd_hat_for
@@ -623,7 +675,7 @@ def club(home, away, kursy, live=None):
     # pewnosci. Nacional Potosi - Real Potosi (22.09): obie druzyny NIESWIEZE (370 i 1738 dni), model
     # tylko z pi, a wydruk pokazywal 1X 98,6% z gwiazdka. Wtedy: przedzial zamiast dziesiatych procenta
     # i bez gwiazdek. Liczby do EV (value) zostaja jak byly — to czesc obliczeniowa, nie komunikat.
-    szac = [o for o in ostrz if 'NIESWIEZA' in o or 'TYLKO JEDEN MODEL' in o]
+    szac = [o for o in ostrz if 'NIESWIEZA' in o or 'TYLKO JEDEN MODEL' in o or 'ROZNE LIGI BEZ ELO' in o]
     if szac:
         print('SZACUNEK — P JAKO PRZEDZIAL, BEZ ★ (' + '; '.join(o.split(':')[0] for o in szac) + ')')
     for k, p, pc in sorted(rows, key=lambda r: -r[2]):
@@ -713,8 +765,26 @@ def intl(home, away, neutral, kursy):
     mk = markets(lh, la, -0.05)
     print(f'\n=== {h} – {a} | Elo {R[h]:.0f} vs {R[a]:.0f} {"(neutralny)" if neutral else ""} ===')
     print(f'Oczekiwane gole: {lh:.2f} – {la:.2f} | wyniki: {mk["wyniki"]}')
-    rows = [(k, mk[k], mk[k]) for k in KEY_MARKETS]
-    for k, p, _ in sorted(rows, key=lambda r: -r[1]): print(f'{k:<18}{p:7.1%}' + (' ★' if p >= 0.75 else ''))
+    # 23.09.2026 (wyd. 24), USTERKA z przebiegu 20:00 (Aruba – Antigua, Turks i Caicos – Montserrat):
+    # (1) sciezka reprezentacji nie miala kontroli swiezosci — Antigua (ostatni mecz 18.11.2025)
+    #     i Montserrat (10.06.2025) dostawaly gwiazdki jak druzyny z pelna forma. Reprezentacje graja
+    #     oknami FIFA, wiec prog jest dluzszy niz 60 dni u klubow: 270 dni = trzy okna bez meczu;
+    # (2) rynki „poniżej” nie mialy −4 pp (sciezka klubowa ma je w P_skalibr.) — ta sama regula tu.
+    today = pd.Timestamp(dt.date.today()); szac = []
+    for t in (h, a):
+        ost = pd.to_datetime(df.loc[(df.home_team == t) | (df.away_team == t), 'date']).max()
+        if pd.notna(ost) and (today - ost).days > 270:
+            szac.append(f'REPREZENTACJA {t} NIESWIEZA: ostatni mecz w bazie {ost.date()} '
+                        f'({(today - ost).days} dni temu)')
+    rows = [(k, mk[k], max(mk[k] - 0.04, 0.0) if k.startswith('U') and mk[k] >= 0.5 else mk[k]) for k in KEY_MARKETS]
+    for x in szac: print('  ' + x + ' — P to SZACUNEK: podawaj przedzial; max 1 noga na kupon.')
+    print('\nRynek            P_model  P_skalibr.   („poniżej” już −4 pp — nie odejmuj drugi raz)')
+    if szac: print('SZACUNEK — P JAKO PRZEDZIAL, BEZ ★ (' + '; '.join(x.split(':')[0] for x in szac) + ')')
+    for k, p, pc in sorted(rows, key=lambda r: -r[2]):
+        if szac:
+            print(f'{k:<18}{p:7.1%}  ok. {max(pc - 0.10, 0.0):.0%}–{min(pc + 0.10, 0.95):.0%}')
+        else:
+            print(f'{k:<18}{p:7.1%}  {pc:7.1%}' + (' ★' if pc >= 0.75 else ''))
     for t in (h, a):
         t10 = df[(df.home_team == t) | (df.away_team == t)].tail(6)
         print(f'\n{t} ost. 6:', ' | '.join(f'{r.date} {r.home_team} {int(r.home_score)}:{int(r.away_score)} {r.away_team} ({r.tournament})' for r in t10.itertuples()))

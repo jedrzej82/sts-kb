@@ -253,7 +253,7 @@ def main(a):
             print(f'  {k.replace("A ", A + " ").replace("B ", B + " "):<34} {cal_apply("esport_cs2", fam, v) if fam else v:6.1%}')
     elif a[0] == 'tenis':
         import tenis as T
-        st = T.state(); pl = set(st['R']); T.NCOUNT.update(st['N'])
+        st = T.state(); pl = set(st['R']); T.NCOUNT.update(st['N']); T.ALIASY.update(st.get('alias', {}))
         A, B = T.resolve(a[1], pl), T.resolve(a[2], pl)
         surf = 'Clay' if '--clay' in a else 'Grass' if '--grass' in a else 'Hard'; bo5 = '--bo5' in a
         if not A or not B: sys.exit('Brak zawodnika w bazie.')

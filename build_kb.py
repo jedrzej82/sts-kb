@@ -343,7 +343,7 @@ def wymus_jeden_mecz_dziennie(allm):
 
     Po naprawie nazw i dat zostaja pojedyncze wiersze, ktorych nie da sie pogodzic
     z terminarzem — najczesciej zrodlo podalo zlego rywala albo zla date, np.:
-        FK Proleter Novi Sad 0:0 FK Metalac   \  ten sam wynik, ten sam rywal,
+        FK Proleter Novi Sad 0:0 FK Metalac   \\  ten sam wynik, ten sam rywal,
         Proleter 023 Zrenjanin 0:0 FK Metalac /   dwa ROZNE kluby jako gospodarz
         FK Pohronie 3:1 Bytca  obok  FK Pohronie 3:1 MFK Skalica
     Nie scalamy ich po nazwie — jedno wystapienie to za malo, zeby uznac dwie nazwy

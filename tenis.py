@@ -29,8 +29,138 @@ def load():
     d = d[~d.score.astype(str).str.contains('W/O|RET|DEF|Walkover|w/o|Ret', na=False)]
     d['surface'] = d.surface.fillna('Hard').replace({'Carpet': 'Hard'})
     d = _scal_warianty(d)
+    d = _scal_zapisy(d)
     return d.sort_values('date', kind='stable').reset_index(drop=True)
 
+
+ALIASY = {}   # wariant nazwy -> nazwa, pod ktora zawodnik jest w bazie Elo (wypelnia load(), zapisuje state())
+
+
+def _scal_zapisy(d):
+    """23.09.2026 (wyd. 24): druga klasa wariantow, ktorej _scal_warianty nie widzi, bo porownuje
+    inicjaly czlonow:
+      (a) te same litery, inny podzial na czlony: "Xinyu Wang" (238 meczow), "Xin-Yu Wang" (5),
+          "Xin Yu Wang" (1); "Yexin Ma" (17) i "Ye Xin Ma" (6). norm() daje im ten sam klucz,
+          a resolve() bral PRZYPADKOWY z nich (ostatni wczytany) — w przebiegu 20:00 "Wang Xinyu"
+          trafila na rekord z 5 meczami, a "Ma Ye Xin" nie dopasowala sie wcale;
+      (c) te same czlony w innej kolejnosci: "Yunchaokete Bu" (4) i "Bu Yunchaokete" (94);
+      (b) wpis bez jednego z imion: "Daniel Vallejo" (4 mecze Pucharu Davisa dla Paragwaju)
+          i "Adolfo Daniel Vallejo" (88). Imiona krotszego zapisu musza byc podzbiorem imion
+          dluzszego, dluzszy ma DOKLADNIE jeden czlon wiecej i jest JEDEN, a kariery musza sie
+          NAKLADAC (przerwa <= 183 dni): recenzja znalazla "Karim Maamoun" (ur. 1979, gral do 2010)
+          i "Karim Mohamed Maamoun" (ur. 1995, od 2012) — przerwa 1,6 roku, dwie rozne osoby.
+    Zabezpieczenia wspolne: ta sama plec rozgrywek (wiekszosc >= 80% meczow), nigdy nie grali ze
+    soba, tego samego dnia moga miec tylko TEN SAM mecz (dubel z dwoch zrodel), aktywni po 2015,
+    bez skrotow jednoliterowych. Przerwa miedzy karierami: (a) bez limitu — identyczne litery to
+    ten sam zapis (identyczny zapis i tak jest w bazie jednym rekordem); (c) <= 3 lata; (b) <= 183 dni.
+    Laczenie grup sprawdza KAZDA pare czlonkow obu grup (bez przechodniego lancucha A~C, B~C).
+    Zostaje zapis z NAJWIEKSZA liczba meczow; pozostale trafiaja do ALIASY."""
+    plec = {'ATP': 'M', 'ITF': 'M', 'CH': 'M', 'WTA': 'W', 'ITF-W': 'W'}
+    w = d[['date', 'winner_name', 'loser_name', 'src']]
+    dl = pd.concat([w.rename(columns={'winner_name': 'n', 'loser_name': 'r'}).assign(wyg=1),
+                    w.rename(columns={'loser_name': 'n', 'winner_name': 'r'}).assign(wyg=0)])
+    dl = dl.assign(pl=dl.src.map(lambda x: plec.get(x, x)))
+
+    def _wiekszosc(s):
+        v = s.value_counts()
+        if not len(v) or v.iloc[0] < 0.8 * v.sum(): return None
+        # wyniki dopisane recznie (tenis_delta, src='delta') nie maja plci — nieznana plec = brak sklejenia
+        return v.index[0] if v.index[0] in ('M', 'W') else None
+    tour = dl.groupby('n').pl.agg(_wiekszosc).to_dict()
+    info = dl.groupby('n').agg(od=('date', 'min'), do=('date', 'max'), ile=('date', 'size'))
+    rywale = dl.groupby('n').r.apply(set).to_dict()
+    # mecze per dzien: {nazwa: {data: {(rywal, wygrana)}}}. Ten sam dzien u obu zapisow jest
+    # dopuszczalny TYLKO gdy to ten sam mecz (ten sam rywal i wynik) — to dubel z dwoch zrodel
+    # pod dwiema nazwami (np. Puchar Davisa 06.02.2026: Rocha pokonal "Yunchaokete Bu" i "Bu Yunchaokete").
+    dzien = {}
+    for n, dt, r, wg in zip(dl.n, dl.date, dl.r, dl.wyg):
+        dzien.setdefault(n, {}).setdefault(dt, set()).add((r, wg))
+    czl = {n: _czl_norm(n) for n in info.index}
+    bez_skrotow = {n for n, t in czl.items() if len(t) >= 2 and all(len(x) >= 2 for x in t)}
+
+    def zgodne(a, b, max_dni):
+        if tour.get(a) is None or tour.get(a) != tour.get(b): return False
+        if b in rywale.get(a, ()) or a in rywale.get(b, ()): return False
+        da, db = dzien[a], dzien[b]
+        if any(da[x] != db[x] for x in set(da) & set(db)): return False
+        if max(info.loc[a, 'do'], info.loc[b, 'do']) < pd.Timestamp('2015-01-01'): return False
+        if max_dni is None: return True
+        przerwa = max(info.loc[a, 'od'], info.loc[b, 'od']) - min(info.loc[a, 'do'], info.loc[b, 'do'])
+        return przerwa.days <= max_dni
+
+    grupa = {n: {n} for n in info.index}          # nazwa -> zbior czlonkow jej grupy (wspoldzielony)
+    def polacz(a, b, max_dni):
+        ga, gb = grupa[a], grupa[b]
+        if ga is gb: return
+        if not all(zgodne(x, y, max_dni) for x in ga for y in gb): return
+        g = ga | gb
+        for n in g: grupa[n] = g
+
+    # (a) ten sam ciag liter
+    kl = {}
+    for n in bez_skrotow:
+        k_ = norm(n)
+        if len(k_) >= 6: kl.setdefault(k_, []).append(n)
+    for ns in kl.values():
+        ns = sorted(ns)
+        for b in ns[1:]: polacz(ns[0], b, None)
+    # (c) te same czlony w innej kolejnosci
+    kl = {}
+    for n in bez_skrotow:
+        t = czl[n]
+        if len(''.join(t)) >= 6: kl.setdefault(tuple(sorted(t)), []).append(n)
+    for ns in kl.values():
+        ns = sorted(ns)
+        for b in ns[1:]: polacz(ns[0], b, 3 * 365)
+    # (b) krotszy zapis bez jednego z imion
+    po_nazwisku = {}
+    for n in bez_skrotow:
+        t = czl[n]
+        if len(t[-1]) >= 3: po_nazwisku.setdefault(t[-1], []).append(n)
+    for ns in po_nazwisku.values():
+        if len(ns) < 2: continue
+        for a in sorted(ns):
+            ia = set(czl[a][:-1])
+            # dokladnie JEDEN czlon wiecej: "Maria Sanchez" (USA) i "Maria Jose Martinez Sanchez"
+            # (ESP) to dwie rozne zawodniczki — przy dwoch dodatkowych czlonach dodatkowy czlon
+            # bywa drugim nazwiskiem, a nie imieniem.
+            dluzsze = [b for b in ns if b != a and ia < set(czl[b][:-1])
+                       and len(set(czl[b][:-1])) == len(ia) + 1]
+            if len(dluzsze) == 1:
+                polacz(a, dluzsze[0], 183)
+    mapa = {}
+    for g in {id(g): g for g in grupa.values() if len(g) > 1}.values():
+        cel = max(g, key=lambda n: (info.loc[n, 'ile'], n))
+        for n in g:
+            if n != cel: mapa[n] = cel
+    if mapa:
+        ow, ol = d.winner_name.values, d.loser_name.values
+        d = d.assign(winner_name=d.winner_name.replace(mapa), loser_name=d.loser_name.replace(mapa))
+        # Po sklejeniu dubel z dwoch zrodel staje sie identycznym wierszem (data, zwyciezca, przegrany).
+        # Usuwamy wiersz TYLKO wtedy, gdy jego grupa (data, zwyciezca, przegrany) powstala z CO NAJMNIEJ
+        # DWOCH roznych zapisow nazw — wtedy to ten sam mecz z dwoch zrodel. Wiersze jednego zapisu
+        # zostaja zawsze: w historii z lat 60.–90. data to poczatek turnieju i dwa mecze tych samych
+        # graczy z jedna data bywaja prawdziwe (round robin, 327 takich par w tenis_hist).
+        klucz = ['date', 'winner_name', 'loser_name']
+        tmp = d.assign(_org=[f'{a}|{b}' for a, b in zip(ow, ol)])
+        tmp = tmp.assign(_zm=[a in mapa or b in mapa for a, b in zip(ow, ol)])
+        tmp = tmp.assign(_ile_zap=tmp.groupby(klucz, sort=False)._org.transform('nunique'))
+        # w grupie z >=2 zapisami zostaje jeden wiersz: pierwszy nieprzepisany, a gdy takiego nie ma — pierwszy
+        tmp = tmp.assign(_prio=(~tmp._zm).astype(int))
+        tmp = tmp.assign(_nr=tmp.sort_values('_prio', ascending=False, kind='stable').groupby(klucz, sort=False).cumcount())
+        # zostaje tyle wierszy, ile ma NAJLICZNIEJSZY pojedynczy zapis w tej grupie (prawdziwe powtorzenia
+        # jednego zapisu, np. round robin, przetrwaja; kopia z drugiego zrodla odpada)
+        tmp = tmp.assign(_ile_org=tmp.groupby(klucz + ['_org'], sort=False)._org.transform('size'))
+        tmp = tmp.assign(_zostaw=tmp.groupby(klucz, sort=False)._ile_org.transform('max'))
+        wyrzuc = (tmp._ile_zap >= 2) & (tmp._nr >= tmp._zostaw)
+        przed = len(d)
+        d = d[~wyrzuc.values]
+        if len(d) < przed:
+            print(f'  tenis: po sklejeniu usunieto {przed - len(d)} zdublowanych meczow (ten sam mecz z dwoch zrodel pod dwiema nazwami)')
+        print(f'  tenis: sklejono {len(mapa)} zapisow tej samej osoby rozniacych sie podzialem na czlony, '
+              f'kolejnoscia albo brakiem jednego imienia (np. {", ".join(f"{a} -> {b}" for a, b in list(sorted(mapa.items()))[:3])})')
+    ALIASY.update(mapa)
+    return d
 
 
 def _scal_warianty(d):
@@ -80,6 +210,7 @@ def _scal_warianty(d):
         cel = max(ns, key=lambda n: (len(''.join(rozbior(n)[2])), info.loc[n, 'ile']))
         for n in ns:
             if n != cel: mapa[n] = cel
+    ALIASY.update(mapa)
     if mapa:
         d = d.assign(winner_name=d.winner_name.replace(mapa), loser_name=d.loser_name.replace(mapa))
         print(f'  tenis: sklejono {len(mapa)} wariantow nazwisk tego samego zawodnika '
@@ -195,6 +326,11 @@ def _resolve1(name, players):
     # Przy nazwie wieloczlonowej zadamy zgodnosci CO NAJMNIEJ DWOCH czlonow.
     if len(parts) > 1:
         c = [p for p in c if _wspolne_czlony(name, p) >= 2]
+        # 23.09.2026 (wyd. 24): kandydat pokrywajacy WSZYSTKIE czlony ma pierwszenstwo przed takim,
+        # ktoremu jednego brakuje ("Adolfo Daniel Vallejo" przed "Daniel Vallejo").
+        pelni = [p for p in c if _wspolne_czlony(name, p) >= len(parts)]
+        if pelni: c = pelni
+        elif len(parts) >= 3: c = []   # trzy czlony w ofercie, zaden kandydat nie ma wszystkich -> None
     if len(c) == 1: return c[0]
     if c and len(parts) == 1:
         # kilku zawodnikow o tym nazwisku, a w ofercie samo nazwisko — wybor po liczbie meczow
@@ -225,12 +361,42 @@ def _resolve1(name, players):
         # ta sama zasada co wyzej: przy nazwie wieloczlonowej rozmyte trafienie musi zgadzac
         # sie na dwoch czlonach, inaczej "Zink Tyler" i "Michelle Tyler" przechodza przez
         # difflib tylko dlatego, ze dziela czlon "Tyler".
-        if len(parts) > 1 and _wspolne_czlony(name, kand) < 2:
+        if len(parts) > 1 and _wspolne_czlony(name, kand) < min(len(parts), 3):
             print(f'  UWAGA: "{name}" -> rozmyte "{kand}" zgadza sie tylko na jednym czlonie '
                   f'— NIE dopasowano.')
             return None
         print(f'  UWAGA: "{name}" dopasowane ROZMYTO do "{kand}" — upewnij sie, ze to ten zawodnik.')
         return kand
+    return None
+
+
+def _dokladnie(name, players):
+    """23.09.2026 (wyd. 24): DOKLADNE trafienie przy DOWOLNEJ kolejnosci czlonow, zanim ruszy
+    dopasowanie po nazwisku i rozmyte. "Vallejo Adolfo Daniel" (STS) to w bazie "Adolfo Daniel
+    Vallejo" — wczesniej odwracanie probowalo tylko dwoch kolejnosci, zadna nie byla dokladna,
+    a dopasowanie rozmyte znajdowalo "Daniel Vallejo" (inny rekord, 4 mecze z 2024).
+    Porownujemy ciag liter (norm), wiec "Wang Xinyu" = "Xinyu Wang" = "Xin-Yu Wang".
+    Kilka ROZNYCH osob pod tym samym ciagiem liter -> NIEJEDNOZNACZNE (nie zgadujemy)."""
+    import itertools
+    czl = [x for x in str(name).replace('.', ' ').split() if norm(x)]
+    if not czl or len(czl) > 5: return None
+    idx = {}
+    for p in players:
+        idx.setdefault(norm(p), set()).add(p)
+    for wariant, cel in ALIASY.items():          # zapisy sklejone w load() prowadza do rekordu docelowego
+        if cel in players: idx.setdefault(norm(wariant), set()).add(cel)
+    traf = set()
+    if len(norm(''.join(czl))) < 6: return None
+    for perm in itertools.permutations(czl):
+        traf |= idx.get(norm(''.join(perm)), set())
+    if len(traf) == 1:
+        r = next(iter(traf))
+        # zwykle "Nazwisko Imie" -> "Imie Nazwisko" to norma STS, nie ma o czym pisac; ostrzegamy
+        # tylko, gdy czlony roznia sie podzialem albo trafienie przyszlo przez sklejony wariant nazwy
+        if sorted(_czl_norm(r)) != sorted(_czl_norm(name)):
+            print(f'  UWAGA: "{name}" dopasowane po wariancie zapisu -> "{r}".')
+        return r
+    if len(traf) > 1: return NIEJEDNOZNACZNE
     return None
 
 
@@ -240,6 +406,11 @@ def resolve(name, players):
     "Imie Nazwisko". W przebiegu 19:30 wszystkie cztery mecze tenisa zwrocily "Brak zawodnika
     w bazie" wlasnie z tego powodu. Dlatego przy braku trafienia probujemy tez odwroconej
     kolejnosci czlonow. Dolozone tez ostrzezenia tam, gdzie kod wczesniej po cichu zgadywal."""
+    r = _dokladnie(name, players)
+    if r is NIEJEDNOZNACZNE:
+        print(f'  "{name}": ten sam zapis ma w bazie kilka osob — nie dopasowano.')
+        return None
+    if r: return r
     r = _resolve1(name, players)
     if r is NIEJEDNOZNACZNE:
         # 22.09.2026: ODRZUCENIE Z POWODU WIELOZNACZNOSCI JEST OSTATECZNE. Wczesniej sciezka
@@ -267,9 +438,20 @@ def resolve(name, players):
 
 def state():
     p = os.path.join(HERE, 'cache', 'tenis_state.pkl'); os.makedirs(os.path.dirname(p), exist_ok=True)
-    mt = max(os.path.getmtime(f) for f in (HIST, DELTA) if os.path.exists(f))
+    # 23.09.2026: takze czas modyfikacji tego skryptu — zmiana sklejania nazwisk musi uniewaznic cache
+    mt = max(os.path.getmtime(f) for f in (HIST, DELTA, os.path.abspath(__file__)) if os.path.exists(f))
     if os.path.exists(p) and os.path.getmtime(p) > mt: return pickle.load(open(p, 'rb'))
-    st, _ = run_elo(load()); pickle.dump(st, open(p, 'wb')); return st
+    ALIASY.clear()
+    st, _ = run_elo(load())
+    # warianty nazw sklejonych w load(): "Joao Lucas Reis Da Silva" -> "João Reis Da Silva" itd.;
+    # lancuch (wariant -> cel -> cel2) rozwijamy do konca
+    al = {}
+    for k_, v in ALIASY.items():
+        n = 0
+        while v in ALIASY and n < 10: v = ALIASY[v]; n += 1
+        al[k_] = v
+    st['alias'] = al
+    pickle.dump(st, open(p, 'wb')); return st
 
 
 def calibrate(p):
@@ -302,7 +484,7 @@ def main():
         print(cal.to_string(index=False, float_format=lambda x: f'{x:.3f}')); return
     surf = 'Clay' if '--clay' in a else 'Grass' if '--grass' in a else 'Hard'
     names = [x for x in a if not x.startswith('--')]
-    st = state(); pl = set(st['R']); NCOUNT.update(st['N'])
+    st = state(); pl = set(st['R']); NCOUNT.update(st['N']); ALIASY.update(st.get('alias', {}))
     A, B = resolve(names[0], pl), resolve(names[1], pl)
     print(f'Dopasowano: {A} | {B} (nawierzchnia {surf})')
     if not A or not B: sys.exit('Brak zawodnika w bazie (ATP+WTA 1968–dziś, główne turnieje + tenis_delta). Dla ITF/WTA: szacunek ręczny i dopisuj wyniki --wynik.')

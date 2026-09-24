@@ -331,10 +331,14 @@ TRAWIASTE = '''ilkley nottingham surbiton birmingham eastbourne halle queens que
  bad homburg berlin wimbledon'''.split()
 
 
-def _nawierzchnie():
+def _nawierzchnie(glowne=None):
     znane = {}
     try:
-        th = pd.read_csv(os.path.join(HERE, 'tenis_hist.csv'), usecols=['tourney_name', 'nawierzchnia'], low_memory=False).dropna()
+        # 23.09.2026 (wyd. 24): z danych glownych przekazanych przez hist_import (TennisCourtLog w pamieci),
+        # a NIE z tenis_hist.csv. Ten plik jest WYNIKIEM hist_import — na czystym klonie go nie ma,
+        # wiec kazdy automatyczny przebieg (jedno uruchomienie) tracil nawierzchnie i pelne nazwiska.
+        th = (glowne[['tourney_name', 'nawierzchnia']] if glowne is not None else
+              pd.read_csv(os.path.join(HERE, 'tenis_hist.csv'), usecols=['tourney_name', 'nawierzchnia'], low_memory=False)).dropna()
         th['m'] = th.tourney_name.map(lambda t: _n(re.sub(r'\b(open|challenger|cup|ii|2|125k?|wta|atp|itf)\b', ' ', str(t))).strip())
         znane = th.groupby('m').nawierzchnia.agg(lambda x: x.value_counts().index[0]).replace({'Carpet': 'Hard'}).to_dict()
     except Exception as e:
@@ -347,7 +351,7 @@ def _nawierzchnie():
     return znane
 
 
-def tenis(max_tcl=None):
+def tenis(max_tcl=None, glowne=None):
     """Tenis z Sofascore (Challenger, ITF, a ATP/WTA po ostatniej dacie TennisCourtLog) → format tenis_hist."""
     s = czytaj('wyniki_*_inne_*.csv')
     if not len(s): return pd.DataFrame()
@@ -374,28 +378,63 @@ def tenis(max_tcl=None):
                     np.where(g.str.contains('hard|carpet|indoor', case=False), 'Hard', '')))
     # brak nawierzchni w źródle → z historii turnieju (TennisCourtLog + wcześniejsze pobrania) albo z tabeli NAWIERZCHNIE
     miasto = s.turniej.map(lambda t: _n(re.sub(r'\b(open|challenger|cup|ii|2|125k?|wta|atp|itf|m\d+|w\d+)\b', ' ', str(t))).strip())
-    znane = _nawierzchnie()
+    znane = _nawierzchnie(glowne)
     niski = s.poz.isin(['CH', 'WTA125', 'ITF', 'ITF-W']).values   # Challenger/125/ITF: lista ZIEMNE (historia to turnieje główne w tym mieście)
     mies = pd.to_datetime(s.data).dt.month.values
     zg = [('Clay' if m in ZIEMNE_S else 'Hard') if n else znane.get(m, 'Hard') for m, n in zip(miasto, niski)]
     zg = [('Clay' if m in ZIEMNE_S else 'Hard') if z == 'Grass' and mm not in (6, 7) else z for z, m, mm in zip(zg, miasto, mies)]
     surf = np.where(surf != '', surf, zg)
-    # LiveScore podaje „Nazwisko I.” — zamiana na pełne imię i nazwisko z TennisCourtLog, gdy jednoznaczne
+    # LiveScore podaje „Nazwisko I.” — zamiana na pełne imię i nazwisko, gdy JEDNOZNACZNE.
+    # 23.09.2026 (wyd. 24, recenzja): kandydaci = dane glowne (TennisCourtLog, przekazane z hist_import)
+    # + pelne nazwiska z TYCH SAMYCH plikow 365/Flashscore, z PLCIA i aktywnoscia. Wczesniej lista
+    # pochodzila z tenis_hist.csv (wyniku poprzedniego przebiegu, na czystym klonie go nie ma) i nie
+    # znala plci: "Wang J." z ITF kobiet rozwijalo sie do "Jimmy Wang", "Rahmani K." z ITF mezczyzn do
+    # "Kimia Rahmani", "Estevez J." (ITF-W) do "Juan Estevez". Teraz kandydat musi byc tej samej plci
+    # i grac w ciagu 3 lat przed najstarszym meczem z plikow; przy dwoch kandydatach skrot zostaje.
     try:
-        th = pd.read_csv(os.path.join(HERE, 'tenis_hist.csv'), usecols=['tour', 'zwyciezca', 'przegrany'], low_memory=False)
+        PL = {'ATP': 'M', 'CH': 'M', 'ITF': 'M', 'WTA': 'W', 'ITF-W': 'W'}
+        if glowne is not None:
+            th = glowne[['tour', 'zwyciezca', 'przegrany', 'date']]
+        else:
+            th = pd.read_csv(os.path.join(HERE, 'tenis_hist.csv'), usecols=['tour', 'zwyciezca', 'przegrany', 'date'], low_memory=False)
         th = th[th.tour.isin(['ATP', 'WTA'])]
-        full = pd.unique(pd.concat([th.zwyciezca, th.przegrany]).dropna())
+        od = pd.to_datetime(s.data).min() - pd.Timedelta(days=3 * 365)
+        th = th[pd.to_datetime(th.date) >= od]
+        skrot = re.compile(r'^(.+?)\s+([A-Z])\.?(?:-[A-Z]\.)?$')
+        # kandydaci: (nazwisko, inicjal, plec) -> {pelna nazwa: 'glowne' albo zbior dat w plikach 365}
         idx = {}
-        for f in full:
-            p = str(f).split()
-            if len(p) < 2: continue
-            key = (_n(' '.join(p[1:])), _n(p[0])[:1]); idx.setdefault(key, set()).add(f)
-        def pelne(n):
-            m = re.match(r'^(.+?)\s+([A-Z])\.?(?:-[A-Z]\.)?$', str(n).strip())
+        def _gr(poz): return 'glowny' if poz in ('ATP', 'WTA', 'DC') else 'nizszy'
+        def _dodaj(f, pl, dt=None):
+            f = str(f)
+            if f == 'nan' or skrot.match(f.strip()): return      # skrot nie jest kandydatem na pelne nazwisko
+            p = f.split()
+            if len(p) < 2 or pl is None: return
+            k_ = idx.setdefault((_n(' '.join(p[1:])), _n(p[0])[:1], pl), {})
+            if dt is None: k_.setdefault(f, set())
+            else: k_.setdefault(f, set()).add(dt)
+        for col in ('zwyciezca', 'przegrany'):
+            for f, t_ in zip(th[col], th.tour): _dodaj(f, PL.get(t_))
+        dat_s = pd.to_datetime(s.data)
+        for col in ('gosp', 'gosc'):
+            for f, t_, dt, pz in zip(s[col], s.tour, dat_s, s.poz): _dodaj(f, PL.get(t_), (dt, _gr(pz)))
+        glowne_n = set(pd.concat([th.zwyciezca, th.przegrany]).astype(str))
+        def pelne(n, pl, poz, dt):
+            m = skrot.match(str(n).strip())
             if not m: return n
-            c = idx.get((_n(m.group(1)), m.group(2).lower()))
-            return next(iter(c)) if c and len(c) == 1 else n
-        s = s.assign(gosp=s.gosp.map(pelne), gosc=s.gosc.map(pelne))
+            c = idx.get((_n(m.group(1)), m.group(2).lower(), pl))
+            if not c or len(c) != 1: return n
+            f, daty = next(iter(c.items()))
+            # recenzja (wyd. 24): "jedyny znany" to za malo przy popularnych nazwiskach (Zhang Y. z W35
+            # Shenyang -> "Ying Zhang" znana tylko z 4 meczow WTA). Rozwijamy, gdy pelna nazwa gra w TYCH
+            # SAMYCH plikach 365/Flashscore na TYM SAMYM poziomie (glowny cykl albo Challenger/125/ITF) lub
+            # w ciagu 30 dni, albo gdy skrot pochodzi
+            # z turnieju ATP/WTA, a pelna nazwa z danych glownych (ATP/WTA). Inaczej skrot zostaje.
+            if any(g == _gr(poz) or abs((dt - x).days) <= 30 for x, g in daty): return f
+            if poz in ('ATP', 'WTA') and f in glowne_n: return f
+            return n
+        plec_s = s.tour.map(PL)
+        s = s.assign(gosp=[pelne(n, pl, pz, dt) for n, pl, pz, dt in zip(s.gosp, plec_s, s.poz, dat_s)],
+                     gosc=[pelne(n, pl, pz, dt) for n, pl, pz, dt in zip(s.gosc, plec_s, s.poz, dat_s)])
     except Exception as e:
         # bylo "pass": nazwiska zostawaly w formie skroconej "Nowak J.", co psuje pozniejsze dopasowanie
         print(f'UWAGA: rozwijanie skroconych nazwisk tenisistow nie powiodlo sie ({e}) — zostaja skroty.')
