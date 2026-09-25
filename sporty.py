@@ -404,6 +404,12 @@ _OGOLNE = frozenset('fc cf sc ac as ss sv fk nk sk bk hk hc mhk vk kk rk ok ks c
                     'county rugby ishockey ik if'.split())
 
 
+# Poprawka 54 (24.09.2026): STS podaje druzyny NCAA z przydomkiem („Coastal Carolina Chanticleers”,
+# „Liberty Flames”), baza 365scores bez niego („Coastal Carolina”, „Liberty”). Przydomek to NIE czlon
+# rozrozniajacy — odpada TYLKO gdy wszystkie odciete czlony stoja NA KONCU nazwy i sa na tej liscie.
+_PRZYDOMKI_USA = frozenset('''49ers aggies anteaters antelopes aztecs badgers baylor bearcats bears beavers bengals big bison black blazers blue bobcats boilermakers bonnies broncos bruins buccaneers buckeyes bucs buffaloes bulldogs bulls cajuns cardinal cardinals catamounts cavaliers chanticleers chargers chippewas colonels commodores cornhuskers cougars cowboys coyotes crimson crusaders cyclones deacons demon devils dolphins dons ducks dukes eagles explorers falcons fighting flames flash flashes friars frogs gaels gamecocks gators golden gophers governors green greyhounds grizzlies hatters hawkeyes hawks heels herd highlanders hilltoppers hokies hoosiers horned hornets hoyas hurricane hurricanes huskers huskies illini irish jackets jackrabbits jaguars jayhawks keydets knights lancers leathernecks lions lobos longhorns lumberjacks matadors mavericks mean midshipmen miners minutemen mocs monarchs mountaineers mustangs niners nittany orange ospreys owls pack paladins panthers penguins phoenix pilots pirates quakers racers ragin raiders rainbow rams razorbacks rebels red redbirds redhawks retrievers roadrunners rockets runnin salukis scarlet seahawks seawolves seminoles skyhawks sooners spartans spiders stags statesmen sun sycamores tar terrapins terriers thunderbirds thundering tide tigers titans toreros tribe tritons trojans utes vandals volunteers warhawks warriors wave wildcats wolf wolfpack wolverines wolves yellow zips'''.split())
+
+
 def _skrot_albo_nic(name, wyn, pula):
     """22.09.2026, USTERKA U1 z przebiegu 21:00: "Independiente Yumbo" (Kolumbia, II liga) zostalo
     policzone jako "Independiente" (Argentyna, Avellaneda) — oczekiwane gole 2,05 : 0,84 z sily
@@ -421,6 +427,9 @@ def _skrot_albo_nic(name, wyn, pula):
     elif tn[-len(tk):] == tk: odp = tn[:-len(tk)]
     else: odp = tuple(t for t in tn if t not in tk)
     if odp and all(t in _OGOLNE for t in odp): return wyn
+    if odp and tn[:len(tk)] == tk and all(t in _PRZYDOMKI_USA for t in odp):
+        print(f'  UWAGA: "{name}" -> "{wyn}" (pominiety przydomek druzyny: {" ".join(odp)})')
+        return wyn
     inne = sorted(p for p in pula if p != wyn and len(_tokeny(p)) > len(tk)
                   and (_tokeny(p)[:len(tk)] == tk or _tokeny(p)[-len(tk):] == tk))
     if inne:

@@ -176,6 +176,34 @@ def znajdz(wiersze, nazwa, liga=None, sport=None):
     if zaw:
         if len({norm(w['druzyna']) for w in zaw}) == 1: return max(zaw, key=mec), 0.9
         return None, 0.0
+    # (5a) Poprawka 54 — tenis: literowki STS znane z tenis.py („Maroszan Fabian” -> „Fabian Marozsan”)
+    #      oraz jedno DRUGIE IMIE, ktorego arkusz nie ma („Etcheverry Tomas Martin” -> „Tomas Etcheverry”).
+    if sport == 'tenis':
+        try:
+            import tenis as _T
+            _lit = getattr(_T, '_LITEROWKI_STS', {}).get(cel.replace(' ', ''))
+        except Exception:
+            _lit = None
+        if _lit:
+            tr = [w for w in kand if norm(w['druzyna']) == norm(_lit)]
+            if len(tr) == 1:
+                print(f'  „{nazwa}” → „{_lit}” (literowka STS, tenis.py)')
+                return tr[0], 0.95
+        tq = cel.split()
+        if len(tq) >= 3:
+            tr = []
+            for w in kand:
+                tw = norm(w['druzyna']).split()
+                if len(tw) == len(tq) - 1 and len(tw) >= 2:
+                    zb = list(tq)
+                    if all(t in zb and not zb.remove(t) for t in tw):
+                        # nazwisko z arkusza (ostatni czlon „Imie Nazwisko”) musi stac NA KONCU nazwy STS
+                        # (pierwszy albo ostatni czlon) — wtedy odpadlo tylko drugie imie
+                        if tw[-1] in (tq[0], tq[-1]):
+                            tr.append(w)
+            if len({norm(w['druzyna']) for w in tr}) == 1:
+                print(f'  „{nazwa}” → „{tr[0]["druzyna"]}” (pominiete drugie imie)')
+                return tr[0], 0.85
     # (5) tenis: „Mensik J.” vs „Jakub Mensik” — nazwisko i WSZYSTKIE inicjaly imion
     if sport == 'tenis':
         tq = _tok_osoba(nazwa)
