@@ -8,7 +8,9 @@ import os, sys, sqlite3, datetime as dt
 import pandas as pd
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DZIS = dt.date.today()
+# 28.09.2026 (Poprawka 55): „dzien zapytania” to dzien POLSKI, nie UTC (kontener chodzi w UTC).
+from zoneinfo import ZoneInfo
+DZIS = dt.datetime.now(ZoneInfo('Europe/Warsaw')).date()
 PROG = {'matches': 2, 'sporty': 2, 'tenis': 2, 'zewn': 2, 'intl': 45}   # dozwolony wiek w dniach
 
 

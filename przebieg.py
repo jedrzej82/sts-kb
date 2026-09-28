@@ -14,10 +14,23 @@ na dzisiejsze, (2) pominieto uzupelnij_ligi.py — archiwum wchodzi do bazy TYLK
 Nic tu nie zgaduje: sprawdza daty meczow w plikach i liczbe meczow w bazie."""
 import os, sys, subprocess, sqlite3, datetime as dt, glob
 import pandas as pd
+from zoneinfo import ZoneInfo
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ZD = os.path.join(HERE, 'zewn')
-DZIS = dt.date.today()
+# 28.09.2026 (Poprawka 55, USTERKA 2 z przebiegu 21:00): kontener chodzi w UTC, a arkusze Google zapisuja
+# data_aktualizacji w czasie POLSKIM. Porownanie z dt.datetime.now() (UTC) zanizalo wiek arkusza o 1–2 h
+# (21:29 PL: „statystyki_koszykowka … 19:46 (-1 h)”). Arkusz stary o 25 h wychodzil jako 23 h i NIE dostawal
+# ostrzezenia. Wszystkie „teraz” i „dzis” w tym pliku licza sie w strefie uzytkownika.
+STREFA = ZoneInfo('Europe/Warsaw')
+
+
+def teraz_pl():
+    """Biezacy czas polski jako naiwny datetime — w tej samej strefie co data_aktualizacji arkuszy."""
+    return dt.datetime.now(STREFA).replace(tzinfo=None)
+
+
+DZIS = teraz_pl().date()
 MIN_MECZOW = 390_000          # po poprawnym przebiegu 24.09: 398 738
 MAKS_WIEK_DNI = 1             # wyniki z biezacego miesiaca musza siegac co najmniej wczoraj
 KROKI = [('build_kb.py', 'b1'), ('uzupelnij_ligi.py', 'u'), ('build_kb.py', 'b2'), ('hist_import.py', 'h'), ('swiezosc.py', 'sw')]
@@ -60,9 +73,11 @@ def kontrola_arkuszy():
         try:
             d = pd.read_csv(f, usecols=['data_aktualizacji'], low_memory=False).data_aktualizacji.astype(str).max()
             t = dt.datetime.strptime(d[:16], '%Y-%m-%d %H:%M')
-            h = (dt.datetime.now() - t).total_seconds() / 3600
+            h = (teraz_pl() - t).total_seconds() / 3600
             print(f'  {a}.csv: aktualizacja {d[:16]} ({h:.0f} h)'
-                  + ('' if h <= MAKS_WIEK_ARKUSZA_H else '  UWAGA: starszy niz 24 h — sezon.py tego sportu tylko informacyjnie'))
+                  + ('' if h <= MAKS_WIEK_ARKUSZA_H else '  UWAGA: starszy niz 24 h — sezon.py tego sportu tylko informacyjnie')
+                  + ('  UWAGA: data z PRZYSZLOSCI — sprawdz strefe czasowa arkusza (oczekiwany czas polski)'
+                     if h < -0.5 else ''))
         except Exception as e:
             bledy.append(f'{a}.csv nieczytelny ({e}) — pobierz ponownie jako CSV')
     return bledy
@@ -141,7 +156,7 @@ def kontrola_bazy():
 
 
 def main():
-    print(f'PRZEBIEG {dt.datetime.now():%Y-%m-%d %H:%M}\n1) Pliki zewn/:')
+    print(f'PRZEBIEG {teraz_pl():%Y-%m-%d %H:%M} (czas polski)\n1) Pliki zewn/:')
     bledy = kontrola_zewn()
     print('   Arkusze statystyk (drugie zrodlo):')
     bledy += kontrola_arkuszy()

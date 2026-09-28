@@ -89,6 +89,21 @@ for _k, _v in {'libertadasuncion': 'Libertad', 'clublibertad': 'Libertad',
                'colonfc': 'Colon', 'colonfcmontevideo': 'Colon', 'santoslaguna': 'Santos Laguna',
                'clubsantoslaguna': 'Santos Laguna'}.items():
     ALIASES.setdefault(_k, _v)
+# 28.09.2026 (Poprawka 55, USTERKI 3–5 z przebiegu 21:00): rdzen nazwy wspolny dla klubow z roznych
+# krajow, a STS dopisuje miasto. Kazda para sprawdzona recznie na kb.sqlite i w plikach zewn/:
+#  - "Olimpia Asuncion" -> Olimpia (PAR, 523 mecze; Flashscore zapisuje wprost "Olimpia Asuncion").
+#    NIE: CD Olimpia (Honduras), Olimpia De Itá (PAR Primera B), Olimpia Satu-Mare.
+#  - "Itagui Leones FC" -> Leones (Colombia | Primera B, jedyne "Leones" w tej lidze; FS: "Leones").
+#    NIE: Leones FC (Ekwador), Leones FC [colombia] (zapis Primera A do 2018).
+#  - "Independiente Yumbo" -> Independiente Valle del Cauca (Colombia | Primera B; ten sam klub —
+#    365scores nazywa jego U20 "Independiente Yumbo U20", Sofascore: team/independiente-yumbo).
+#  - "Independiente La Chorrera" -> Independiente [panama] (Liga Panamena). NIE: "... U20" (mlodziez).
+for _k, _v in {'olimpiaasuncion': 'Olimpia',
+               'itaguileonesfc': 'Leones', 'itaguileones': 'Leones', 'leonesfcitagui': 'Leones',
+               'independienteyumbo': 'Independiente Valle del Cauca',
+               'independientelachorrera': 'Independiente [panama]',
+               'caindependientelachorrera': 'Independiente [panama]'}.items():
+    ALIASES.setdefault(_k, _v)
 # 23.09.2026 (wyd. 24): polskie nazwy STS dla klubow, ktorych nie ratuje zamiana nazwy miasta
 # (sprawdzone recznie na kb.sqlite 23.09.2026; kazdy cel ma setki meczow w lidze swojego kraju).
 for _k, _v in {'sportinglizbona': 'Sp Lisbon', 'sportinglisbon': 'Sp Lisbon',

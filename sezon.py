@@ -110,7 +110,16 @@ def _warianty(nazwa):
 # (ca/cd/cs sa celowo poza _OGOLNE — recenzja: „CA”/„CD” rozrozniaja kluby). Kazda para sprawdzona recznie:
 # ta sama liga i miasto. Zapis STS -> zapis arkusza statystyki_druzyn.
 _ALIASY_PILKA = {'capenarol': 'Peñarol', 'cacerro': 'Cerro', 'cdohiggins': "O'Higgins",
-                 'cscienciano': 'Cienciano', 'cdrecoleta': 'Recoleta FC'}
+                 'cscienciano': 'Cienciano', 'cdrecoleta': 'Recoleta FC',
+                 # 28.09.2026 (Poprawka 55): Primera PAR w arkuszu zapisuje "Olimpia".
+                 # Kolumbijskiej Primera B i Panamy w arkuszu NIE MA — celowo bez aliasow
+                 # (np. "Leones" trafiloby w ekwadorskie Leones FC z LigaPro ECU).
+                 'olimpiaasuncion': 'Olimpia',
+                 # 28.09.2026 (Poprawka 55): te same pary co w typuj.py z 23.09 (U2/U3), ktorych
+                 # sezon.py nie mial — "Libertad Asuncion" i "Sportivo San Lorenzo" dawaly NIE ZNALEZIONO,
+                 # choc arkusz (Primera PAR) ma "Libertad" i "CS San Lorenzo".
+                 'libertadasuncion': 'Libertad', 'clublibertad': 'Libertad',
+                 'sportivosanlorenzo': 'CS San Lorenzo', 'clubsportivosanlorenzo': 'CS San Lorenzo'}
 
 
 def _alias(nazwa):
