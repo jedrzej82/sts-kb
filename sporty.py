@@ -786,7 +786,20 @@ def nazwa_sportu(s):
     s = str(s).strip().lower()
     if s in SPORT: return s
     k = norm(s.replace('_', ' ').replace('-', ' '))
-    return next((x for x in SPORT if norm(x) == k), s)
+    r = next((x for x in SPORT if norm(x) == k), None)
+    if r: return r
+    # 29.09.2026 (Raport 15:00): „sporty.py typuj reczna …” -> BRAK W BAZIE dla calej pilki recznej
+    # (Füchse Berlin, VfL Gummersbach sa w bazie). Skroty i nazwy angielskie:
+    r = _SPORT_SYNONIMY.get(k)
+    if r in SPORT: return r
+    kand = [x for x in SPORT if k and norm(x.split()[-1]) == k]      # „reczna”, „stolowy”, „wodna”
+    return kand[0] if len(kand) == 1 else s
+
+
+_SPORT_SYNONIMY = {'handball': 'piłka ręczna', 'basketball': 'koszykówka', 'volleyball': 'siatkówka',
+                   'hockey': 'hokej', 'icehockey': 'hokej', 'hokejnalodzie': 'hokej', 'darts': 'dart',
+                   'tabletennis': 'tenis stołowy', 'pingpong': 'tenis stołowy', 'americanfootball': 'futbol amerykański',
+                   'nfl': 'futbol amerykański', 'floorball': 'unihokej'}
 
 
 def main(a):
