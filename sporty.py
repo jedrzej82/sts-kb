@@ -780,6 +780,21 @@ def wspolna_skala(d, sport, h, g, dni=730):
 
 
 
+START_SEZONU = '2026-08-01'
+
+
+def biezacy_sezon(d, od=None, min_meczow=20):
+    """Ligi z >= min_meczow meczami od startu sezonu: mecze, druzyny, kolejki (mediana meczow na druzyne)."""
+    x = d[d.data.astype(str) >= (od or START_SEZONU)]
+    t = pd.concat([x[['sport', 'liga', 'gosp']].rename(columns={'gosp': 'd'}), x[['sport', 'liga', 'gosc']].rename(columns={'gosc': 'd'})])
+    g = t.groupby(['sport', 'liga', 'd']).size().groupby(['sport', 'liga']).agg(druzyn='size', kolejki='median')
+    g['mecze'] = x.groupby(['sport', 'liga']).size()
+    g = g[g.mecze >= min_meczow]
+    g['kolejki'] = g.kolejki.round().astype(int)
+    g['szacunek'] = (g.kolejki < 3).map({True: 'TAK (< 3 kolejki)', False: 'nie'})
+    return g[['mecze', 'druzyn', 'kolejki', 'szacunek']]
+
+
 def nazwa_sportu(s):
     """29.09.2026 (Raport 12:00, usterka 6): "koszykowka", "pilka_reczna", "tenis-stolowy" -> nazwa z bazy
     ("koszykówka", "piłka ręczna", "tenis stołowy"). Nieznana nazwa wraca bez zmian (dalej BRAK W BAZIE)."""
@@ -835,7 +850,15 @@ def main(a):
                 sys.exit(2)
             print('baza pusta (pliki istnieja, ale nie zawieraja zadnego meczu) — sprawdz hist_import.py')
         if os.path.exists(TAB):
-            t = pd.read_csv(TAB); print('\nTabele lig (siła startowa):'); print(t.groupby(['sport', 'liga']).agg(druzyn=('druzyna', 'size'), sezon=('sezon', 'max')).to_string())
+            t = pd.read_csv(TAB)
+            # 29.09.2026 (Raport 15:00): kolumna „sezon” to sezon TABELI SILY STARTOWEJ (poprzedni sezon),
+            # a przebieg odczytal ja jako „trwa sezon 2025-26” i uznal hokej za szacunek. Stan biezacego
+            # sezonu (A1 a: >= 3 kolejki) jest nizej, liczony z wynikow.
+            print('\nTabele lig — SILA STARTOWA z poprzedniego sezonu (to NIE jest stan biezacego sezonu):')
+            print(t.groupby(['sport', 'liga']).agg(druzyn=('druzyna', 'size'), sezon_tabeli=('sezon', 'max')).to_string())
+        if len(d):
+            print(f'\nBIEZACY SEZON (od {START_SEZONU}) — rozegrane kolejki na lige (A1 a: szacunek, gdy < 3):')
+            print(biezacy_sezon(d).to_string())
     elif a[0] == 'typuj':
         sport = a[1].lower(); d = load(); inf = {}; R, N, hfa, draws, pdraw = elo(d, sport, info=inf); L_ = inf['last']
         pool = set(R); h, g = resolve(a[2], pool), resolve(a[3], pool)

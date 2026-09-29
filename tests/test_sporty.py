@@ -146,3 +146,13 @@ def test_aliasy_raport_1500():
     assert sporty.resolve('Kataja Basket Joensuu', pula) == 'Joensuun Kataja'
     assert sporty.resolve('Rytiri Kladno', pula) == 'Kladno' and sporty.resolve('Mikkelin Jukurit', pula) == 'Jukurit'
     assert sporty.resolve('Dynamo Pardubice', pula) == 'HC CSOB Pardubice'
+
+
+def test_biezacy_sezon_kolejki():
+    rows = [('2026-09-%02d' % (1 + r), 'hokej', 'Finland | Liiga', f'T{2 * i}', f'T{2 * i + 1}', 3, 2, 0) for r in range(4) for i in range(5)]
+    rows += [('2026-09-20', 'hokej', 'Canada | OHL', f'O{i}', f'P{i}', 1, 0, 0) for i in range(21)]
+    rows += [('2026-04-01', 'hokej', 'Finland | Liiga', 'T0', 'T1', 1, 0, 0)]          # poprzedni sezon — nie liczy sie
+    d = pd.DataFrame(rows, columns=['data', 'sport', 'liga', 'gosp', 'gosc', 'pg', 'pa', 'dogrywka'])
+    b = sporty.biezacy_sezon(d, min_meczow=20)
+    assert b.loc[('hokej', 'Finland | Liiga'), 'kolejki'] == 4 and b.loc[('hokej', 'Finland | Liiga'), 'szacunek'] == 'nie'
+    assert b.loc[('hokej', 'Canada | OHL'), 'szacunek'].startswith('TAK')
