@@ -183,7 +183,7 @@ def sets_probs_from_set(s, bo=3):
 
 def backtest_cs2(d):
     import sporty as sp
-    pre = []; hfa = sp.elo(d, 'esport_cs2', pre)[2]
+    pre = []; sp.elo(d, 'esport_cs2', pre)   # CS2: bez przewagi gospodarza (SPORT: hfa 0)
     t = d[d.sport == 'esport_cs2'].assign(ra=[x[0] for x in pre], rb=[x[1] for x in pre], na=[x[2] for x in pre], nb=[x[3] for x in pre])
     t = t[(t.na >= 15) & (t.nb >= 15) & (t.pg + t.pa).isin([2, 3])]
     rows = []

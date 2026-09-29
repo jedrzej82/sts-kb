@@ -11,7 +11,7 @@ def games(s):
 d['gs']=[games(s) for s in d.score]
 W=d.winner_name.values; L=d.loser_name.values; S=d.surface.values; G=d.gs.values; D=d.date.values
 def run(c1=250,c2=5,c3=0.4,mov=0.0,decay=0.0):
-    R,Rs,N,Ns,last={},{},{},{},{}
+    R,Rs,N,Ns={},{},{},{}
     out=np.empty((len(d),6))
     for i in range(len(d)):
         w,l,s=W[i],L[i],S[i]
