@@ -257,6 +257,7 @@ def norm(s): return re.sub(r'[^a-z]', '', unicodedata.normalize('NFKD', str(s).t
 
 
 NCOUNT = {}
+OSTATNI = {}     # zawodnik -> data ostatniego meczu w bazie (wypelnia main z state()['last'])
 
 
 NIEJEDNOZNACZNE = object()   # odrzucenie ostateczne — zadna inna sciezka nie ma prawa go cofnac
@@ -298,12 +299,15 @@ def _wspolne_czlony(zrodlo, kandydat):
     """Ile czlonow nazwy ze zrodla ma odpowiednik u kandydata. Kazdy czlon kandydata
     moze byc zuzyty tylko raz, zeby "Tyler" nie liczyl sie dwa razy."""
     tz, tk = _czl_norm(zrodlo), list(_czl_norm(kandydat))
-    n = 0
+    n = pelne = 0
     for z in tz:
         for i, k in enumerate(tk):
             if _czlon_pasuje(z, k):
-                n += 1; tk.pop(i); break
-    return n
+                n += 1; pelne += len(z) > 1 and len(k) > 1; tk.pop(i); break
+    # 29.09.2026 (proba generalna): NAZWISKO musi sie zgadzac jako pelne slowo. Inaczej inicjaly
+    # robily z obcej osoby „dwa zgodne czlony”: „Linette M.” -> „Cinalli L. M.” (Linette~L., M~M.),
+    # „Auger-Aliassime F.” -> „Alhogbani A. F.”, „De Minaur A.” -> „Sibanda M. D. A.”.
+    return n if pelne else min(n, 1)
 
 
 def _resolve1(name, players):
@@ -341,6 +345,15 @@ def _resolve1(name, players):
         ini = norm(parts[0])[:1]
         c2 = [p for p in c if ini and norm(p)[:1] == ini]
         if len(c2) == 1: return c2[0]
+        # 29.09.2026: „Ruud C.” = Casper (gra) albo Christian (ostatni mecz 2001). Zawodnik bez meczu
+        # od 2 lat nie jest w dzisiejszej ofercie — jesli AKTYWNY jest dokladnie jeden, to on.
+        if len(c2) > 1 and OSTATNI:
+            gr = pd.Timestamp.today() - pd.Timedelta(days=730)
+            akt = [p for p in c2 if OSTATNI.get(p) is not None and pd.Timestamp(OSTATNI[p]) >= gr]
+            if len(akt) == 1:
+                print(f'  UWAGA: "{name}" pasuje do {len(c2)} zawodnikow, aktywny (mecz w ostatnich 2 latach) '
+                      f'tylko "{akt[0]}" — wybrano go.')
+                return akt[0]
         if c2:
             print(f'  UWAGA: "{name}" pasuje do {len(c2)} zawodnikow ({", ".join(sorted(c2)[:4])}) — '
                   f'nie dopasowano. Podaj pelne imie i nazwisko.')
@@ -490,7 +503,7 @@ def main():
         print(cal.to_string(index=False, float_format=lambda x: f'{x:.3f}')); return
     surf = 'Clay' if '--clay' in a else 'Grass' if '--grass' in a else 'Hard'
     names = [x for x in a if not x.startswith('--')]
-    st = state(); pl = set(st['R']); NCOUNT.update(st['N']); ALIASY.update(st.get('alias', {}))
+    st = state(); pl = set(st['R']); NCOUNT.update(st['N']); ALIASY.update(st.get('alias', {})); OSTATNI.update(st['last'])
     A, B = resolve(names[0], pl), resolve(names[1], pl)
     print(f'Dopasowano: {A} | {B} (nawierzchnia {surf})')
     if not A or not B: sys.exit('Brak zawodnika w bazie (ATP+WTA 1968–dziś, główne turnieje + tenis_delta). Dla ITF/WTA: szacunek ręczny i dopisuj wyniki --wynik.')
