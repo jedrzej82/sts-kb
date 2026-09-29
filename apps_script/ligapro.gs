@@ -1,9 +1,127 @@
 /**
- * LIGA PRO (tenis stołowy, Czechy) — diagnoza źródeł (29.09.2026). Samodzielny plik w projekcie „wyniki STS”;
+ * LIGA PRO (tenis stołowy) — wyniki ze scores24 (29.09.2026). Samodzielny plik w projekcie „wyniki STS”;
  * korzysta z TERMINARZ_FOLDER_ID i TERMINARZ_UA z pliku „terminarz”.
- * Flashscore nie podaje już Ligi Pro, Sofascore blokował serwery Google — tu sprawdzamy, co z Google działa.
- * Uruchom „ligaproDiagnoza” → zapisuje ligapro_diagnoza.txt do folderu baza-wiedzy. Niczego nie zmienia.
+ * Flashscore podaje Ligę Pro tylko do 06.2024, Sofascore/Tipsport/BetsAPI blokują Google (diagnozy 1–5 niżej).
+ * Źródło: https://scores24.live/rapi/leagues/table-tennis/{liga}/matches (bez klucza; wymagane date_between).
+ *
+ * INSTALACJA: plik „ligapro” w projekcie → wklej CAŁY ten plik → Ctrl+S → uruchom „ligaproUstaw” (wyzwalacz co godzinę
+ * + pierwsze pobranie). Wyłączenie: „ligaproUsun”.
+ * PLIKI (folder baza-wiedzy): wyniki_lp_inne_RRRR-MM.csv.gz — format jak wyniki_fs_inne (zewn.inne() czyta je sam),
+ *   runda = id meczu scores24 (klucz bez duplikatów); ligapro_log.txt — ile meczów na ligę i okno, stan historii.
+ * HISTORIA: każde uruchomienie dociąga też wstecz kolejne dni (do LIGAPRO_DNI_WSTECZ), aż do limitu czasu.
  */
+var LIGAPRO_LIGI = {'czech-liga-pro-1': ['CZECH REPUBLIC', 'Liga Pro'], 'tt-cup': ['CZECH REPUBLIC', 'TT Cup'],
+  'setka-cup': ['UKRAINE', 'Setka Cup']};   // slug scores24 -> [kraj, turniej]; nieistniejący slug = 0 meczów w logu
+var LIGAPRO_DNI_WSTECZ = 60;
+var LIGAPRO_OKNO_H = 2;          // okno zapytania w godzinach (limit 100 meczów na odpowiedź)
+var LIGAPRO_LIMIT_MS = 4.5 * 60 * 1000;
+
+function ligaproUstaw() {
+  ligaproUsun();
+  ScriptApp.newTrigger('ligaproPracuj').timeBased().everyHours(1).create();
+  ligaproPracuj();
+}
+
+function ligaproUsun() {
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'ligaproPracuj') ScriptApp.deleteTrigger(t);
+  });
+}
+
+function ligaproPracuj() {
+  var start = Date.now(), log = ['ligaproPracuj ' + new Date().toISOString()], nowe = {};
+  var teraz = Math.floor(Date.now() / 3600000) * 3600000;
+  ligaproOkres(teraz - 30 * 3600000, teraz + 3600000, nowe, log);          // ostatnie 30 h
+  var P = PropertiesService.getScriptProperties(), dol = Number(P.getProperty('ligapro_hist') || (teraz - 30 * 3600000));
+  var granica = teraz - LIGAPRO_DNI_WSTECZ * 86400000;
+  while (dol > granica && Date.now() - start < LIGAPRO_LIMIT_MS * 0.6) {   // historia: dzień po dniu wstecz
+    ligaproOkres(dol - 86400000, dol, nowe, log);
+    dol -= 86400000;
+    P.setProperty('ligapro_hist', String(dol));
+  }
+  log.push('historia do ' + new Date(dol).toISOString().substr(0, 10) + (dol <= granica ? ' (komplet)' : ' (ciąg dalszy w następnym uruchomieniu)'));
+  var zapisane = ligaproZapisz(nowe);
+  log.push('zapisano: ' + JSON.stringify(zapisane));
+  var folder = DriveApp.getFolderById(TERMINARZ_FOLDER_ID), sl = folder.getFilesByName('ligapro_log.txt');
+  while (sl.hasNext()) sl.next().setTrashed(true);
+  folder.createFile('ligapro_log.txt', log.join('\n'), 'text/plain');
+}
+
+function ligaproCzas(ms) { return Utilities.formatDate(new Date(ms), 'UTC', 'yyyy-MM-dd HH:mm:ss'); }
+
+/** Zakończone mecze wszystkich lig z [od, do) w oknach LIGAPRO_OKNO_H -> nowe[miesiac][id] = wiersz CSV. */
+function ligaproOkres(od, doo, nowe, log) {
+  var zad = [], opis = [];
+  Object.keys(LIGAPRO_LIGI).forEach(function (slug) {
+    for (var a = od; a < doo; a += LIGAPRO_OKNO_H * 3600000) {
+      var b = Math.min(a + LIGAPRO_OKNO_H * 3600000, doo);
+      zad.push({url: 'https://scores24.live/rapi/leagues/table-tennis/' + slug + '/matches?lang=en&audience=en&first=100' +
+        '&status=ended&with_statistics=false&date_between[]=' + encodeURIComponent(ligaproCzas(a)) +
+        '&date_between[]=' + encodeURIComponent(ligaproCzas(b)), muteHttpExceptions: true,
+        headers: {'User-Agent': TERMINARZ_UA['User-Agent'], 'Accept': 'application/json'}});
+      opis.push(slug);
+    }
+  });
+  var ile = {}, bledy = {}, pelne = 0;
+  for (var i = 0; i < zad.length; i += 20) {
+    UrlFetchApp.fetchAll(zad.slice(i, i + 20)).forEach(function (r, k) {
+      var slug = opis[i + k];
+      ile[slug] = ile[slug] || 0;
+      if (r.getResponseCode() !== 200) { bledy[slug] = r.getResponseCode(); return; }
+      var j; try { j = JSON.parse(r.getContentText()); } catch (e) { bledy[slug] = 'json'; return; }
+      var e = ((j.data && j.data.edges) || j.edges || []);
+      if (e.length >= 100) pelne++;
+      e.forEach(function (x) {
+        var w = ligaproWiersz(x.node || x, LIGAPRO_LIGI[slug]);
+        if (!w) return;
+        (nowe[w.mies] = nowe[w.mies] || {})[w.id] = w.csv;
+        ile[slug]++;
+      });
+    });
+  }
+  log.push(ligaproCzas(od).substr(0, 13) + ' – ' + ligaproCzas(doo).substr(0, 13) + ': ' + JSON.stringify(ile) +
+    (Object.keys(bledy).length ? ' | HTTP ' + JSON.stringify(bledy) : '') + (pelne ? ' | UWAGA: ' + pelne + ' okien z limitem 100' : ''));
+}
+
+/** Węzeł scores24 -> {id, mies, csv} w kolumnach wyniki_fs_inne albo null (mecz bez wyniku). */
+function ligaproWiersz(n, liga) {
+  var t = n.teams || [], wynik = String(n.resultScore || '').split(':');
+  if (t.length !== 2 || wynik.length !== 2 || !n.matchDate) return null;
+  var wg = Number(wynik[0]), wa = Number(wynik[1]);
+  if (isNaN(wg) || isNaN(wa) || wg === wa) return null;
+  var sety = (n.resultScores || []).filter(function (s) { return /^\d+$/.test(String(s.type)); })
+    .sort(function (x, y) { return Number(x.type) - Number(y.type); }).map(function (s) { return String(s.value).split(':'); });
+  var d = String(n.matchDate).substr(0, 10);
+  return {id: String(n.id), mies: d.substr(0, 7), csv: terminarzCsv([d, 'table-tennis', liga[0], liga[1], 'sc24:' + n.id,
+    t[0].name, t[1].name, wg, wa, sety.map(function (s) { return s[0]; }).join(';'), sety.map(function (s) { return s[1]; }).join(';'),
+    wg > wa ? 1 : 2, ''])};
+}
+
+/** Dopisuje nowe wiersze do wyniki_lp_inne_RRRR-MM.csv.gz (bez duplikatów po id w kolumnie runda). */
+function ligaproZapisz(nowe) {
+  var folder = DriveApp.getFolderById(TERMINARZ_FOLDER_ID), wynik = {};
+  var NAGL = 'data,sport,kraj,turniej,runda,gosp,gosc,wg,wa,okresy_g,okresy_a,zwyciezca,nawierzchnia';
+  Object.keys(nowe).forEach(function (mies) {
+    var nazwa = 'wyniki_lp_inne_' + mies + '.csv.gz', stare = folder.getFilesByName(nazwa), doKosza = [], wiersze = {};
+    while (stare.hasNext()) {
+      var f = stare.next(); doKosza.push(f);
+      Utilities.ungzip(f.getBlob().setContentType('application/x-gzip')).getDataAsString().split('\n').slice(1).forEach(function (l) {
+        var m = l.match(/,sc24:([^,]+),/); if (m) wiersze[m[1]] = l;
+      });
+    }
+    var przed = Object.keys(wiersze).length;
+    Object.keys(nowe[mies]).forEach(function (id) { wiersze[id] = nowe[mies][id]; });
+    var ids = Object.keys(wiersze);
+    if (ids.length === przed && doKosza.length) { wynik[mies] = '0 nowych'; return; }
+    var tresc = NAGL + '\n' + ids.map(function (id) { return wiersze[id]; }).sort().join('\n');
+    folder.createFile(Utilities.gzip(Utilities.newBlob(tresc, 'text/csv', 'wyniki_lp_inne_' + mies + '.csv')).setName(nazwa));
+    doKosza.forEach(function (f) { f.setTrashed(true); });   // stary plik dopiero PO zapisie nowego
+    wynik[mies] = (ids.length - przed) + ' nowych, razem ' + ids.length;
+  });
+  return wynik;
+}
+
+// ---------------- diagnozy (29.09.2026) — zostają dla przyszłych zmian źródła ----------------
 function ligaproDiagnoza() {
   var d = Utilities.formatDate(new Date(), 'UTC', 'yyyy-MM-dd');
   var zrodla = {

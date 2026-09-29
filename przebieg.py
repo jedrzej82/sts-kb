@@ -115,6 +115,16 @@ def kontrola_zewn():
             print(f'  UWAGA: zewn/{os.path.basename(f)} nieczytelny ({e}) — e-sport bez swiezych danych')
     # 29.09.2026 (faza 3b): terminarz 365scores (Apps Script, co godzine) — opcjonalny; bez niego typuj.py
     # po prostu nie robi kontroli kraju meczu z terminarza. Tylko informacja, nie blad.
+    # 29.09.2026: Liga Pro (tenis stolowy) ze scores24 — opcjonalna; brak pliku = tenis stolowy Ligi Pro bez danych
+    f = os.path.join(ZD, f'wyniki_lp_inne_{DZIS.strftime("%Y-%m")}.csv.gz')
+    if os.path.exists(f):
+        try:
+            t = pd.read_csv(f, usecols=['data'], dtype=str)
+            print(f'  zewn/{os.path.basename(f)}: {len(t)} meczow Ligi Pro, ostatni {t.data.max()}')
+        except Exception as e:
+            print(f'  UWAGA: zewn/{os.path.basename(f)} nieczytelny ({e}) — tenis stolowy Ligi Pro bez danych')
+    else:
+        print(f'  zewn/{os.path.basename(f)}: brak (opcjonalny — Liga Pro, Apps Script „ligapro”)')
     # od 29.09 takze terminarz_fs.csv.gz (Flashscore) — wiecej sportow i nizszych lig niz 365scores
     for nazwa in ('terminarz_fs.csv.gz', 'terminarz_365.csv.gz'):
         f = os.path.join(ZD, nazwa)

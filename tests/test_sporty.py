@@ -39,3 +39,14 @@ def test_mala_proba_to_none():
 ])
 def test_werdykt_meczu(skala, p_dz, n, oczekiwane):
     assert sporty.werdykt_meczu(skala, p_dz, n) == oczekiwane
+
+
+@pytest.mark.parametrize('oferta, oczekiwane', [
+    ('Stolfa Jakub', 'Jakub Stolfa'), ('Stolfa J.', 'Jakub Stolfa'), ('Jan Trefny', 'Trefny Jan'),
+    ('Novak J.', None),            # dwaj Novakowie na J. — noga MNIEJ, nie zgadujemy
+    ('Stolfa Petr', None),         # inne imie to inny gracz
+])
+def test_gracz_w_odwrotnej_kolejnosci(oferta, oczekiwane):
+    # Liga Pro (29.09.2026): scores24 "Imie Nazwisko" albo "Nazwisko Imie", STS "Nazwisko Imie" / "Nazwisko I."
+    pula = ['Jakub Stolfa', 'Trefny Jan', 'Jan Novak', 'Jiri Novak', 'Lukas Jindrak']
+    assert sporty.resolve(oferta, pula) == oczekiwane

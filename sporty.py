@@ -543,6 +543,16 @@ def _rdzen_rowny(name, kandydaci):
     return traf[0]
 
 
+def _osoba_rowna(a, b):
+    """Dwa czlony nazwy osoby: te same w dowolnej kolejnosci albo nazwisko + inicjal imienia ("stolfa","j")."""
+    if len(b) != 2 or not all(a) or not all(b): return False
+    for x, y in ((a, b), (a, b[::-1])):
+        if x == y: return True
+        if x[0] == y[0] and len(x[0]) >= 3 and (len(x[1]) == 1 and y[1].startswith(x[1]) or len(y[1]) == 1 and x[1].startswith(y[1])):
+            return True
+    return False
+
+
 def resolve(name, pool):
     """Zwraca nazwe z bazy albo None. None JEST POPRAWNYM WYNIKIEM — wolacz ma sie wtedy zatrzymac.
     21.09.2026: naprawiona ta sama usterka, ktora wykryto w typuj.py. Nazwa zapisana cyrylica
@@ -574,6 +584,16 @@ def resolve(name, pool):
         print(f'  UWAGA: "{name}" pasuje do {len(_kol[k_])} roznych wpisow w bazie '
               f'({", ".join(sorted(_kol[k_]))}) — sprawdz, ktory to.')
     if k_ in by: return by[k_]
+    # 29.09.2026 (Liga Pro): scores24 pisze gracza "Jakub Stolfa", STS "Stolfa Jakub" albo "Stolfa J." —
+    # dwuczlonowe nazwy osob porownujemy tez w odwrotnej kolejnosci i z inicjalem imienia; tylko jeden kandydat.
+    _cz = re.findall(r'[^\W\d_]+', str(name).translate(_LITERY))
+    if len(_cz) == 2:
+        _n2 = [norm(x) for x in _cz]
+        kand = sorted({p for p in by.values() if _osoba_rowna(_n2, [norm(x) for x in re.findall(r'[^\W\d_]+', str(p).translate(_LITERY))])})
+        if len(kand) == 1: return kand[0]
+        if len(kand) > 1:
+            print(f'  ODRZUCONO: "{name}" pasuje do {len(kand)} graczy ({", ".join(kand)}) — noga MNIEJ')
+            return None
     # Poprawka 51 (24.09.2026): rok zalozenia w nazwie ("TVB Stuttgart" w STS, "TVB 1898 Stuttgart" w bazie).
     # Rok wolno pominac TYLKO gdy rdzen bez roku ma >= 2 czlony (chroni "Metalist 1925" != "Metalist",
     # Poprawka 33, oraz "1860 Munich" != "Munich") i gdy pasuje DOKLADNIE jeden kandydat.
