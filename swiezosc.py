@@ -133,7 +133,7 @@ def niemozliwe_mecze(pokaz=12):
         zle += 1
         print(f'  LICZBA MECZOW NIEMOZLIWA: {len(ciezkie)} przypadkow, gdzie klub ma 4+ meczow')
         print(f'      jednego dnia (maks {int(ciezkie.ile.max())}). Zadna liga tak nie gra —')
-        print(f'      to znaczy, ze caly blok terminarza dostal JEDNA date.')
+        print('      to znaczy, ze caly blok terminarza dostal JEDNA date.')
         for x in ciezkie.sort_values('ile', ascending=False).head(pokaz).itertuples():
             print(f'      [{x.Division}] {x.MatchDate} "{x.k}" — {x.ile} meczow')
         print('      Sprawdz przypisywanie dat w uzupelnij_ligi.py (sciezka wiki).')
@@ -169,7 +169,7 @@ def main():
                   'graja oknami — sam wiek nie swiadczy o zepsuciu'))
         n = pd.read_sql('select Division, max(MatchDate) m from matches group by Division', c)
         sw = (n.m >= str(DZIS - dt.timedelta(days=60))).sum()
-        w.append((f'  w tym lig swiezych (60 dni)', f'{sw}/{len(n)}', None, None, ''))
+        w.append(('  w tym lig swiezych (60 dni)', f'{sw}/{len(n)}', None, None, ''))
         c.close()
     else:
         w.append(('kb.sqlite', 'BRAK', None, None, 'nie zbudowano bazy'))

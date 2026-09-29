@@ -920,8 +920,8 @@ def main(a):
         print(f'  {note}')
         if n < 5:
             print(f'  BRAK DANYCH RYWALA: najslabiej opisana druzyna ma {n} mecz(e) w bazie. Elo jest')
-            print(f'  wtedy bliskie domyslnemu 1500, wiec powyzsze P nie jest pomiarem, tylko artefaktem')
-            print(f'  braku danych. NIE buduj na tym nogi kuponu, nawet jesli EV wychodzi wysokie.')
+            print('  wtedy bliskie domyslnemu 1500, wiec powyzsze P nie jest pomiarem, tylko artefaktem')
+            print('  braku danych. NIE buduj na tym nogi kuponu, nawet jesli EV wychodzi wysokie.')
         elif n < 10:
             print(f'  UWAGA: mało meczów w bazie ({n}) — P to szacunek; opieraj się na statystykach z sieci (MASTER PROMPT część B).')
         elif n < 25:
@@ -934,10 +934,10 @@ def main(a):
             # Skutek praktyczny: na slabszej druzynie wychodzi pozorne, bardzo wysokie EV. To nie jest
             # przewaga, tylko brak zbieznosci Elo. Ostrzegamy o kierunku bledu, nie o jego istnieniu.
             print(f'  ELO NIEZBIEZNE: najslabiej opisana druzyna ma {n} mecz(e) — za malo, by Elo')
-            print(f'  odeszlo od startowych 1500. Rozstep jest scisniety KU SRODKOWI: P faworyta jest')
-            print(f'  zanizone, P slabszego zawyzone, tym bardziej im wieksza roznica klas.')
-            print(f'  Wysokie EV na SLABSZEJ druzynie jest tu artefaktem, nie przewaga — nie graj go.')
-            print(f'  P faworyta traktuj jako DOLNA granice. Mecze wyrownane sa wiarygodniejsze.')
+            print('  odeszlo od startowych 1500. Rozstep jest scisniety KU SRODKOWI: P faworyta jest')
+            print('  zanizone, P slabszego zawyzone, tym bardziej im wieksza roznica klas.')
+            print('  Wysokie EV na SLABSZEJ druzynie jest tu artefaktem, nie przewaga — nie graj go.')
+            print('  P faworyta traktuj jako DOLNA granice. Mecze wyrownane sa wiarygodniejsze.')
         fav = h if ec >= 0.5 else g
         p_k, powody = werdykt_meczu(ok_, p_dz, n, _ligi_druzyny(d[d.sport == sport], h, 1) | _ligi_druzyny(d[d.sport == sport], g, 1))
         if powody:

@@ -522,9 +522,9 @@ def main():
         # — najwyzsza "wartosc" calego okna, podczas gdy rynek wycenial mecz na 50/50.
         # To nie jest przewaga informacyjna, tylko BRAK DANYCH UDAJACY PRZEWAGE.
         print(f'  BRAK DANYCH RYWALA: najslabiej opisany zawodnik ma {_nmin} mecz(e) w bazie.')
-        print(f'  Elo jest wtedy bliskie domyslnemu 1500, wiec ponizsze P NIE JEST pomiarem, tylko')
-        print(f'  artefaktem braku danych. NIE buduj na tym nogi kuponu — szczegolnie gdy wychodzi')
-        print(f'  wysokie EV przy kursie bliskim 2,00: to sygnal falszywy, nie okazja.')
+        print('  Elo jest wtedy bliskie domyslnemu 1500, wiec ponizsze P NIE JEST pomiarem, tylko')
+        print('  artefaktem braku danych. NIE buduj na tym nogi kuponu — szczegolnie gdy wychodzi')
+        print('  wysokie EV przy kursie bliskim 2,00: to sygnal falszywy, nie okazja.')
         print(f'Faworyt: {fav}  P (SZACUNEK, brak danych rywala) ok. {max(p, 1 - p):.0%}')
     else:
         print(f'Faworyt: {fav}  P_model {max(p, 1 - p):.1%}  P_skalibr {pc:.1%}')
