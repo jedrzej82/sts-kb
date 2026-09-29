@@ -31,3 +31,14 @@ def test_main_bez_kolumn(tmp_path):
     f = tmp_path / 't.csv'; f.write_text('data,kurs\n2026-09-29,1.5\n')
     with pytest.raises(SystemExit, match='BRAK KOLUMN'):
         clv.main([str(f)])
+
+
+def test_dopisz_typ_scala_kolumny_ze_starym_logiem(tmp_path):
+    f = tmp_path / 'typy_log.csv'
+    f.write_text('data,gosp,gość,rynek,p,trafiony\n2026-09-28,A,B,1X,0.8,1\n')
+    clv.dopisz_typ(str(f), dict(data='2026-09-29', gosp='C', gość='D', rynek='O1.5', p=0.78, trafiony=None), ['1,35', 'tak'])
+    clv.dopisz_typ(str(f), dict(data='2026-09-29', gosp='E', gość='F', rynek='1', p=0.7, trafiony=None), [])
+    d = pd.read_csv(f)
+    assert list(d.gosp) == ['A', 'C', 'E']
+    assert d.kurs_typu.iloc[1] == 1.35 and d.pieniadze.iloc[1] == 1
+    assert pd.isna(d.kurs_typu.iloc[0]) and pd.isna(d.kurs_typu.iloc[2])

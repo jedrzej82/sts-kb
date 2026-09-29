@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Pętla uczenia na wynikach na żywo (codziennie):
   python3 ucz.py wynik LIGA DATA GOSP GOŚĆ G_GOSP G_GOŚĆ [HT_G HT_A]  -> dopisuje wynik do delta.csv (ligi/mecze spoza GitHuba)
-  python3 ucz.py typ DATA GOSP GOŚĆ RYNEK P                           -> zapisuje typ modelu do typy_log.csv
+  python3 ucz.py typ DATA GOSP GOŚĆ RYNEK P [KURS_TYPU [PIENIADZE]]   -> zapisuje typ modelu do typy_log.csv
+                                                                         (kurs z chwili typu i 1/0 za pieniadze — P56.3, CLV)
   python3 ucz.py rozlicz                                              -> rozlicza typy wynikami z bazy, liczy własną trafność
 Po rozliczeniu powstaje korekta_wlasna.csv: dla każdego rynku i przedziału P miesza kalibrację z backtestu
 z NASZĄ rzeczywistą trafnością (waga n/(n+100)), więc model poprawia się z każdym rozliczonym typem."""
@@ -28,8 +29,9 @@ def main(a):
                    HTHome=int(a[7]) if len(a) > 8 else None, HTAway=int(a[8]) if len(a) > 8 else None)
         pd.DataFrame([row]).to_csv(DELTA, mode='a', header=not os.path.exists(DELTA), index=False); print('dopisano', row)
     elif a[0] == 'typ':
+        from clv import dopisz_typ
         row = dict(data=a[1], gosp=a[2], gość=a[3], rynek=a[4], p=float(a[5]), trafiony=None)
-        pd.DataFrame([row]).to_csv(LOG, mode='a', header=not os.path.exists(LOG), index=False); print('zapisano typ', row)
+        print('zapisano typ', dopisz_typ(LOG, row, a[6:8]))
     elif a[0] == 'rozlicz':
         if not os.path.exists(LOG): sys.exit('brak typów')
         L = pd.read_csv(LOG)

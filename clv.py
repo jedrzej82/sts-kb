@@ -18,6 +18,21 @@ MIN_N_INFO = 30
 MIN_N_FAZA2 = 100
 
 
+def dopisz_typ(plik, row, argv_kurs):
+    """Dopisuje typ do logu (typy_log.csv / sporty_typy.csv) z opcjonalnymi kolumnami P56.3:
+    argv_kurs = [KURS_TYPU [PIENIADZE]] z konca linii polecenia. Plik jest scalany po nazwach kolumn
+    (stary log z Dysku nie ma kurs_typu/pieniadze — dopisanie trybem 'a' przesuneloby kolumny)."""
+    import os
+    if argv_kurs:
+        row['kurs_typu'] = float(str(argv_kurs[0]).replace(',', '.'))
+        row['pieniadze'] = int(_tak(argv_kurs[1])) if len(argv_kurs) > 1 else 0
+    nowy = pd.DataFrame([row])
+    if os.path.exists(plik):
+        nowy = pd.concat([pd.read_csv(plik), nowy], ignore_index=True)
+    nowy.to_csv(plik, index=False)
+    return row
+
+
 def _tak(x):
     return str(x).strip().lower() in ('1', 'tak', 'true', 'yes', 't', 'p', 'pieniadze')
 
