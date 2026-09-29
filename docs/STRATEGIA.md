@@ -79,7 +79,9 @@ z EV > 0 po bramce, glownie pojedyncze (K3), gdzie przewaga ma szanse przetrwac 
 - [x] aliasy jako dane: `aliasy.csv` wczytywane przez typuj/sporty/sezon (kod wygrywa), objete rejestrem i testem
 - [x] `build_kb.norm`: l/o/ss przez nazwy.LITERY (baza identyczna); zachowanie lat ODRZUCONE po przebudowie —
   odklejalo Basel/Hoffenheim II, niczego nie naprawialo (hipoteza z audytu nie potwierdzona danymi)
-- [ ] przeniesienie istniejacych tabel z kodu do aliasy.csv (stopniowo, z testem rownowaznosci)
+- [x] przeniesienie starych tabel do aliasy.csv — ODRZUCONE (29.09): tabele sa pogrupowane wg poprawek z uzasadnieniem
+  kazdej pary; przeniesienie nie zmieniloby dzialania, a pogorszyloby czytelnosc. Nowe pary -> aliasy.csv.
+  'GKS Jastrzêbie' w sporty.py to NIE blad aliasu — tak (z zepsutym kodowaniem) zapisuje ja zrodlo danych.
 
 ### Faza 4 — model i przewaga (do 15.11)
 - [x] CLV: `clv.py` + `kurs_typu`/`pieniadze` w `ucz.py typ` / `sporty.py typ` (Poprawka 56.3)
