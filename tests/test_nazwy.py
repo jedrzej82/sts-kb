@@ -113,3 +113,21 @@ def test_brak_nowych_sprzecznosci_w_aliasach():
     import rejestr
     n = rejestr.nowe_konflikty()
     assert n.empty, n.to_string()
+
+
+def test_aliasy_z_pliku_kod_wygrywa(tmp_path):
+    from nazwy import aliasy_z_pliku
+    f = tmp_path / 'aliasy.csv'
+    f.write_text('modul,nazwa,cel,uzasadnienie,data\n'
+                 'typuj,Independiente Yumbo,Independiente Valle del Cauca,Primera B COL,2026-09-29\n'
+                 'typuj,Legia Warszawa,Inny Klub,probuje nadpisac kod,2026-09-29\n'
+                 'sporty,Lukko Rauma,Lukko,inny modul,2026-09-29\n', encoding='utf-8')
+    d = {'legiawarszawa': 'Legia'}
+    assert aliasy_z_pliku('typuj', typuj.norm, d, str(f)) == 1
+    assert d == {'legiawarszawa': 'Legia', 'independienteyumbo': 'Independiente Valle del Cauca'}
+
+
+def test_aliasy_csv_ma_naglowek():
+    import csv
+    from nazwy import ALIASY_CSV
+    assert csv.DictReader(open(ALIASY_CSV, encoding='utf-8')).fieldnames == ['modul', 'nazwa', 'cel', 'uzasadnienie', 'data']

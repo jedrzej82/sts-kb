@@ -49,6 +49,10 @@ def zbierz():
     dodaj('sezon._ALIASY_PILKA', sezon._ALIASY_PILKA)
     dodaj('tenis._LITEROWKI_STS', tenis._LITEROWKI_STS)
     dodaj('zewn._DRUZYNA_FS', zewn._DRUZYNA_FS)
+    from nazwy import ALIASY_CSV
+    if os.path.exists(ALIASY_CSV):
+        for r in pd.read_csv(ALIASY_CSV, dtype=str).fillna('').itertuples():
+            w.append((f'aliasy.csv:{r.modul}', '', r.nazwa, klucz(r.nazwa), r.cel))
     return pd.DataFrame(w, columns=['tabela', 'zakres', 'nazwa', 'klucz', 'cel'])
 
 

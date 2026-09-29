@@ -7,6 +7,7 @@ bylo wnosic w kilku plikach, a kopie zaczynaly sie rozjezdzac).
   znaczniki(s) — RODZAJE znacznikow w nazwie; porownanie jest symetryczne: rozne znaczniki = rozne druzyny
   wspolna_liga(m, a, b) — czy dwa kluby graly w jednej lidze (dopasowanie LACZNE pary z oferty)
 """
+import os
 import re
 
 LITERY = str.maketrans({'ł': 'l', 'Ł': 'L', 'đ': 'd', 'Đ': 'D', 'ø': 'o', 'Ø': 'O', 'ß': 'ss',
@@ -46,8 +47,31 @@ def wspolna_liga(m, a, b, dni=730):
     wiarygodna tylko wtedy, gdy oba kluby naprawde dziela lige. Puchar krajowy z roznych lig -> False
     (noga MNIEJ — bezpieczny kierunek bledu)."""
     if a is None or b is None or m is None or not len(m): return False
-    od = m.MatchDate.max() - __import__('pandas').Timedelta(days=dni)
+    import pandas as pd
+    od = m.MatchDate.max() - pd.Timedelta(days=dni)
     x = m[m.MatchDate >= od]
     def ligi(t):
         return set(x.loc[(x.HomeTeam == t) | (x.AwayTeam == t), 'Division'].dropna())
     return bool(ligi(a) & ligi(b))
+
+
+ALIASY_CSV = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'aliasy.csv')
+
+
+def aliasy_z_pliku(modul, klucz, slownik, plik=None):
+    """29.09.2026 (faza 3b): aliasy jako DANE — aliasy.csv (modul,nazwa,cel,uzasadnienie,data), nazwa tak jak
+    w ofercie; klucz liczy funkcja danego modulu. Dopisuje przez setdefault, wiec wpis w kodzie wygrywa
+    (istniejace dopasowania sie nie zmieniaja). Nowe pary nazw: jeden wiersz w CSV zamiast zmian w kilku plikach.
+    Zwraca liczbe dodanych wpisow."""
+    import csv
+    plik = plik or ALIASY_CSV
+    if not os.path.exists(plik): return 0
+    n = 0
+    with open(plik, encoding='utf-8', newline='') as fh:
+        for r in csv.DictReader(fh):
+            if (r.get('modul') or '').strip() != modul or not (r.get('nazwa') or '').strip() or not (r.get('cel') or '').strip():
+                continue
+            k = klucz(r['nazwa'].strip())
+            if k and k not in slownik:
+                slownik[k] = r['cel'].strip(); n += 1
+    return n

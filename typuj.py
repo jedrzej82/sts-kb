@@ -973,6 +973,10 @@ def intl(home, away, neutral, kursy):
     value(rows, kursy, dz)
 
 
+# 29.09.2026 (faza 3b): aliasy z pliku danych aliasy.csv (modul=typuj) — na koncu, zeby wpisy w kodzie wygrywaly
+from nazwy import aliasy_z_pliku as _aliasy_z_pliku
+_aliasy_z_pliku('typuj', norm, ALIASES)
+
 if __name__ == '__main__':
     args = [x for x in sys.argv[1:]]
     kursy = {}

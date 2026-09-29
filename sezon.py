@@ -503,6 +503,10 @@ def druzyny(plik, frag):
             print(w.get('liga') or w.get('rozgrywki'), '|', w['druzyna'], '| mecze', w.get('mecze'))
 
 
+# 29.09.2026 (faza 3b): aliasy z pliku danych aliasy.csv (modul=sezon; cel = zapis z arkusza statystyk)
+from nazwy import aliasy_z_pliku as _aliasy_z_pliku
+_aliasy_z_pliku('sezon', lambda n: ''.join(ch for ch in norm(n) if ch.isalnum()), _ALIASY_PILKA)
+
 if __name__ == '__main__':
     a = sys.argv[1:]
     opcja = lambda k: float(a[a.index(k) + 1]) if k in a else None

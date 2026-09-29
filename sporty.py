@@ -884,5 +884,9 @@ def main(a):
         c.to_csv(CAL, index=False, float_format='%.4f')
 
 
+# 29.09.2026 (faza 3b): aliasy z pliku danych aliasy.csv (modul=sporty) — na koncu, zeby wpisy w kodzie wygrywaly
+from nazwy import aliasy_z_pliku as _aliasy_z_pliku
+_aliasy_z_pliku('sporty', norm, _ALIASY_RECZNE)
+
 if __name__ == '__main__':
     main(sys.argv[1:] or ['stan'])
