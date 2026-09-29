@@ -8,7 +8,7 @@
   tenis_hist.csv   — ATP i WTA 1968–dziś (LuckyLoser91/TennisCourtLog, format Sackmanna, aktualizowane co tydzień)
 Kolumna dogrywka: 1 = dogrywka/karne/dodatkowe inningi, 0 = regulaminowy czas, -1 = nieznane.
   python3 hist_import.py          — pobiera/aktualizuje źródła i przebudowuje cache (ok. 2–3 min)"""
-import os, glob, subprocess, datetime as dt, pandas as pd
+import os, re, glob, subprocess, datetime as dt, pandas as pd
 
 HERE = os.path.dirname(os.path.abspath(__file__)); RAW = os.path.join(HERE, 'raw'); REL = os.path.join(RAW, 'rel')
 REPOS = {'hoopR-data': ('sportsdataverse/hoopR-data', 'nba/schedules/csv/*'),
@@ -268,6 +268,13 @@ def tenis():
         ['date', 'tour', 'tourney_name', 'poziom', 'nawierzchnia', 'round', 'best_of', 'zwyciezca', 'przegrany', 'score']]
 
 
+def _jeden_zapis(n):
+    """Encje HTML i apostrofy typograficzne -> jeden zapis nazwy (O&#039;Connor, O’Connor -> O'Connor)."""
+    import html
+    if not isinstance(n, str): return n
+    return re.sub(r"[’ʼ`´]", "'", html.unescape(n))
+
+
 def main():
     fetch()
     parts = [espn('nba', 'NBA'), espn('wnba', 'WNBA'), nhl(), nfl(), mlb(), esport()]
@@ -280,6 +287,8 @@ def main():
     eu = os.path.join(HERE, 'sporty_eu.csv')
     if os.path.exists(eu): parts.append(pd.read_csv(eu))
     h = pd.concat(parts, ignore_index=True)[COLS].dropna(subset=['gosp', 'gosc', 'pg', 'pa'])
+    # 29.09.2026: dart mial „William O&#039;Connor” i „William O’Connor” jako dwoch graczy — jeden zapis nazw
+    for c in ('gosp', 'gosc'): h[c] = h[c].map(_jeden_zapis)
     lol = h.sport == 'esport_lol'  # LoL = pojedyncze mapy: kolejne mapy serii tego samego dnia to NIE duplikaty
     h = pd.concat([h[~lol].drop_duplicates(['data', 'sport', 'gosp', 'gosc', 'pg', 'pa']), h[lol]]).sort_values('data', kind='stable')
     h.to_csv(os.path.join(HERE, 'sporty_hist.csv'), index=False)

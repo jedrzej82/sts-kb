@@ -11,7 +11,7 @@ codziennie do sporty_delta.csv. Model uczy się od zera — im więcej wyników,
   python3 sporty.py backtest                                        — kalibracja z historii (sporty_hist.csv) → sporty_kalibracja_hist.csv
 Baza = sporty_hist.csv (NBA/WNBA/NHL/NFL/MLB z GitHub, hist_import.py) + sporty_delta.csv (wyniki dopisywane codziennie)."""
 import os, sys, re, difflib, unicodedata, numpy as np, pandas as pd
-import functools
+import functools, html
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DB, LOG, CAL = (os.path.join(HERE, f) for f in ('sporty_delta.csv', 'sporty_typy.csv', 'sporty_kalibracja.csv'))
@@ -82,7 +82,8 @@ K = 24
 # czyli przypadek. Dotyczy wszystkich nazw z l z kreska, d z kreska, o z kreska itd.
 from nazwy import LITERY as _LITERY   # 29.09.2026: jedna tabela dla wszystkich modulow (nazwy.py)
 
-def norm(s): return re.sub(r'[^a-z0-9]', '', unicodedata.normalize('NFKD', str(s).translate(_LITERY)).encode('ascii', 'ignore').decode().lower())
+# 29.09.2026: html.unescape — w bazie dart byl „William O&#039;Connor” obok „William O’Connor” (dwa klucze, dwa Elo)
+def norm(s): return re.sub(r'[^a-z0-9]', '', unicodedata.normalize('NFKD', html.unescape(str(s)).translate(_LITERY)).encode('ascii', 'ignore').decode().lower())
 
 
 def scal_warianty(d, cicho=False):
@@ -231,7 +232,7 @@ def elo(d, sport, pre=None, info=None):
 
 @functools.lru_cache(maxsize=None)
 def _tokeny(s):
-    return tuple(re.findall(r'[a-z0-9]+', unicodedata.normalize('NFKD', str(s).translate(_LITERY)).encode('ascii', 'ignore').decode().lower()))
+    return tuple(re.findall(r'[a-z0-9]+', unicodedata.normalize('NFKD', html.unescape(str(s)).translate(_LITERY)).encode('ascii', 'ignore').decode().lower()))
 
 
 # Nazwy reprezentacji: STS pisze po polsku, bazy po angielsku — i to KAZDA INACZEJ.
@@ -544,8 +545,12 @@ def _rdzen_rowny(name, kandydaci):
 
 
 def _osoba_rowna(a, b):
-    """Dwa czlony nazwy osoby: te same w dowolnej kolejnosci albo nazwisko + inicjal imienia ("stolfa","j")."""
-    if len(b) != 2 or not all(a) or not all(b): return False
+    """Dwa czlony nazwy osoby: te same w dowolnej kolejnosci albo nazwisko + inicjal imienia ("stolfa","j").
+    29.09.2026: 3-4 czlony — imie przeniesione z konca na poczatek („van Veen Gian” = „Gian van Veen”)."""
+    if not all(a) or not all(b): return False
+    if len(a) == len(b) >= 3:
+        return (a[:-1] == b[1:] and a[-1] == b[0]) or (b[:-1] == a[1:] and b[-1] == a[0])
+    if len(b) != 2 or len(a) != 2: return False
     for x, y in ((a, b), (a, b[::-1])):
         if x == y: return True
         if x[0] == y[0] and len(x[0]) >= 3 and (len(x[1]) == 1 and y[1].startswith(x[1]) or len(y[1]) == 1 and x[1].startswith(y[1])):
@@ -594,10 +599,11 @@ def resolve(name, pool):
             return r
     # 29.09.2026 (Liga Pro): scores24 pisze gracza "Jakub Stolfa", STS "Stolfa Jakub" albo "Stolfa J." —
     # dwuczlonowe nazwy osob porownujemy tez w odwrotnej kolejnosci i z inicjalem imienia; tylko jeden kandydat.
-    _cz = re.findall(r'[^\W\d_]+', str(name).translate(_LITERY))
-    if len(_cz) == 2:
-        _n2 = [norm(x) for x in _cz]
-        kand = sorted({p for p in by.values() if _osoba_rowna(_n2, [norm(x) for x in re.findall(r'[^\W\d_]+', str(p).translate(_LITERY))])})
+    # 29.09.2026: apostrof nie dzieli nazwiska („O'Connor William” to 2 czlony, nie 3) i 3-4 czlony („van Veen Gian”)
+    _czl = lambda s: [norm(x) for x in re.findall(r'[^\W\d_]+', re.sub(r"['’ʼ`´]", '', html.unescape(str(s))).translate(_LITERY))]
+    _n2 = _czl(name)
+    if 2 <= len(_n2) <= 4:
+        kand = sorted({p for p in by.values() if _osoba_rowna(_n2, _czl(p))})
         if len(kand) == 1: return kand[0]
         if len(kand) > 1:
             print(f'  ODRZUCONO: "{name}" pasuje do {len(kand)} graczy ({", ".join(kand)}) — noga MNIEJ')

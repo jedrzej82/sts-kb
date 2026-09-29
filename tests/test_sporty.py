@@ -133,6 +133,24 @@ def test_aliasy_reczna_terminarz_fs():
     assert sporty.resolve('Wybrzeze Gdansk', pula) is None
 
 
+def test_raport_1800_hokej_reczna_dart():
+    # Raport 29.09 18:00, usterki 1, 2 i 5
+    hk = {'ZSC Lions', 'Genève-Servette HC', 'Rouen', 'Amiens', 'Grenoble', 'Cergy-Pontoise', 'Angers', 'New York Rangers'}
+    for a, b in [('ZSC Lions Zurich', 'ZSC Lions'), ('Servette Geneva', 'Genève-Servette HC'), ('Rouen Dragons', 'Rouen'),
+                 ('Angers Ducs', 'Angers'), ('Jokers de Cergy-Pontoise', 'Cergy-Pontoise')]:
+        assert sporty.resolve(a, hk) == b
+    rc = {'Nexe', 'Saint Raphaël', 'Benfica', 'Hammarby', 'Valur', 'Mors'}
+    for a, b in [('Nexe Nasice', 'Nexe'), ('Valur Reykjavik', 'Valur'), ('Mors-Thy Handbold', 'Mors'), ('Benfica Lizbona', 'Benfica')]:
+        assert sporty.resolve(a, rc) == b
+    dart = {"William O'Connor", 'Gian van Veen', 'Dirk van Duijvenbode', 'Ryan Searle', 'Richard Veenstra'}
+    assert sporty.resolve("O'Connor William", dart) == "William O'Connor"
+    assert sporty.resolve('O’Connor William', dart) == "William O'Connor"
+    assert sporty.resolve('van Veen Gian', dart) == 'Gian van Veen'
+    assert sporty.resolve('van Duijvenbode Dirk', dart) == 'Dirk van Duijvenbode'
+    assert sporty.resolve('William O&#039;Connor', dart) == "William O'Connor"   # encja HTML ze zrodla
+    assert sporty.resolve('van Gian Veen', dart) is None                         # inna kolejnosc — nie zgadujemy
+
+
 def test_samo_nazwisko_kilku_osob_nie_zgadujemy():
     """29.09.2026: „Price” -> „Sam Price” (Gerwyn, Lewis, Kane...), „Higgins” -> „Alex Higgins” — zgadywanie."""
     pula = {'Sam Price', 'Gerwyn Price', 'Lewis Price', 'Luke Littler', 'Alex Higgins', 'John Higgins'}

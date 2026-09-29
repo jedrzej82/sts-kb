@@ -88,3 +88,21 @@ def test_fsx_kraj_w_nawiasie_i_rowna_nazwa(tmp_path, monkeypatch):
     x = zewn.inne()
     assert (x.gosp == 'SK Knights').sum() == 3
     assert 'China (W)' in set(x[x.liga.str.contains('Asian Games')].gosp)
+
+
+def test_fsx_alias_z_aliasy_csv(tmp_path, monkeypatch):
+    # 29.09: „St. Raphael” (FS) i „Saint Raphaël” (365) byly w bazie dwoma klubami — alias z aliasy.csv je laczy
+    s365 = pd.DataFrame([_w('handball', 'France', 'Starligue', 'Saint Raphaël', 'USAM Nimes', 30, 28)], columns=KOL)
+    fsx = pd.DataFrame([_w('handball', 'EUROPE', 'European League', 'St. Raphael', 'Nexe', 31, 29)], columns=KOL)
+    s365.to_csv(tmp_path / 'wyniki_365_inne_2026-09.csv.gz', index=False)
+    fsx.to_csv(tmp_path / 'wyniki_fsx_inne_2026-09.csv.gz', index=False)
+    monkeypatch.setattr(zewn, 'ZD', str(tmp_path))
+    x = zewn.inne()
+    assert (x.gosp == 'Saint Raphaël').sum() == 2 and 'St. Raphael' not in set(x.gosp)
+
+
+def test_hist_jeden_zapis_nazwy():
+    import hist_import
+    assert hist_import._jeden_zapis('William O&#039;Connor') == "William O'Connor"
+    assert hist_import._jeden_zapis('William O’Connor') == "William O'Connor"
+    assert hist_import._jeden_zapis(None) is None
