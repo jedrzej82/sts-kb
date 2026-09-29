@@ -71,3 +71,20 @@ def test_fsx_nazwa_tylko_w_tym_samym_kraju(tmp_path, monkeypatch):
     x = zewn.inne()
     nazwy = set(x.gosp) | set(x.gosc)
     assert 'Zamora' in nazwy and 'FC Porto' in set(x[x.liga.str.contains('European League')].gosp)
+
+
+def test_fsx_kraj_w_nawiasie_i_rowna_nazwa(tmp_path, monkeypatch):
+    # „Seoul Knights” (KBL) i „Seoul Knights (Kor)” (puchar) to jeden klub = „SK Knights” z 365;
+    # „China W” to „China (W)”, nie „China Univ. (W)” (jedyna nazwa o tych samych czlonach)
+    s365 = pd.DataFrame([_w('basketball', 'South Korea', 'KBL', 'SK Knights', 'KCC Egis', 80, 75),
+                         _w('volleyball', 'Asia', 'Asian Championship Women', 'China (W)', 'Japan (W)', 3, 1),
+                         _w('volleyball', 'Asia', 'Universiade Women', 'China Univ. (W)', 'Japan Univ. (W)', 3, 2)], columns=KOL)
+    fsx = pd.DataFrame([_w('basketball', 'SOUTH KOREA', 'KBL Cup', 'Seoul Knights', 'Anyang', 70, 65),
+                        _w('basketball', 'WORLD', 'Intercontinental Cup', 'Seoul Knights (Kor)', 'Tenerife', 60, 70),
+                        _w('volleyball', 'ASIA', 'Asian Games Women', 'China W', 'Thailand W', 3, 0)], columns=KOL)
+    s365.to_csv(tmp_path / 'wyniki_365_inne_2026-09.csv.gz', index=False)
+    fsx.to_csv(tmp_path / 'wyniki_fsx_inne_2026-09.csv.gz', index=False)
+    monkeypatch.setattr(zewn, 'ZD', str(tmp_path))
+    x = zewn.inne()
+    assert (x.gosp == 'SK Knights').sum() == 3
+    assert 'China (W)' in set(x[x.liga.str.contains('Asian Games')].gosp)
