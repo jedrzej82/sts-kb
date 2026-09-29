@@ -15,11 +15,12 @@ def test_brak_drugiego_zrodla_przy_malej_probie(capsys):
     assert 'BRAK DRUGIEGO ZRODLA' in capsys.readouterr().out
 
 
-def test_zgodne_daje_mniejsze_z_dwoch():
-    # H wygrywa 8/10, A przegrywa 8/10 -> forma '1' = (9/12 + 9/12)/2 = 0.75
+def test_zgodne_daje_p_modelu():
+    # Poprawka 58: zgodnosc obowiazkowa, ale P do kuponu = P modelu (nie min) — docs/BACKTEST_P48.md.
+    # H wygrywa 8/10, A przegrywa 8/10 -> forma '1' = (9/12 + 9/12)/2 = 0.75, model 0.80 -> zgodne (5 pp)
     w = _mecze('H', [(2, 0)] * 8 + [(0, 1)] * 2) + _mecze('A', [(0, 1)] * 8 + [(1, 0)] * 2)
     wynik = typuj.drugie_zrodlo(w, 'H', 'A', [('1', 0.80, 0.80)])
-    assert wynik['1'] == pytest.approx(0.75)
+    assert wynik['1'] == pytest.approx(0.80)
 
 
 def test_rozbiezne_to_none():

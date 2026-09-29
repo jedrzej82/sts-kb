@@ -843,15 +843,18 @@ def drugie_zrodlo(w, h, a, rows, n=10):
          'BTTS_tak': sr(lambda z, s: z > 0 and s > 0), 'BTTS_nie': sr(lambda z, s: z == 0 or s == 0),
          'gosp_O0.5': (r(*cz(fh, lambda z, s: z > 0)) + r(*cz(fa, lambda z, s: s > 0))) / 2,
          'gość_O0.5': (r(*cz(fa, lambda z, s: z > 0)) + r(*cz(fh, lambda z, s: s > 0))) / 2}
+    # 29.09.2026 (Poprawka 58, docs/BACKTEST_P48.md): zgodnosc zostaje OBOWIAZKOWA, ale P do kuponu = P modelu,
+    # nie mniejsze z dwoch. Backtest 54 699 nog (P >= 70%, 01-09.2026): min(P) srednio 77,1% przy trafnosci
+    # 82,2% (P modelu 80,4%), gorszy Brier (0,1441 vs 0,1411) i log loss — zanizal EV o ok. 5 pp.
     wynik = {}
     print(f'  {"Rynek":<12}{"P_model":>8}{"P_forma":>9}  werdykt')
     for k, p, pc in sorted(rows, key=lambda x: -x[2]):
         if k not in P or pc < 0.60: continue
         pf = P[k]; ok = abs(pc - pf) <= 0.10
-        wynik[k] = min(pc, pf) if ok else None
-        print(f'  {k:<12}{pc:8.1%}{pf:9.1%}  ' + (f'ZGODNE → P do kuponu {min(pc, pf):.1%}' if ok
+        wynik[k] = pc if ok else None
+        print(f'  {k:<12}{pc:8.1%}{pf:9.1%}  ' + (f'ZGODNE → P do kuponu {pc:.1%} (P modelu)' if ok
               else f'ROZBIEZNE ({(pf - pc) * 100:+.0f} pp) → NIE NA KUPON'))
-    print('  Zasada (Poprawka 48): na kupon tylko ZGODNE; P do kuponu = mniejsze z dwoch; do tego sprawdz nieobecnosci w sieci.')
+    print('  Zasada (Poprawki 48 i 58): na kupon tylko ZGODNE; P do kuponu = P modelu; do tego sprawdz nieobecnosci w sieci.')
     return wynik
 
 
@@ -872,9 +875,9 @@ def werdykt_nogi(k, dz):
 
 
 def value(rows, kursy, dz=None):
-    """29.09.2026: wczesniej EV liczone bylo z P modelu, a wynik drugie_zrodlo() byl wyrzucany — bramka
-    z Poprawki 48 istniala tylko jako tekst do przeczytania. Teraz: EV i Kelly do kuponu liczone z P po
-    bramce (mniejsze z dwoch), a noga bez zgodnego drugiego zrodla ma wprost werdykt NIE NA KUPON."""
+    """29.09.2026: wczesniej wynik drugie_zrodlo() byl wyrzucany — bramka z Poprawki 48 istniala tylko jako tekst
+    do przeczytania. Teraz: noga bez zgodnego drugiego zrodla ma wprost werdykt NIE NA KUPON, a EV i Kelly do
+    kuponu licza sie z P po bramce (od Poprawki 58: P modelu, gdy zrodla zgodne)."""
     if not kursy: return
     d = {k: pc for k, p, pc in rows}
     print('\nWARTOŚĆ (kurs użyty dopiero po wyliczeniu P; podatek 12%):')
