@@ -726,6 +726,16 @@ def drugie_zrodlo(d, sport, h, g, p_h):
     return min(pm, pf_tego)
 
 
+def werdykt_meczu(skala_ok, p_dz, n):
+    """29.09.2026: jedna linia WERDYKT zamiast bramek rozrzuconych po wyjsciu (wspolna skala, drugie
+    zrodlo z Poprawek 48/51, dane rywala z Poprawki 15). Zwraca (P do kuponu | None, lista powodow)."""
+    powody = []
+    if not skala_ok: powody.append('rozne ligi bez wspolnej skali')
+    if p_dz is None: powody.append('brak zgodnego drugiego zrodla')
+    if n < 5: powody.append(f'brak danych rywala ({n} mecz(e))')
+    return (None if powody else p_dz), powody
+
+
 def _ligi_druzyny(x, t, min_m=3):
     v = pd.concat([x.loc[x.gosp == t, 'liga'], x.loc[x.gosc == t, 'liga']]).value_counts()
     return set(v[v >= min_m].index)
@@ -837,7 +847,7 @@ def main(a):
         if not ok_:
             print(f'  ROZNE LIGI BEZ WSPOLNEJ SKALI: {h} ({", ".join(sorted(Lh_))}) i {g} ({", ".join(sorted(Lg_))}) — '
                   f'Elo z rozlacznych basenow, P NIEPOROWNYWALNE; nie buduj nogi kuponu z tego meczu, takze papierowej.')
-        drugie_zrodlo(d, sport, h, g, ec)
+        p_dz = drugie_zrodlo(d, sport, h, g, ec)
         stale = [t for t in (h, g) if t in L_ and (pd.Timestamp.today() - L_[t]).days > 150]
         if stale: print('  OSTRZEŻENIE: ostatni mecz w bazie >150 dni temu dla:', ', '.join(stale), '— sprawdź transfery/formę w sieci, korekta maks. ±6 pp.')
         print(f'  {note}')
@@ -861,6 +871,14 @@ def main(a):
             print(f'  zanizone, P slabszego zawyzone, tym bardziej im wieksza roznica klas.')
             print(f'  Wysokie EV na SLABSZEJ druzynie jest tu artefaktem, nie przewaga — nie graj go.')
             print(f'  P faworyta traktuj jako DOLNA granice. Mecze wyrownane sa wiarygodniejsze.')
+        fav = h if ec >= 0.5 else g
+        p_k, powody = werdykt_meczu(ok_, p_dz, n)
+        if powody:
+            print(f'\nWERDYKT: NIE NA KUPON — {"; ".join(powody)}')
+        else:
+            print(f'\nWERDYKT: NOGA DOPUSZCZONA — {fav}' + (' (z dogrywka)' if draws else '')
+                  + f', P do kuponu {p_k:.1%}' + (' (SZACUNEK: < 10 meczow)' if n < 10 else '')
+                  + '; EV licz z TEGO P: P × kurs × 0,88 − 1')
     elif a[0] == 'typ':
         row = dict(data=a[1], sport=a[2].lower(), gosp=a[3], gosc=a[4], rynek=a[5], p=float(a[6]), trafiony=None)
         pd.DataFrame([row]).to_csv(LOG, mode='a', header=not os.path.exists(LOG), index=False); print('zapisano', row)

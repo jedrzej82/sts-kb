@@ -49,7 +49,7 @@ z EV > 0 po bramce, glownie pojedyncze (K3), gdzie przewaga ma szanse przetrwac 
 - [x] pyflakes: niezdefiniowane `dni` (uzupelnij_ligi), `last_div` (eksport), nieuzywane importy
 - [x] `tests/` — zloty zestaw nazw + bramka; znane defekty jako `xfail(strict)`
 - [x] CI (GitHub Actions): pyflakes, kompilacja, pytest
-- [ ] `sporty.py`: jedna linia WERDYKT laczaca bramki (wspolna skala, drugie zrodlo, dane rywala) — do zrobienia
+- [x] `sporty.py`: jedna linia WERDYKT laczaca bramki (wspolna skala, drugie zrodlo, dane rywala)
 - [ ] Poprawka 56 na Drive — projekt w `docs/POPRAWKA_56_projekt.md`, do zatwierdzenia
 
 ### Faza 2 — niezawodnosc i czas (1 tydzien)
