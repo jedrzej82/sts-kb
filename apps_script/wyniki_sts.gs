@@ -46,7 +46,9 @@ var UZYJ_LS = false, UZYJ_ESPN = false;   // LiveScore i ESPN odrzucają serwery
 // 29.09.2026 (faza 3b): TERMINARZ — mecze dziś i jutro (także nierozegrane) → terminarz_365.csv.gz (nadpisywany).
 // Po co: oferta STS pisze nazwy inaczej niż bazy; mecz z terminarza (obie drużyny + data) wskazuje KRAJ i ROZGRYWKI,
 // więc typuj.py może odrzucić dopasowanie do klubu z innego kraju/ligi. Koszt: ~80 pobrań na godzinę.
-var UZYJ_TERMINARZ = true;
+// UWAGA: ten plik jest STARSZĄ wersją skryptu (bez Flashscore) — działający projekt użytkownika jest nowszy.
+// Terminarz instaluje się jako osobny plik apps_script/terminarz.gs (bez podmiany kodu), dlatego tu wyłączony.
+var UZYJ_TERMINARZ = false;
 var UA = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36',
   'Accept': 'application/json, text/plain, */*', 'Accept-Language': 'en-US,en;q=0.9', 'Referer': 'https://www.sofascore.com/',
   'Origin': 'https://www.sofascore.com'};
