@@ -82,10 +82,17 @@ z EV > 0 po bramce, glownie pojedyncze (K3), gdzie przewaga ma szanse przetrwac 
 - [ ] przeniesienie istniejacych tabel z kodu do aliasy.csv (stopniowo, z testem rownowaznosci)
 
 ### Faza 4 — model i przewaga (do 15.11)
-- CLV: kurs w chwili typu i kurs zamkniecia dla kazdej nogi (takze papierowej).
-- Backtest bramki P48; zastapienie `min(P)` mieszanka w logit z waga z backtestu + kalibracja na holdoucie.
-- `kupon.py`: skladanie kuponow w kodzie (JSON), LLM tylko prezentuje i weryfikuje kursy.
-- Instrukcja v7: poprawki 1–56 scalone, sprzecznosci usuniete, cel < 30 tys. znakow.
+- [x] CLV: `clv.py` + `kurs_typu`/`pieniadze` w `ucz.py typ` / `sporty.py typ` (Poprawka 56.3)
+- [x] Backtest bramki P48 (`bt_drugie_zrodlo.py`, docs/BACKTEST_P48.md): min(P) zanizal P o 4–5 pp ->
+  Poprawka 58: P do kuponu = P modelu przy zgodnych zrodlach (pilka i sporty.py); zgodnosc nadal obowiazkowa
+- [x] Kalibracja per rynek: U2.5 / BTTS / „2” przy P >= 70% mocno zawyzone -> NIE NA KUPON (Poprawka 58.5);
+  „ponizej −4 pp” potwierdzone danymi
+- [x] Rekalibracja na poprawionej bazie (wagi 0,4/0/0,6, nie gorsze na tescie; korekta rynkow przeliczona)
+- [x] `kupon.py`: K1/K2/K3/K5 wg v7 w kodzie; `typuj.py --nogi` zapisuje nogi dopuszczone
+- [x] Instrukcja v7 opublikowana (29 tys. znakow zamiast ~130 tys.)
+- [x] Czas budowy bazy ~13 min -> ~4–6 min (build_kb 332 s -> 38 s, hist_import szybszy; bazy identyczne)
+- [ ] Backtest tenisa i sezon.py (arkusze nie maja historii — potrzebny zapis dzienny arkuszy)
+- [ ] Po >= 100 nogach z CLV: ocena przewagi (clv.py) i decyzja o fazie 2
 
 ## 5. Kryteria sukcesu na 15.11
 
