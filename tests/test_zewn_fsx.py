@@ -106,3 +106,16 @@ def test_hist_jeden_zapis_nazwy():
     assert hist_import._jeden_zapis('William O&#039;Connor') == "William O'Connor"
     assert hist_import._jeden_zapis('William O’Connor') == "William O'Connor"
     assert hist_import._jeden_zapis(None) is None
+
+
+def test_archiwum_365h_wczytane_bez_dubli(tmp_path, monkeypatch):
+    # 29.09: wyniki365Historia (terminarz.gs) — jeden plik z cala reczna z 365; mecze, ktore „wyniki STS” juz ma, raz
+    s365 = pd.DataFrame([_w('handball', 'Germany', 'Bundesliga', 'THW Kiel', 'SC Magdeburg', 30, 28)], columns=KOL)
+    h = pd.DataFrame([_w('handball', 'Germany', 'Bundesliga', 'THW Kiel', 'SC Magdeburg', 30, 28),
+                      _w('handball', 'Poland', 'Superliga', 'Kielce', 'Wisla Plock', 31, 28)], columns=KOL)
+    h.loc[0, 'runda'] = 'Round 5'                      # inna runda niz w pliku miesiecznym — nadal ten sam mecz
+    s365.to_csv(tmp_path / 'wyniki_365_inne_2026-09.csv.gz', index=False)
+    h.to_csv(tmp_path / 'wyniki_365h_inne_archiwum.csv.gz', index=False)
+    monkeypatch.setattr(zewn, 'ZD', str(tmp_path))
+    x = zewn.inne()
+    assert len(x) == 2 and 'Kielce' in set(x.gosp)
