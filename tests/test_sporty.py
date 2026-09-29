@@ -57,3 +57,10 @@ def test_liga_pro_zawsze_nie_na_kupon():
     p, powody = sporty.werdykt_meczu(True, 0.75, 30, {'CZECH REPUBLIC | Liga Pro'})
     assert p is None and any('Liga Pro' in x for x in powody)
     assert sporty.werdykt_meczu(True, 0.75, 30, {'POLAND | Superliga'}) == (0.75, [])
+
+
+@pytest.mark.parametrize('arg, nazwa', [('koszykowka', 'koszykówka'), ('pilka_reczna', 'piłka ręczna'),
+                                        ('tenis-stolowy', 'tenis stołowy'), ('hokej', 'hokej'), ('xyz', 'xyz')])
+def test_nazwa_sportu_bez_ogonkow(arg, nazwa):
+    # Raport 29.09 12:00, usterka 6: "sporty.py typuj koszykowka" dawalo BRAK W BAZIE
+    assert sporty.nazwa_sportu(arg) == nazwa

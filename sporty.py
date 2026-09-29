@@ -767,7 +767,19 @@ def wspolna_skala(d, sport, h, g, dni=730):
 
 
 
+def nazwa_sportu(s):
+    """29.09.2026 (Raport 12:00, usterka 6): "koszykowka", "pilka_reczna", "tenis-stolowy" -> nazwa z bazy
+    ("koszykówka", "piłka ręczna", "tenis stołowy"). Nieznana nazwa wraca bez zmian (dalej BRAK W BAZIE)."""
+    s = str(s).strip().lower()
+    if s in SPORT: return s
+    k = norm(s.replace('_', ' ').replace('-', ' '))
+    return next((x for x in SPORT if norm(x) == k), s)
+
+
 def main(a):
+    a = list(a)
+    if a and a[0] in ('wynik', 'typ') and len(a) > 2: a[2] = nazwa_sportu(a[2])
+    elif len(a) > 1: a[1] = nazwa_sportu(a[1])
     if a[0] == 'wynik':
         row = dict(data=a[1], sport=a[2].lower(), liga=a[3], gosp=a[4], gosc=a[5], pg=float(a[6]), pa=float(a[7]),
                    dogrywka=int(a[8]) if len(a) > 8 else 0)
