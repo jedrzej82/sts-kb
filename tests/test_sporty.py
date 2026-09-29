@@ -14,12 +14,11 @@ def _baza(wyg_h, wyg_g, n=10):
     return pd.DataFrame(w)
 
 
-def test_zgodne_daje_mniejsze_z_dwoch():
-    # forma H 8/10 -> 0.75, G 3/10 -> 1/3; log5 = 0.75*(2/3) / (0.75*(2/3) + (1/3)*0.25) = 6/7
-    p = sporty.drugie_zrodlo(_baza(8, 3), 'hokej', 'H', 'G', 0.80)
-    assert p == pytest.approx(0.80)
-    p = sporty.drugie_zrodlo(_baza(8, 3), 'hokej', 'H', 'G', 0.90)
-    assert p == pytest.approx(6 / 7)
+def test_zgodne_daje_p_modelu():
+    # forma H 8/10 -> 0.75, G 3/10 -> 1/3; log5 = 0.75*(2/3) / (0.75*(2/3) + (1/3)*0.25) = 6/7 ~ 0.857
+    # Poprawka 58: przy zgodnych zrodlach P do kuponu = P modelu (docs/BACKTEST_P48.md)
+    assert sporty.drugie_zrodlo(_baza(8, 3), 'hokej', 'H', 'G', 0.80) == pytest.approx(0.80)
+    assert sporty.drugie_zrodlo(_baza(8, 3), 'hokej', 'H', 'G', 0.90) == pytest.approx(0.90)
 
 
 def test_rozni_faworyci_to_none():

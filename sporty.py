@@ -697,9 +697,12 @@ def drugie_zrodlo(d, sport, h, g, p_h):
     if abs(pm - pf_tego) > DZ_PROG:
         print(f'  ROZBIEZNE ({(pf_tego - pm) * 100:+.0f} pp) → NIE NA KUPON')
         return None
-    print(f'  ZGODNE → P do kuponu {min(pm, pf_tego):.1%} ({fm}; mniejsze z dwoch)')
+    # 29.09.2026 (Poprawka 58, docs/BACKTEST_P48.md): zgodnosc obowiazkowa, P do kuponu = P modelu. Backtest
+    # 3119 nog (dart, LoL, koszykowka, rugby, snooker; P >= 70%, 01-09.2026): min(P) 74,6% przy trafnosci 78,7%
+    # (P modelu 76,7%), gorszy Brier i log loss; odrzucone przez bramke trafialy 79,2% — nie gorzej.
+    print(f'  ZGODNE → P do kuponu {pm:.1%} ({fm}; P modelu, Poprawka 58)')
     print('  Zasada (Poprawka 51): gdy liga jest tez w arkuszu statystyk, noga musi byc zgodna rowniez z sezon.py.')
-    return min(pm, pf_tego)
+    return pm
 
 
 def werdykt_meczu(skala_ok, p_dz, n):
