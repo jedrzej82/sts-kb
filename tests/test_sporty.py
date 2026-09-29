@@ -123,3 +123,11 @@ def test_aliasy_reczna_lm():
     assert sporty.resolve('OTP Bank Pick Szeged', pula) == 'Pick Szeged'
     assert sporty.resolve('RK Zagreb', pula) == 'PPD Zagreb'
     assert sporty.resolve('Paris Saint-Germain', {'Paris Basketball'}) is None     # cel spoza puli -> nic
+
+
+def test_samo_nazwisko_kilku_osob_nie_zgadujemy():
+    """29.09.2026: „Price” -> „Sam Price” (Gerwyn, Lewis, Kane...), „Higgins” -> „Alex Higgins” — zgadywanie."""
+    pula = {'Sam Price', 'Gerwyn Price', 'Lewis Price', 'Luke Littler', 'Alex Higgins', 'John Higgins'}
+    assert sporty.resolve('Price', pula) is None and sporty.resolve('Higgins', pula) is None
+    assert sporty.resolve('Price G.', pula) == 'Gerwyn Price' and sporty.resolve('Higgins J.', pula) == 'John Higgins'
+    assert sporty.resolve('Littler', pula) == 'Luke Littler'                  # jeden kandydat -> dalej dziala
