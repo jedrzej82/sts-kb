@@ -191,3 +191,14 @@ def test_wikidata_ten_sam_klub_inna_nazwa():
     assert sporty.resolve('Langnau Tigers', {'SCL Tigers'}) is None                                   # brak sportu
     assert sporty.resolve('Metallurg Novokuznetsk', {'Metallurg'}, 'hokej') is None                   # „Metallurg” to tez Magnitogorsk
     assert sporty.resolve('Langnau Tigers', {'SCL Tigers'}, 'koszykówka') is None                     # inny sport
+
+
+def test_kalibracja_hokej_poza_nhl():
+    # 29.09.2026: osobna tabela dla lig bez NHL (backtest walk-forward, OOS); NHL i inne sporty bez zmian
+    assert sporty.poza_nhl({'Sweden | SHL', 'Europe | Champions Hockey League'})
+    assert not sporty.poza_nhl({'NHL'}) and not sporty.poza_nhl({'USA | NHL', 'Sweden | SHL'}) and not sporty.poza_nhl(set())
+    stara, _ = sporty.calibrate('hokej', 0.71)
+    nowa, opis = sporty.calibrate('hokej', 0.71, sporty.KAL_POZA_NHL)
+    assert nowa > stara + 0.05 and 'hokej_poza_nhl' in opis
+    assert abs(sporty.calibrate('hokej', 0.29, sporty.KAL_POZA_NHL)[0] - (1 - nowa)) < 1e-9   # symetria
+    assert sporty.calibrate('koszykówka', 0.7, 'nie_ma_takiej')[0] == sporty.calibrate('koszykówka', 0.7)[0]

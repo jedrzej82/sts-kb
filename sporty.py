@@ -701,11 +701,26 @@ def _wikidata(name, pula, sport):
     return p
 
 
-def calibrate(sport, p):
-    """Najpierw własne rozliczone prognozy (n≥150), potem backtest historyczny (dotyczy P faworyta/zwycięzcy, bez remisu)."""
+# 29.09.2026 (backtest walk-forward 09.2025-09.2026): kalibracja hokeja „z NHL” zanizala P w ligach europejskich
+# o ok. 5 pp (P 70-75% -> trafnosc 81%), a w NHL zawyzala o 3 pp. Osobna tabela dla meczow bez druzyny z NHL
+# (OOS, 3 podzialy czasu: Brier 0,2227 -> 0,2181, logloss 0,637 -> 0,627). NHL zostaje przy tabeli dotychczasowej.
+KAL_POZA_NHL = 'hokej_poza_nhl'
+OD_POZA_NHL = '2025-09-01'   # wczesniej w bazie praktycznie tylko NHL
+
+
+def poza_nhl(ligi):
+    """Czy zadna z lig druzyn (zbior nazw lig) nie jest NHL — wtedy hokej kalibrujemy tabela „poza NHL”."""
+    return bool(ligi) and not any(re.search(r'\bNHL\b', str(x)) for x in ligi)
+
+
+def calibrate(sport, p, klucz=None):
+    """Najpierw własne rozliczone prognozy (n≥150), potem backtest historyczny (dotyczy P faworyta/zwycięzcy, bez remisu).
+    klucz: osobna tabela w backteście historycznym (np. 'hokej_poza_nhl'); brak jej w pliku = tabela sportu."""
     for path, lab in ((CAL, 'własne prognozy'), (CALH, 'backtest historyczny')):
         if not os.path.exists(path): continue
-        c = pd.read_csv(path); c = c[c.sport == sport]
+        c = pd.read_csv(path)
+        if klucz and path == CALH and (c.sport == klucz).any(): c, lab = c[c.sport == klucz], f'{lab}, {klucz}'
+        else: c = c[c.sport == sport]
         if c.n.sum() < 150: continue
         q = max(p, 1 - p); pc = float(np.interp(q, c.p_model, c.p_kalibr))
         return (pc if p >= 0.5 else 1 - pc), f'skalibrowane ({lab}, n={int(c.n.sum())})'
@@ -732,10 +747,14 @@ def marza(d, sport, k):
     return R
 
 
-def backtest(d, sport, od='2015-01-01'):
+def backtest(d, sport, od='2015-01-01', maska=None, klucz=None, do=None):
+    """maska: funkcja (ramka meczow sportu) -> bool, np. mecze bez NHL; klucz: nazwa tabeli w pliku (domyslnie sport)."""
     pre = []; hfa = elo(d, sport, pre)[2]
     t = d[d.sport == sport].assign(ra=[x[0] for x in pre], rb=[x[1] for x in pre], na=[x[2] for x in pre], nb=[x[3] for x in pre])
     t = t[(t.data >= od) & (t.na >= 20) & (t.nb >= 20) & (t.pg != t.pa)]
+    if do is not None: t = t[t.data < do]
+    if maska is not None: t = t[maska(t)]
+    sport = klucz or sport
     if len(t) < 300: return None
     e = 1 / (1 + 10 ** ((t.rb - t.ra - hfa) / 400)); win = (t.pg > t.pa).astype(float)
     pf = np.maximum(e, 1 - e); hit = np.where(e >= 0.5, win, 1 - win)
@@ -878,6 +897,8 @@ def main(a):
         pd.DataFrame([row]).to_csv(DB, mode='a', header=not os.path.exists(DB), index=False); print('dopisano', row)
     elif a[0] == 'backtest':
         d = load(); cals = [c for sp in sorted(d.sport.unique()) for c in [backtest(d, sp)] if c is not None]
+        c = backtest(d, 'hokej', od=OD_POZA_NHL, maska=lambda t: ~t.liga.astype(str).str.contains(r'\bNHL\b'), klucz=KAL_POZA_NHL)
+        if c is not None: cals.append(c)
         if cals: pd.concat(cals).to_csv(CALH, index=False, float_format='%.4f'); print('zapisano', CALH)
     elif a[0] == 'druzyny':  # lista drużyn w bazie pasujących do fragmentu nazwy
         sport = a[1].lower(); inf = {}; R, N, *_ = elo(load(), sport, info=inf); q = norm(a[2]) if len(a) > 2 else ''
@@ -941,7 +962,8 @@ def main(a):
         print(f'{sport}: {h} (Elo {R.get(h, 1500):.0f}, {N.get(h, 0)} m.) – {g} (Elo {R.get(g, 1500):.0f}, {N.get(g, 0)} m.)')
         for t in (h, g):
             if t in inf['seeded']: print(f'  {t}: siła startowa z tabeli ligi {inf["seeded"][t]} (+ wyniki dopisane później)')
-        ec, note = calibrate(sport, e)
+        _, Lh0, Lg0 = wspolna_skala(d, sport, h, g)
+        ec, note = calibrate(sport, e, KAL_POZA_NHL if sport == 'hokej' and poza_nhl(Lh0 | Lg0) else None)
         prm = (__import__('json').load(open(PARAM)) if os.path.exists(PARAM) else {}).get(sport)
         if prm and not draws:
             from scipy.stats import norm as _nd
