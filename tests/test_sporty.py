@@ -125,6 +125,14 @@ def test_aliasy_reczna_lm():
     assert sporty.resolve('Paris Saint-Germain', {'Paris Basketball'}) is None     # cel spoza puli -> nic
 
 
+def test_aliasy_reczna_terminarz_fs():
+    pula = {'SG Flensburg-Handewitt', 'Saint Raphaël', 'Wybrzeze Gdansk II'}
+    assert sporty.resolve('Flensburg-H.', pula) == 'SG Flensburg-Handewitt'
+    assert sporty.resolve('St. Raphael', pula) == 'Saint Raphaël'
+    # druga druzyna (II) to nie pierwsza — bez zgadywania
+    assert sporty.resolve('Wybrzeze Gdansk', pula) is None
+
+
 def test_samo_nazwisko_kilku_osob_nie_zgadujemy():
     """29.09.2026: „Price” -> „Sam Price” (Gerwyn, Lewis, Kane...), „Higgins” -> „Alex Higgins” — zgadywanie."""
     pula = {'Sam Price', 'Gerwyn Price', 'Lewis Price', 'Luke Littler', 'Alex Higgins', 'John Higgins'}
