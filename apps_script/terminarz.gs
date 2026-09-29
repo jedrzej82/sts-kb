@@ -265,3 +265,101 @@ function wynikiFsUstaw() {
 function wynikiFsTydzien() {
   wynikiFsDruzynowe([-1, -2, -3, -4, -5, -6, -7]);
 }
+
+// ---------------------------------------------------------------------------------------------
+// 29.09.2026: HISTORIA piłki ręcznej z 365scores (wszystkie ligi, nie tylko te, które zbiera „wyniki STS”).
+// Liga Europejska, ligi skandynawskie i polska miały po 1–2 mecze w bazie — model nie mógł ich typować.
+// allscores przyjmuje daty z przeszłości: pobieramy dzień po dniu od HIST365_OD do wczoraj i zapisujemy JEDEN plik
+// wyniki_365h_inne_archiwum.csv.gz (format jak wyniki_365_inne; zewn.py czyta go sam, duble z 365 usuwa).
+// Limit Apps Script (6 min): po ok. 4,5 min zapis postępu — URUCHOM PONOWNIE, aż log pokaże „GOTOWE”.
+var HIST365_SPORT = 'handball', HIST365_OD = '2025-07-01', HIST365_PLIK = 'wyniki_365h_inne_archiwum.csv.gz';
+
+function _hist365Sport_(props) {
+  var sid = Number(props.getProperty('H365_SID') || 0);
+  if (sid) return sid;
+  var d = Utilities.formatDate(new Date(Date.now() - 86400000), 'UTC', 'dd/MM/yyyy'), ids = [];
+  for (var i = 1; i <= TERMINARZ_MAX_SPORT; i++) ids.push(i);
+  terminarzPobierz(ids.map(function (id) {
+    return 'https://webws.365scores.com/web/games/allscores/?appTypeId=5&langId=1&timezoneName=UTC&userCountryId=1&sports=' + id +
+      '&startDate=' + d + '&endDate=' + d + '&showOdds=false&onlyMajorGames=false&withTop=false';
+  })).forEach(function (r, i) {
+    if (sid || r.getResponseCode() !== 200) return;
+    var j; try { j = JSON.parse(r.getContentText()); } catch (e) { return; }
+    (j.sports || []).forEach(function (s) {
+      if (s.id === ids[i] && String(s.nameForURL || s.name).toLowerCase() === HIST365_SPORT) sid = s.id;
+    });
+  });
+  if (sid) props.setProperty('H365_SID', String(sid));
+  return sid;
+}
+
+function wyniki365Historia() {
+  var start = Date.now(), props = PropertiesService.getScriptProperties(), log = ['wyniki365Historia ' + new Date().toISOString()];
+  var sid = _hist365Sport_(props);
+  var folder = DriveApp.getFolderById(TERMINARZ_FOLDER_ID);
+  if (!sid) { folder.createFile('wyniki_365h_log.txt', log.concat(['nie znaleziono sportu ' + HIST365_SPORT + ' w 365scores']).join('\n'), 'text/plain'); return; }
+  var gotowe = JSON.parse(props.getProperty('H365_DNI') || '{}'), dni = [];
+  var wczoraj = Utilities.formatDate(new Date(Date.now() - 86400000), 'UTC', 'yyyy-MM-dd');
+  for (var t = new Date(HIST365_OD + 'T12:00:00Z'); Utilities.formatDate(t, 'UTC', 'yyyy-MM-dd') <= wczoraj; t = new Date(t.getTime() + 86400000)) {
+    var dd = Utilities.formatDate(t, 'UTC', 'yyyy-MM-dd');
+    if (!gotowe[dd]) dni.push(dd);
+  }
+  var wiersze = {}, stare = folder.getFilesByName(HIST365_PLIK), doKosza = [];
+  while (stare.hasNext()) {
+    var plik = stare.next(); doKosza.push(plik);
+    Utilities.ungzip(plik.getBlob()).getDataAsString().split('\n').slice(1).forEach(function (w) {
+      if (w) wiersze[w.split(',').slice(0, 7).join(',')] = w;
+    });
+  }
+  var nowe = 0, zrobione = 0;
+  for (var i = 0; i < dni.length && Date.now() - start < 270000; i += 10) {
+    var paczka = dni.slice(i, i + 10);
+    terminarzPobierz(paczka.map(function (d) {
+      var dm = d.substr(8, 2) + '/' + d.substr(5, 2) + '/' + d.substr(0, 4);
+      return 'https://webws.365scores.com/web/games/allscores/?appTypeId=5&langId=1&timezoneName=UTC&userCountryId=1&sports=' + sid +
+        '&startDate=' + dm + '&endDate=' + dm + '&showOdds=false&onlyMajorGames=false&withTop=false';
+    })).forEach(function (r, k) {
+      var d = paczka[k];
+      if (r.getResponseCode() !== 200) { log.push(d + ': HTTP ' + r.getResponseCode()); return; }
+      var j; try { j = JSON.parse(r.getContentText()); } catch (e) { log.push(d + ': zly JSON'); return; }
+      var strony = [j];
+      for (var p = 0; p < 30 && j.paging && j.paging.nextPage; p++) {
+        var r2 = terminarzPobierz(['https://webws.365scores.com' + j.paging.nextPage])[0];
+        if (r2.getResponseCode() !== 200) break;
+        try { j = JSON.parse(r2.getContentText()); } catch (e) { break; }
+        strony.push(j);
+      }
+      var kraje = {}, komp = {};
+      strony.forEach(function (x) {
+        (x.countries || []).forEach(function (c) { kraje[c.id] = c.name; });
+        (x.competitions || []).forEach(function (c) { komp[c.id] = c; });
+      });
+      strony.forEach(function (x) {
+        (x.games || []).forEach(function (g) {
+          var st = String(g.startTime || '');
+          if (st.substr(0, 10) !== d || g.statusGroup !== 4) return;
+          var h = g.homeCompetitor || {}, a = g.awayCompetitor || {}, kp = komp[g.competitionId] || {};
+          var sg = Number(h.score), sa = Number(a.score);
+          if (!(sg >= 0) || !(sa >= 0)) return;
+          var w = terminarzCsv([d, HIST365_SPORT, kraje[kp.countryId] || '', kp.name || g.competitionDisplayName || '',
+            g.roundName || g.stageName || '', h.name, a.name, sg, sa, '', '', sg > sa ? 1 : sa > sg ? 2 : 0, '']);
+          var klucz = w.split(',').slice(0, 7).join(',');
+          if (!wiersze[klucz]) nowe++;
+          wiersze[klucz] = w;
+        });
+      });
+      gotowe[d] = 1; zrobione++;
+    });
+  }
+  var naglowek = 'data,sport,kraj,turniej,runda,gosp,gosc,wg,wa,okresy_g,okresy_a,zwyciezca,nawierzchnia';
+  var tresc = naglowek + '\n' + Object.keys(wiersze).map(function (k) { return wiersze[k]; }).join('\n');
+  folder.createFile(Utilities.gzip(Utilities.newBlob(tresc, 'text/csv', HIST365_PLIK.replace('.gz', ''))).setName(HIST365_PLIK));
+  doKosza.forEach(function (f) { f.setTrashed(true); });   // stary plik dopiero PO zapisie nowego
+  props.setProperty('H365_DNI', JSON.stringify(gotowe));
+  var zostalo = dni.length - zrobione;
+  log.push('sport 365 id ' + sid + '; dni pobrane teraz: ' + zrobione + ', nowych meczow: ' + nowe + ', w pliku: ' + Object.keys(wiersze).length);
+  log.push(zostalo > 0 ? 'ZOSTALO ' + zostalo + ' dni — URUCHOM PONOWNIE wyniki365Historia' : 'GOTOWE — wszystkie dni od ' + HIST365_OD);
+  var sl = folder.getFilesByName('wyniki_365h_log.txt');
+  while (sl.hasNext()) sl.next().setTrashed(true);
+  folder.createFile('wyniki_365h_log.txt', log.join('\n'), 'text/plain');
+}
