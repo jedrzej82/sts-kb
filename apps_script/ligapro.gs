@@ -18,6 +18,7 @@ var LIGAPRO_LIMIT_MS = 4.5 * 60 * 1000;
 
 function ligaproUstaw() {
   ligaproUsun();
+  PropertiesService.getScriptProperties().deleteProperty('ligapro_hist');   // historia od nowa
   ScriptApp.newTrigger('ligaproPracuj').timeBased().everyHours(1).create();
   ligaproPracuj();
 }
@@ -31,11 +32,11 @@ function ligaproUsun() {
 function ligaproPracuj() {
   var start = Date.now(), log = ['ligaproPracuj ' + new Date().toISOString()], nowe = {};
   var teraz = Math.floor(Date.now() / 3600000) * 3600000;
-  ligaproOkres(teraz - 30 * 3600000, teraz + 3600000, nowe, log);          // ostatnie 30 h
   var P = PropertiesService.getScriptProperties(), dol = Number(P.getProperty('ligapro_hist') || (teraz - 30 * 3600000));
   var granica = teraz - LIGAPRO_DNI_WSTECZ * 86400000;
-  while (dol > granica && Date.now() - start < LIGAPRO_LIMIT_MS * 0.6) {   // historia: dzień po dniu wstecz
-    ligaproOkres(dol - 86400000, dol, nowe, log);
+  var ok = ligaproOkres(teraz - 30 * 3600000, teraz + 3600000, nowe, log);   // ostatnie 30 h (wynik true = bez błędów HTTP)
+  while (ok && dol > granica && Date.now() - start < LIGAPRO_LIMIT_MS * 0.6) {   // historia: dzień po dniu wstecz
+    if (!ligaproOkres(dol - 86400000, dol, nowe, log)) break;   // błąd API — ten dzień zostaje na następny raz
     dol -= 86400000;
     P.setProperty('ligapro_hist', String(dol));
   }
@@ -62,12 +63,16 @@ function ligaproOkres(od, doo, nowe, log) {
       opis.push(slug);
     }
   });
-  var ile = {}, bledy = {}, pelne = 0;
+  var ile = {}, bledy = {}, pelne = 0, tresc = '';
   for (var i = 0; i < zad.length; i += 20) {
     UrlFetchApp.fetchAll(zad.slice(i, i + 20)).forEach(function (r, k) {
       var slug = opis[i + k];
       ile[slug] = ile[slug] || 0;
-      if (r.getResponseCode() !== 200) { bledy[slug] = r.getResponseCode(); return; }
+      if (r.getResponseCode() !== 200) {
+        bledy[slug] = r.getResponseCode();
+        if (!tresc && slug === 'czech-liga-pro-1') tresc = String(r.getContentText()).substr(0, 300);
+        return;
+      }
       var j; try { j = JSON.parse(r.getContentText()); } catch (e) { bledy[slug] = 'json'; return; }
       var e = ((j.data && j.data.edges) || j.edges || []);
       if (e.length >= 100) pelne++;
@@ -80,7 +85,9 @@ function ligaproOkres(od, doo, nowe, log) {
     });
   }
   log.push(ligaproCzas(od).substr(0, 13) + ' – ' + ligaproCzas(doo).substr(0, 13) + ': ' + JSON.stringify(ile) +
-    (Object.keys(bledy).length ? ' | HTTP ' + JSON.stringify(bledy) : '') + (pelne ? ' | UWAGA: ' + pelne + ' okien z limitem 100' : ''));
+    (Object.keys(bledy).length ? ' | HTTP ' + JSON.stringify(bledy) : '') + (pelne ? ' | UWAGA: ' + pelne + ' okien z limitem 100' : '') +
+    (tresc ? '\n    odpowiedź: ' + tresc : ''));
+  return !('czech-liga-pro-1' in bledy);   // pozostałe ligi mogą nie istnieć — nie blokują historii
 }
 
 /** Węzeł scores24 -> {id, mies, csv} w kolumnach wyniki_fs_inne albo null (mecz bez wyniku). */
@@ -119,6 +126,30 @@ function ligaproZapisz(nowe) {
     wynik[mies] = (ids.length - przed) + ' nowych, razem ' + ids.length;
   });
   return wynik;
+}
+
+/** Test zapytania: 6 wariantów parametrów dla ostatnich 2 h Ligi Pro -> ligapro_diagnoza.txt. */
+function ligaproTest() {
+  var t = Math.floor(Date.now() / 3600000) * 3600000, a = ligaproCzas(t - 7200000), b = ligaproCzas(t);
+  var baza = 'https://scores24.live/rapi/leagues/table-tennis/czech-liga-pro-1/matches?lang=en&audience=en&with_statistics=false';
+  var ea = encodeURIComponent(a), eb = encodeURIComponent(b);
+  var warianty = {
+    'obecny': baza + '&first=100&status=ended&date_between[]=' + ea + '&date_between[]=' + eb,
+    'nawiasy_kod': baza + '&first=100&status=ended&date_between%5B%5D=' + ea + '&date_between%5B%5D=' + eb,
+    'first20': baza + '&first=20&status=ended&date_between%5B%5D=' + ea + '&date_between%5B%5D=' + eb,
+    'indeksy': baza + '&first=20&status=ended&date_between%5B0%5D=' + ea + '&date_between%5B1%5D=' + eb,
+    'jak_strona': baza + '&first=5&status=ended&date_between%5B%5D=&date_between%5B%5D=' + eb,
+    'przecinek': baza + '&first=20&status=ended&date_between=' + ea + ',' + eb
+  };
+  var out = ['ligaproTest ' + new Date().toISOString() + ' okno ' + a + ' – ' + b];
+  Object.keys(warianty).forEach(function (w) {
+    var r = UrlFetchApp.fetch(warianty[w], {muteHttpExceptions: true, headers: {'User-Agent': TERMINARZ_UA['User-Agent'], 'Accept': 'application/json'}});
+    var tx = r.getContentText() || '', n = (tx.match(/"matchDate"/g) || []).length;
+    out.push(w + ' | HTTP ' + r.getResponseCode() + ' | meczow ' + n + ' | ' + tx.substr(0, 400).replace(/\s+/g, ' '));
+  });
+  var folder = DriveApp.getFolderById(TERMINARZ_FOLDER_ID), stare = folder.getFilesByName('ligapro_diagnoza.txt');
+  while (stare.hasNext()) stare.next().setTrashed(true);
+  folder.createFile('ligapro_diagnoza.txt', out.join('\n'), 'text/plain');
 }
 
 // ---------------- diagnozy (29.09.2026) — zostają dla przyszłych zmian źródła ----------------
