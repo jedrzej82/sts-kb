@@ -105,3 +105,21 @@ def test_aliasy_siatkowka_kobiet():
     assert sporty.resolve('Fenerbahce Medicana (K)', pula) == 'Fenerbahçe (W)'
     assert sporty.resolve('LKS Commercecon Łódź (K)', pula) == 'LKS Lodz (W)'
     assert sporty.resolve('Fenerbahce Medicana', pula) is None     # bez (K) niejednoznaczne (sekcja meska)
+
+
+def test_aliasy_hokej():
+    pula = {'Aksam Unia Oswiecim', 'Nesta Torun', 'Ciarko PBS Bank', 'Třinec', 'HIFK'}
+    assert sporty.resolve('Re-Plast Unia Oświęcim', pula) == 'Aksam Unia Oswiecim'
+    assert sporty.resolve('KH Energa Toruń', pula) == 'Nesta Torun'
+    assert sporty.resolve('Marma Ciarko STS Sanok', pula) == 'Ciarko PBS Bank'
+    assert sporty.resolve('HC Oceláři Třinec', pula) == 'Třinec'
+    assert sporty.resolve('HIFK Helsinki', pula) == 'HIFK'
+
+
+def test_aliasy_reczna_lm():
+    pula = {'Paris Handball', 'Veszprem', 'Pick Szeged', 'PPD Zagreb'}
+    assert sporty.resolve('Paris Saint-Germain', pula) == 'Paris Handball'
+    assert sporty.resolve('One Veszprém', pula) == 'Veszprem'
+    assert sporty.resolve('OTP Bank Pick Szeged', pula) == 'Pick Szeged'
+    assert sporty.resolve('RK Zagreb', pula) == 'PPD Zagreb'
+    assert sporty.resolve('Paris Saint-Germain', {'Paris Basketball'}) is None     # cel spoza puli -> nic
