@@ -527,6 +527,48 @@ def _hokej_fs_nazwy(s, maska_fs):
               f'(nowa druzyna albo inny zapis — sprawdz): ' + ', '.join(f'{t} [{lg}]' for lg, t in sorted(nowe)[:12]))
     return s
 
+FSX_SPORTY = ('basketball', 'handball', 'volleyball')
+
+
+def _fsx_bez_dubli(s, fsx=None):
+    """29.09.2026: wyniki koszykowki/recznej/siatkowki z Flashscore (wyniki_fsx_inne_*, Apps Script wynikiFsDruzynowe).
+    Mecz z Flashscore jest DUBLEM, gdy 365scores ma tego dnia mecz tego sportu z obiema pasujacymi druzynami
+    (terminarz.pasuje, w dowolnej kolejnosci) — wtedy zostaje wiersz 365. Nazwy druzyn z Flashscore, ktore maja
+    w 365 (ten sam sport) DOKLADNIE jeden pasujacy odpowiednik, dostaja zapis 365 (inaczej klub mialby dwa Elo)."""
+    from terminarz import pasuje
+    fsx = czytaj('wyniki_fsx_inne_*.csv') if fsx is None else fsx
+    if not len(fsx) or not len(s): return s
+    kol = list(s.columns)
+    klucz = set(map(tuple, fsx[kol].astype(str).values))
+    jest = pd.Series([tuple(r) in klucz for r in s[kol].astype(str).values], index=s.index) & s.sport.isin(FSX_SPORTY)
+    if not jest.any(): return s
+    baza = s[~jest & s.sport.isin(FSX_SPORTY)]
+    dni = {}
+    for r in baza.itertuples():
+        dni.setdefault((r.sport, str(r.data)[:10]), []).append((r.gosp, r.gosc))
+    dubel = pd.Series(False, index=s.index)
+    for i, r in s[jest].iterrows():
+        for g, a in dni.get((r.sport, str(r.data)[:10]), ()):
+            if (pasuje(r.gosp, g) and pasuje(r.gosc, a)) or (pasuje(r.gosp, a) and pasuje(r.gosc, g)):
+                dubel[i] = True; break
+    zostaje = jest & ~dubel
+    nazwy = {sp: sorted(set(g.gosp) | set(g.gosc)) for sp, g in baza.groupby('sport')}
+    mapa, zle = {}, 0
+    for sp, t in set(zip(s.sport[zostaje], s.gosp[zostaje])) | set(zip(s.sport[zostaje], s.gosc[zostaje])):
+        if t in nazwy.get(sp, ()): continue
+        kand = [n for n in nazwy.get(sp, ()) if pasuje(t, n)]
+        if len(kand) == 1: mapa[(sp, t)] = kand[0]
+        elif len(kand) > 1: zle += 1
+    s = s.copy()
+    s.loc[zostaje, 'kraj'] = s.loc[zostaje, 'kraj'].map(_kraj_365)
+    for c in ('gosp', 'gosc'):
+        s.loc[zostaje, c] = [mapa.get((sp, t), t) for sp, t in zip(s.loc[zostaje, 'sport'], s.loc[zostaje, c])]
+    print(f'  zewn: koszykowka/reczna/siatkowka z Flashscore: {int(jest.sum())} meczow, {int(dubel.sum())} dubli z 365 '
+          f'odrzuconych, zostaje {int(zostaje.sum())}; {len(mapa)} nazw ujednoliconych do zapisu 365'
+          + (f', {zle} nazw z kilkoma kandydatami (zostaja jak w Flashscore)' if zle else '') + '.')
+    return s[~dubel]
+
+
 def inne():
     """Sporty drużynowe i indywidualne (bez tenisa) → wiersze w formacie sporty_hist (data,sport,liga,gosp,gosc,pg,pa,dogrywka)."""
     s = czytaj('wyniki_*_inne_*.csv')
@@ -535,6 +577,7 @@ def inne():
     # wykluczone i wchodzily DRUGI raz pod innymi nazwami druzyn ("USA | NFL" obok "NFL", "Japan | NPB" obok "NPB").
     s = s[~(s.kraj + ' ' + s.turniej).str.contains(r'\b(?:NHL|NBA|WNBA|MLB|NFL|KBO|NPB)\b')]
     s = _hokej_fs_bez_dubli(s)
+    s = _fsx_bez_dubli(s)
     rows = []
     s = s.assign(sport=s.sport.map(lambda x: ALIAS_SPORT.get(x, x)))
     kt = s.kraj + ' ' + s.turniej

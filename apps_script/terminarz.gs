@@ -190,3 +190,73 @@ function terminarzCsv(a) {
     return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
   }).join(',');
 }
+
+// 29.09.2026: WYNIKI koszykówki, piłki ręcznej i siatkówki z Flashscore (ten sam kanał co terminarzFs, dzień -1 i -2).
+// Wcześniej te sporty były tylko z 365scores — np. Liga Europejska EHF: 24 z 32 drużyn bez żadnego wyniku w bazie.
+// Plik miesięczny wyniki_fsx_inne_RRRR-MM.csv.gz (format jak wyniki_fs_inne); zewn.py usuwa mecze, które 365 już ma.
+// Wyzwalacz: codziennie ok. 06:00 (ustaw raz: wynikiFsUstaw).
+var WYNIKI_FS_SPORTY = {3: 'basketball', 7: 'handball', 12: 'volleyball'};
+
+function wynikiFsDruzynowe() {
+  var ids = Object.keys(WYNIKI_FS_SPORTY), nowe = {}, log = ['wynikiFsDruzynowe ' + new Date().toISOString()];
+  [-1, -2].forEach(function (dzien) {
+    var odp = null;
+    for (var h = 0; h < TERMINARZ_FS_HOSTY.length && !odp; h++) {
+      var host = TERMINARZ_FS_HOSTY[h];
+      var proba = UrlFetchApp.fetchAll(ids.map(function (id) {
+        return {url: host + 'f_' + id + '_' + dzien + '_0_en_1', muteHttpExceptions: true,
+          headers: {'x-fsign': 'SW9D1eZo', 'User-Agent': TERMINARZ_UA['User-Agent'], 'Referer': 'https://www.flashscore.com/'}};
+      }));
+      if (proba.some(function (r) { return r.getResponseCode() === 200 && r.getContentText().indexOf('AA÷') >= 0; })) odp = proba;
+    }
+    if (!odp) { log.push('dzien ' + dzien + ': brak danych'); return; }
+    odp.forEach(function (r, i) {
+      var sport = WYNIKI_FS_SPORTY[ids[i]], kraj = '', turniej = '', n = 0;
+      if (r.getResponseCode() !== 200) return;
+      r.getContentText().split('~').forEach(function (rek) {
+        var f = {};
+        rek.split('¬').forEach(function (p) { var k = p.indexOf('÷'); if (k > 0) f[p.substr(0, k)] = p.substr(k + 1); });
+        if (f.ZA !== undefined) {
+          var c = f.ZA.indexOf(': ');
+          kraj = c > 0 ? f.ZA.substr(0, c) : (f.ZY || ''); turniej = c > 0 ? f.ZA.substr(c + 2) : f.ZA;
+        } else if (f.AA !== undefined && f.AB === '3' && f.AG !== undefined && f.AH !== undefined && f.AD) {
+          var t = new Date(Number(f.AD) * 1000), og = [], oa = [];
+          [['BA', 'BB'], ['BC', 'BD'], ['BE', 'BF'], ['BG', 'BH'], ['BI', 'BJ']].forEach(function (p) {
+            if (f[p[0]] !== undefined && f[p[1]] !== undefined) { og.push(f[p[0]]); oa.push(f[p[1]]); }
+          });
+          var g = Number(f.AG), a = Number(f.AH);
+          nowe[f.AA] = terminarzCsv([Utilities.formatDate(t, 'UTC', 'yyyy-MM-dd'), sport, kraj, turniej, f.ER || '',
+            f.AE || f.FH || '', f.AF || f.FK || '', f.AG, f.AH, og.join(';'), oa.join(';'), g > a ? 1 : a > g ? 2 : 0, '']);
+          n++;
+        }
+      });
+      log.push('dzien ' + dzien + ' ' + sport + ': ' + n + ' zakonczonych');
+    });
+  });
+  var folder = DriveApp.getFolderById(TERMINARZ_FOLDER_ID), naglowek = 'data,sport,kraj,turniej,runda,gosp,gosc,wg,wa,okresy_g,okresy_a,zwyciezca,nawierzchnia';
+  var miesiace = {};
+  Object.keys(nowe).forEach(function (id) { var m = nowe[id].substr(0, 7); (miesiace[m] = miesiace[m] || {})[id] = nowe[id]; });
+  Object.keys(miesiace).forEach(function (m) {
+    var nazwa = 'wyniki_fsx_inne_' + m + '.csv.gz', stare = folder.getFilesByName(nazwa), doKosza = [], wiersze = {};
+    while (stare.hasNext()) {
+      var plik = stare.next(); doKosza.push(plik);
+      Utilities.ungzip(plik.getBlob()).getDataAsString().split('\n').slice(1).forEach(function (w) {
+        if (w) wiersze[w.split(',').slice(0, 7).join(',')] = w;   // klucz: data..gosc
+      });
+    }
+    Object.keys(miesiace[m]).forEach(function (id) { var w = miesiace[m][id]; wiersze[w.split(',').slice(0, 7).join(',')] = w; });
+    var tresc = naglowek + '\n' + Object.keys(wiersze).map(function (k) { return wiersze[k]; }).join('\n');
+    folder.createFile(Utilities.gzip(Utilities.newBlob(tresc, 'text/csv', nazwa.replace('.gz', ''))).setName(nazwa));
+    doKosza.forEach(function (f) { f.setTrashed(true); });   // stary plik dopiero PO zapisie nowego
+    log.push(nazwa + ': ' + Object.keys(wiersze).length + ' meczow');
+  });
+  var sl = folder.getFilesByName('wyniki_fsx_log.txt');
+  while (sl.hasNext()) sl.next().setTrashed(true);
+  folder.createFile('wyniki_fsx_log.txt', log.join('\n'), 'text/plain');
+}
+
+function wynikiFsUstaw() {
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'wynikiFsDruzynowe') ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('wynikiFsDruzynowe').timeBased().everyDays(1).atHour(6).create();
+  wynikiFsDruzynowe();
+}
