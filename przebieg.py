@@ -198,7 +198,7 @@ def main():
     if '--kontrola' in sys.argv:
         print('\nKONTROLA PLIKOW I ARKUSZY OK — uruchom: python3 przebieg.py')
         return 0
-    print('2) Budowa (5 krokow, razem ok. 15–20 min):')
+    print('2) Budowa (5 krokow, razem ok. 4–6 min):')
     for skrypt, tag in KROKI:
         kod, tb = uruchom(skrypt, tag)
         if tb or (kod != 0 and skrypt != 'swiezosc.py'):     # swiezosc zwraca 1 przy ostrzezeniach — to nie awaria
