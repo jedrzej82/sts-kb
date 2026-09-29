@@ -3,3 +3,4 @@ olympiakos,"rozne sporty i przestrzenie nazw: typuj.ALIASES -> pilkarski Olympia
 olympiakospireus,"jak olympiakos — dwa sporty, dwa zrodla; sprawdzone 29.09.2026"
 redstarbelgrade,"ten sam klub w dwoch przestrzeniach nazw: typuj.ALIASES_KLUBY -> nazwa w kb.sqlite (Red Star [serbia]), uzupelnij_ligi.ALIAS_ZEWN -> zapis FBref/wiki przed budowa (Crvena Zvezda); sprawdzone 29.09.2026"
 lommel,"dwa kluby w roznych okresach: kluby.SCAL_RECZNIE ma wpisy z data (Lommel 1932-2003 do 2003, potem Lommel SK) — nie sprzecznosc; sprawdzone 29.09.2026"
+parissaintgermain,"rozne sporty: pilka (typuj/build_kb/uzupelnij_ligi) -> Paris SG, sporty (pilka reczna, LM) -> Paris Handball; alias sporty dziala tylko gdy cel jest w puli recznej; sprawdzone 29.09.2026"
