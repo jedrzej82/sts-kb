@@ -81,3 +81,35 @@ def test_scal_bez_duplikatow_wynik_wygrywa(tmp_path):
     d = pd.read_csv(tmp_path / 'typy_log.csv', dtype=str, keep_default_na=False)
     assert wyn['typy_log'] == (2, 3, 2) and d.loc[d.gosp == 'A', 'trafiony'].iloc[0] == '1'
     assert not os.path.exists(tmp_path / 'ako_log.csv')
+
+
+def test_kotwica_gdy_zrodla_pisza_mecz_inaczej():
+    # 365: „Maccabi Bnei Reineh – Hapoel Raanana”, Flashscore: „Maccabi Bnei Raina – H. Raanana” (28.09.2026)
+    pilka = pd.DataFrame({'d': [DZIS, DZIS], 'h': ['Maccabi Bnei Reineh', 'Maccabi Bnei Raina'], 'a': ['Hapoel Raanana', 'H. Raanana'],
+                          'g': [1, 1], 'ga': [2, 2], 'hg': [None] * 2, 'ha': [None] * 2})
+    W = dict(pilka=pilka, inne=pd.DataFrame(columns=['d', 'sport', 'h', 'a', 'pg', 'pa', 'ot']), tenis=pd.DataFrame(columns=['d', 'w', 'l', 'score']))
+    st, wyn, uw = dzienniki.rozlicz_noge(dict(sport='pilka', zdarzenie='Maccabi Bnei Reina - Hapoel Raanana', rynek='powyzej 1.5', data=D, uwaga=''), W)
+    assert (st, wyn) == ('TRAFIONY', '1:2') and 'dopasowano po jednej druzynie' in uw
+
+
+def test_kotwica_sprzeczne_wyniki_nie_rozstrzyga():
+    # dwa wiersze z ta sama kotwica i pasujacym rywalem, ale roznym wynikiem -> nie zgadujemy
+    okno = pd.DataFrame({'d': [DZIS, DZIS + pd.Timedelta(days=1)], 'h': ['Maccabi Bnei Reineh', 'Hapoel Raanana'],
+                         'a': ['Hapoel Raanana', 'Maccabi Bnei Reineh'], 'g': [1, 0], 'ga': [2, 0]})
+    args = (okno, None, 'Hapoel Raanana', 'Maccabi Bnei Reina', 'Hapoel Raanana', dzienniki._rozwiaz_pilka, 'h', 'a')
+    assert dzienniki._po_kotwicy(*args) is None
+    okno.loc[1, ['g', 'ga']] = [2, 1]                     # ten sam wynik (odwrocone strony) -> rozstrzyga
+    s_, odwr = dzienniki._po_kotwicy(*args)
+    assert (s_.g, s_.ga, odwr) == (1, 2, False)
+
+
+def test_rozlicz_ako_z_katalogu(tmp_path, monkeypatch, W):
+    k = tmp_path / 'delty'; k.mkdir()
+    _ako('AKOP-1200-1', '1', [('pilka', 'Etiopia - Senegal', '12', '1.18', '')], '1.18', 'PAPIEROWY', '').to_csv(k / 'ako_log 12:00', index=False)
+    monkeypatch.setattr(dzienniki, 'HERE', str(tmp_path))
+    monkeypatch.setattr(dzienniki, 'wyniki_pilka', lambda *a: W['pilka'])
+    monkeypatch.setattr(dzienniki, 'wyniki_inne', lambda *a: W['inne'])
+    monkeypatch.setattr(dzienniki, 'wyniki_tenis', lambda *a: W['tenis'])
+    dzienniki.main(['rozlicz', D, '--ako', str(k), '--wyjscie', str(tmp_path / 'r.csv')])
+    r = pd.read_csv(tmp_path / 'r.csv', dtype=str)
+    assert r.loc[r.tag == 'RAZEM_AKOP-1200-1_1', 'TRAFIONY_PRZEGRANY'].iloc[0] == 'TRAFIONY 1/1'

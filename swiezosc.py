@@ -41,6 +41,39 @@ def kompletnosc(daty, etykieta):
     return out
 
 
+# 29.09.2026 (proba generalna): 28.09 oznaczony jako „dzien NIEPELNY” (47 meczow klubowych przy ~119),
+# choc pliki byly kompletne — trwala przerwa reprezentacyjna (Liga Narodow UEFA i CONCACAF, eliminacje PNA).
+# Kluby wtedy nie graja, wiec porownanie z mediana zwyklych tygodni daje falszywy alarm.
+# Dzien klubowy jest usprawiedliwiony, gdy w plikach zewn/ (365 i Flashscore) w oknie [dzien-3, dzien+1]
+# jest co najmniej PROG_PRZERWY meczow SENIORSKICH reprezentacji. Tabela intl sie tu nie nadaje (zrodlo spoznione).
+_KRAJE_REPR = {'international', 'world', 'europe', 'africa', 'asia', 'north america', 'south america', 'oceania'}
+_TURNIEJ_REPR = r'nations league|qualif|friendly international|world cup|cup of nations|euro|gold cup|copa america|asian cup'
+_TURNIEJ_NIE = r'\bu\d\d\b|women|\(w\)|femen|club|champions|europa|conference|libertadores|sudamericana|concacaf cup'
+PROG_PRZERWY = 30        # 28.09.2026: 212; zwykle tygodnie 0–20 (pojedyncze sparingi)
+
+
+def mecze_reprezentacji(katalog=None):
+    """Daty meczow seniorskich reprezentacji z plikow zewn/wyniki_*_pilka_* (bez archiwum)."""
+    zd = katalog or os.path.join(HERE, 'zewn')
+    if not os.path.isdir(zd): return pd.Series(dtype=object)
+    cz = []
+    for p in sorted(os.listdir(zd)):
+        if not (p.startswith('wyniki_') and '_pilka_' in p) or 'archiwum' in p: continue
+        try: z = pd.read_csv(os.path.join(zd, p), usecols=['data', 'kraj', 'turniej'], dtype=str).fillna('')
+        except Exception: continue
+        t = z.turniej.str.lower()
+        z = z[z.kraj.str.strip().str.lower().isin(_KRAJE_REPR) & t.str.contains(_TURNIEJ_REPR)
+              & ~t.str.contains(_TURNIEJ_NIE)]
+        cz.append(z.data.str[:10])
+    if not cz: return pd.Series(dtype=object)
+    return pd.to_datetime(pd.concat(cz), errors='coerce').dropna().dt.date
+
+
+def przerwa_reprezentacyjna(dzien, daty_repr):
+    """Liczba meczow seniorskich reprezentacji w oknie [dzien-3, dzien+1] (0 = zwykly tydzien klubowy)."""
+    if daty_repr is None or len(daty_repr) == 0: return 0
+    return int(((daty_repr >= dzien - dt.timedelta(days=3)) & (daty_repr <= dzien + dt.timedelta(days=1))).sum())
+
 
 def niemozliwe_mecze(pokaz=12):
     """Wykrywa mecze, ktore fizycznie nie mogly sie odbyc. Dwa warunki, oba zerojedynkowe:
@@ -117,15 +150,20 @@ def niemozliwe_mecze(pokaz=12):
 
 
 def main():
-    w, uwagi, niepelne = [], [], []
+    w, uwagi, niepelne, przerwy = [], [], [], []
     kb = os.path.join(HERE, 'kb.sqlite')
     if os.path.exists(kb):
         c = sqlite3.connect(kb)
         d = pd.read_sql('select max(MatchDate) d from matches', c).iloc[0].d
         w.append(('pilka kluby (matches)', d, wiek(d), PROG['matches'], ''))
-        niepelne += kompletnosc(pd.read_sql(
+        kl = kompletnosc(pd.read_sql(
             "select MatchDate from matches where MatchDate >= date('now','-40 day')", c).MatchDate,
             'pilka kluby')
+        repr_ = mecze_reprezentacji() if kl else None
+        for x in kl:
+            n_r = przerwa_reprezentacyjna(x[0], repr_)
+            if n_r >= PROG_PRZERWY: przerwy.append(x + (n_r,))
+            else: niepelne.append(x)
         d = pd.read_sql('select max(date) d from intl', c).iloc[0].d
         w.append(('reprezentacje (intl)', d, wiek(d), PROG['intl'],
                   'graja oknami — sam wiek nie swiadczy o zepsuciu'))
@@ -193,6 +231,11 @@ def main():
         print("  Jesli nie ma go w ofercie — to przerwa w sezonie i nie rob nic.\n")
         for sp, d, a in sorted(uwagi, key=lambda x: -x[2]):
             print(f"    {sp:<22} ostatni mecz {d}  ({a} dni temu)")
+    if przerwy:
+        print("\nPRZERWA REPREZENTACYJNA — mniej meczow klubowych jest normalne (NIE jest to dzien niepelny):")
+        for dzien, ile_, ocz, ud, et, n_r in sorted(przerwy):
+            print(f"    {et:<14} {dzien}  {ile_:5d} meczow  przy ~{ocz} w zwykle tygodnie; "
+                  f"{n_r} meczow reprezentacji w oknie [-3, +1] dni")
     if niepelne:
         print("\nDNI NIEPELNE — data jest swieza, ale wynikow z tego dnia brakuje:")
         print("  porownanie z mediana tego samego dnia tygodnia z 4 poprzednich tygodni.\n")
