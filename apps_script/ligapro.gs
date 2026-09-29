@@ -131,3 +131,36 @@ function ligaproDiagnoza4() {
   while (stare.hasNext()) stare.next().setTrashed(true);
   folder.createFile('ligapro_diagnoza.txt', out.join('\n'), 'text/plain');
 }
+
+/** Diagnoza 5: adres API rapi dla leaguesMatches (definicja w skrypcie strony) + próby wprost. */
+function ligaproDiagnoza5() {
+  var h = {'User-Agent': TERMINARZ_UA['User-Agent'], 'Accept': 'application/json,text/html,*/*', 'Accept-Language': 'en-US,en;q=0.9'};
+  var out = ['ligaproDiagnoza5 ' + new Date().toISOString()];
+  var t = UrlFetchApp.fetch('https://scores24.live/en/table-tennis/l-czech-liga-pro-1', {muteHttpExceptions: true, headers: h}).getContentText();
+  var tok = (t.match(/window\.__API_TOKEN__\s*=\s*"([^"]+)"/) || [])[1] || '';
+  out.push('token ' + tok.length + ' znakow');
+  var src = (t.match(/<script[^>]+src="([^"]+\.js)"/g) || []).map(function (s) { return s.match(/src="([^"]+)"/)[1]; });
+  src.forEach(function (s) {
+    var u = s.indexOf('http') === 0 ? s : 'https://scores24.live' + s, js = UrlFetchApp.fetch(u, {muteHttpExceptions: true, headers: h}).getContentText() || '';
+    [/Dne=/g, /\/matches[`'"?]/g, /__API_TOKEN__/g, /rapi/g].forEach(function (re) {
+      var m, n = 0;
+      while ((m = re.exec(js)) !== null && n < 4) {
+        out.push('JS ' + re.source + ' @' + m.index + ': ' + js.substr(Math.max(0, m.index - 250), 600).replace(/\s+/g, ' ')); n++;
+      }
+    });
+  });
+  var q = 'lang=en&first=20&status=ended&audience=en&with_statistics=false';
+  ['https://scores24.live/rapi/table-tennis/leagues/czech-liga-pro-1/matches?',
+   'https://scores24.live/rapi/sports/table-tennis/leagues/czech-liga-pro-1/matches?',
+   'https://scores24.live/rapi/leagues/table-tennis/czech-liga-pro-1/matches?',
+   'https://scores24.live/rapi/leagues/czech-liga-pro-1/matches?sportSlug=table-tennis&'].forEach(function (u) {
+    [{}, {'Authorization': 'Bearer ' + tok}, {'X-Api-Token': tok}].forEach(function (x, i) {
+      var hh = {}; Object.keys(h).forEach(function (k) { hh[k] = h[k]; }); Object.keys(x).forEach(function (k) { hh[k] = x[k]; });
+      var r = UrlFetchApp.fetch(u + q, {muteHttpExceptions: true, headers: hh});
+      out.push('PROBA ' + u + ' naglowek ' + i + ' | HTTP ' + r.getResponseCode() + ' | ' + (r.getContentText() || '').substr(0, 250).replace(/\s+/g, ' '));
+    });
+  });
+  var folder = DriveApp.getFolderById(TERMINARZ_FOLDER_ID), stare = folder.getFilesByName('ligapro_diagnoza.txt');
+  while (stare.hasNext()) stare.next().setTrashed(true);
+  folder.createFile('ligapro_diagnoza.txt', out.join('\n'), 'text/plain');
+}
