@@ -8,7 +8,7 @@ __pycache__/
 # --- duze cache historyczne (ciagniete przez hist_import.py z GitHuba) ---
 tenis_hist.csv
 sporty_hist.csv
-tenis_kalibracja.csv
+# tenis_kalibracja.csv — OD 29.09.2026 SLEDZONY: bez niego przebiegi liczyly tenis na surowym P (zawyzonym o ok. 6 pp)
 
 # --- dane z arkuszy Apps Script, odswiezane co godzine (zrodlo: Drive) ---
 statystyki_*.csv

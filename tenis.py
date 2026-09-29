@@ -526,6 +526,11 @@ def main():
         print('  artefaktem braku danych. NIE buduj na tym nogi kuponu — szczegolnie gdy wychodzi')
         print('  wysokie EV przy kursie bliskim 2,00: to sygnal falszywy, nie okazja.')
         print(f'Faworyt: {fav}  P (SZACUNEK, brak danych rywala) ok. {max(p, 1 - p):.0%}')
+    elif not os.path.exists(CAL):
+        # 29.09.2026: plik powstawal tylko w bloku poniedzialkowym (w kontenerze przebiegu) — w pozostalych przebiegach
+        # surowe P (zawyzone o ok. 6 pp przy P >= 70%) bylo podpisane jako „P_skalibr”. Brak pliku = glosno.
+        print(f'Faworyt: {fav}  P_model {max(p, 1 - p):.1%}  BRAK KALIBRACJI (tenis_kalibracja.csv) — P zawyzone, '
+              f'noga tylko jako „szacunek”; uruchom python3 tenis.py --backtest')
     else:
         print(f'Faworyt: {fav}  P_model {max(p, 1 - p):.1%}  P_skalibr {pc:.1%}')
     stale = [x for x in (A, B) if (pd.Timestamp.today() - st['last'].get(x)).days > 90]
