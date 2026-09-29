@@ -96,3 +96,12 @@ def test_egzonimy_polskie_miasta():
     assert sporty.resolve('Maccabi Tel Awiw', pula) == 'Maccabi Tel Aviv'
     assert sporty.resolve('Tofas Bursa', pula) == 'Tofas'
     assert sporty.resolve('Hapoel Hajfa', pula) is None          # brak w puli -> nie zgadujemy
+
+
+def test_aliasy_siatkowka_kobiet():
+    pula = {'Conegliano (W)', 'Ks Rzeszow (W)', 'Fenerbahçe (W)', 'Fenerbahçe', 'LKS Lodz (W)'}
+    assert sporty.resolve('Imoco Volley Conegliano', pula) == 'Conegliano (W)'        # klub tylko kobiecy
+    assert sporty.resolve('Developres Rzeszów (K)', pula) == 'Ks Rzeszow (W)'
+    assert sporty.resolve('Fenerbahce Medicana (K)', pula) == 'Fenerbahçe (W)'
+    assert sporty.resolve('LKS Commercecon Łódź (K)', pula) == 'LKS Lodz (W)'
+    assert sporty.resolve('Fenerbahce Medicana', pula) is None     # bez (K) niejednoznaczne (sekcja meska)
