@@ -459,8 +459,13 @@ def resolve(name, pool):
         else:   # "Chievo Verona" zawiera i "Chievo", i "Verona" — pierwszy czlon to niemal zawsze wlasciwy klub
             pref = [p for p in c if k.startswith(norm(p)) or norm(p).startswith(k)]
             if len(pref) == 1: wyn = pref[0]
-            elif pref: wyn = max(pref, key=lambda p: len(norm(p)))
-            else: wyn = min(c, key=lambda p: abs(len(norm(p)) - len(k)))
+            else:
+                # 29.09.2026: wczesniej wybor najdluzszego / najblizszego dlugoscia kandydata — zgadywanie
+                # („Dinamo” -> „Dinamo Samarkand”, „Spartak” -> „Spartak Kostroma”, „Sparta” -> „Sparta
+                # Rotterdam”, „Real” -> „Real Madrid Castilla”). Kilku kandydatow = noga MNIEJ.
+                print(f'  ODRZUCONO: "{name}" pasuje do {len(c)} klubow ({", ".join(sorted(c)[:5])}) — '
+                      f'nie zgadujemy, noga MNIEJ.')
+                return None
         return _skrot_albo_nic(name, wyn, by.values())
     # prog 0.55 byl za luzny: "RC Warwick" trafialo na "RKC Waalwijk", a "Virtus Ciserano Bergamo"
     # na "Virtus Lanciano". Lepiej zwrocic None i zatrzymac analize, niz policzyc nie ten mecz.
