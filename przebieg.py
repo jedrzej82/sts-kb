@@ -115,15 +115,17 @@ def kontrola_zewn():
             print(f'  UWAGA: zewn/{os.path.basename(f)} nieczytelny ({e}) — e-sport bez swiezych danych')
     # 29.09.2026 (faza 3b): terminarz 365scores (Apps Script, co godzine) — opcjonalny; bez niego typuj.py
     # po prostu nie robi kontroli kraju meczu z terminarza. Tylko informacja, nie blad.
-    f = os.path.join(ZD, 'terminarz_365.csv.gz')
-    if os.path.exists(f):
-        try:
-            d = pd.read_csv(f, usecols=['data'], dtype=str).data.max()
-            print(f'  zewn/terminarz_365.csv.gz: mecze do {d}')
-        except Exception as e:
-            print(f'  UWAGA: zewn/terminarz_365.csv.gz nieczytelny ({e}) — kontrola terminarza w typuj.py pominieta')
-    else:
-        print('  zewn/terminarz_365.csv.gz: brak (opcjonalny — pobierz z Dysku, jesli Apps Script go zapisuje)')
+    # od 29.09 takze terminarz_fs.csv.gz (Flashscore) — 365scores od ok. 20.09 zwraca ~1/4 meczow pilki
+    for nazwa in ('terminarz_fs.csv.gz', 'terminarz_365.csv.gz'):
+        f = os.path.join(ZD, nazwa)
+        if os.path.exists(f):
+            try:
+                t = pd.read_csv(f, usecols=['data', 'sport'], dtype=str)
+                print(f'  zewn/{nazwa}: mecze do {t.data.max()} (pilka {int((t.sport == "football").sum())}, razem {len(t)})')
+            except Exception as e:
+                print(f'  UWAGA: zewn/{nazwa} nieczytelny ({e}) — kontrola terminarza w typuj.py bez tego pliku')
+        else:
+            print(f'  zewn/{nazwa}: brak (opcjonalny — pobierz z Dysku, jesli Apps Script go zapisuje)')
     arch = glob.glob(os.path.join(ZD, 'wyniki_365_pilka_archiwum_*.csv.gz'))
     if not arch:
         bledy.append('brak zewn/wyniki_365_pilka_archiwum_*.csv.gz (sezon 2025/26) — pobierz z Dysku; '

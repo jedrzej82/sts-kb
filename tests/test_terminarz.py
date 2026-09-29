@@ -40,3 +40,34 @@ def test_jeden_czlon_nie_wystarcza():
 
 def test_brak_pliku(tmp_path):
     assert terminarz.wczytaj(str(tmp_path / 'brak.csv.gz')) is None
+
+
+def test_dwa_zrodla_flashscore_pierwszy():
+    # te same mecze w dwoch zrodlach z roznymi nazwami ligi — nie moga dac „kilku kandydatow”
+    fs = T.assign(kraj=T.kraj.str.upper(), turniej='Liga FS', zrodlo='fs')
+    t = pd.concat([fs, T.assign(zrodlo='365')], ignore_index=True)
+    m = terminarz.znajdz('Independiente Yumbo', 'Real Cundinamarca', t)
+    assert (m['kraj'], m['turniej']) == ('COLOMBIA', 'Liga FS')
+    # mecz tylko w 365scores nadal znaleziony
+    t2 = pd.concat([fs.iloc[1:], T.assign(zrodlo='365')], ignore_index=True)
+    assert terminarz.znajdz('Independiente Yumbo', 'Real Cundinamarca', t2)['kraj'] == 'Colombia'
+
+
+def test_wczytaj_laczy_pliki(tmp_path, monkeypatch):
+    T.to_csv(tmp_path / 'fs.csv.gz', index=False); T.iloc[:1].to_csv(tmp_path / '365.csv.gz', index=False)
+    monkeypatch.setattr(terminarz, 'PLIK_FS', str(tmp_path / 'fs.csv.gz'))
+    monkeypatch.setattr(terminarz, 'PLIK', str(tmp_path / '365.csv.gz'))
+    t = terminarz.wczytaj()
+    assert len(t) == 5 and sorted(t.zrodlo.unique()) == ['365', 'fs']
+    monkeypatch.setattr(terminarz, 'PLIK_FS', str(tmp_path / 'brak.csv.gz'))
+    assert list(terminarz.wczytaj().zrodlo.unique()) == ['365']
+
+
+def test_kraje_flashscore():
+    import typuj
+    n = typuj.norm
+    assert typuj._ten_sam_kraj(n('BOSNIA AND HERZEGOVINA'), n('Bosnia & Herzegovina'))
+    assert typuj._ten_sam_kraj(n('CZECH REPUBLIC'), n('Czechia')) and not typuj._ten_sam_kraj('oman', 'romania')
+    znane = typuj._kraje_znane()
+    assert typuj._kanon_kraju(n('PARAGUAY')) in znane and typuj._kanon_kraju(n('ITF MEN - SINGLES')) not in znane
+    assert n('AUSTRALIA & OCEANIA') in typuj._KRAJE_OGOLNE

@@ -8,6 +8,9 @@
  *  2. U góry wybierz funkcję „terminarzUstaw” → „Uruchom” → zezwól na dostęp. Tworzy osobny wyzwalacz co godzinę
  *     i od razu zapisuje pierwszy plik. Wszystkie nazwy mają przedrostek „terminarz”, żeby nie kolidować z resztą kodu.
  *  Wyłączenie: uruchom „terminarzUsun”.
+ *  FLASHSCORE (od 29.09): 365scores od ok. 20.09 zwraca ~1/4 meczów piłki, więc terminarzPracuj zapisuje też
+ *  terminarz_fs.csv.gz z Flashscore (te same kolumny) i terminarz_fs_log.txt (liczba meczów per sport, kody HTTP).
+ *  typuj.py szuka najpierw we Flashscore, potem w 365scores.
  *  Diagnoza pokrycia: uruchom „terminarzDiagnoza” — zapisuje terminarz_diagnoza.txt (liczby meczów przy różnych
  *  parametrach zapytania) do tego samego folderu. Nic nie zmienia w terminarzu.
  *
@@ -32,6 +35,7 @@ function terminarzUsun() {
 }
 
 function terminarzPracuj() {
+  try { terminarzFs(); } catch (e) { Logger.log('terminarzFs: ' + e); }   // błąd Flashscore nie blokuje 365scores
   var dzis = Utilities.formatDate(new Date(), 'UTC', 'yyyy-MM-dd');
   var jutro = Utilities.formatDate(new Date(Date.now() + 86400000), 'UTC', 'yyyy-MM-dd');
   var wiersze = [], nazwySportow = {};
@@ -74,6 +78,60 @@ function terminarzPracuj() {
   while (stare.hasNext()) doKosza.push(stare.next());
   folder.createFile(Utilities.gzip(Utilities.newBlob(tresc, 'text/csv', 'terminarz_365.csv')).setName('terminarz_365.csv.gz'));
   doKosza.forEach(function (f) { f.setTrashed(true); });   // stary plik dopiero PO zapisie nowego
+}
+
+// Flashscore: identyfikator sportu -> nazwa w pliku (jak w wyniki_fs_*; piłka jako „football” dla typuj.py)
+var TERMINARZ_FS_SPORTY = {1: 'football', 2: 'tennis', 3: 'basketball', 4: 'hockey', 5: 'american-football', 6: 'baseball',
+  7: 'handball', 8: 'rugby-union', 9: 'floorball', 10: 'bandy', 11: 'futsal', 12: 'volleyball', 13: 'cricket', 14: 'darts',
+  15: 'snooker', 16: 'boxing', 17: 'beach-volleyball', 18: 'aussie-rules', 19: 'rugby-league', 21: 'badminton',
+  22: 'waterpolo', 24: 'field-hockey', 25: 'table-tennis', 26: 'beach-soccer', 28: 'mma', 30: 'pesapallo', 36: 'esports'};
+var TERMINARZ_FS_HOSTY = ['https://global.flashscore.ninja/2/x/feed/', 'https://d.flashscore.com/x/feed/'];
+
+function terminarzFs() {
+  var ids = Object.keys(TERMINARZ_FS_SPORTY), wiersze = [], byly = {}, log = ['terminarzFs ' + new Date().toISOString()];
+  [0, 1].forEach(function (dzien) {   // 0 = dziś, 1 = jutro (strefa 0 = UTC)
+    var odp = null, host = '';
+    for (var h = 0; h < TERMINARZ_FS_HOSTY.length && !odp; h++) {
+      host = TERMINARZ_FS_HOSTY[h];
+      var proba = UrlFetchApp.fetchAll(ids.map(function (id) {
+        return {url: host + 'f_' + id + '_' + dzien + '_0_en_1', muteHttpExceptions: true,
+          headers: {'x-fsign': 'SW9D1eZo', 'User-Agent': TERMINARZ_UA['User-Agent'], 'Referer': 'https://www.flashscore.com/'}};
+      }));
+      if (proba.some(function (r) { return r.getResponseCode() === 200 && r.getContentText().indexOf('AA÷') >= 0; })) odp = proba;
+      else log.push('dzien ' + dzien + ' host ' + host + ': brak danych (' + proba.map(function (r) { return r.getResponseCode(); }).join(',') + ')');
+    }
+    if (!odp) return;
+    odp.forEach(function (r, i) {
+      var sport = TERMINARZ_FS_SPORTY[ids[i]], n = 0, kraj = '', turniej = '';
+      if (r.getResponseCode() !== 200) { log.push('dzien ' + dzien + ' ' + sport + ': HTTP ' + r.getResponseCode()); return; }
+      r.getContentText().split('~').forEach(function (rek) {
+        var f = {};
+        rek.split('¬').forEach(function (p) { var k = p.indexOf('÷'); if (k > 0) f[p.substr(0, k)] = p.substr(k + 1); });
+        if (f.ZA !== undefined) {   // nagłówek rozgrywek: „KRAJ: Liga”
+          var c = f.ZA.indexOf(': ');
+          kraj = c > 0 ? f.ZA.substr(0, c) : (f.ZY || ''); turniej = c > 0 ? f.ZA.substr(c + 2) : f.ZA;
+        } else if (f.AA !== undefined && f.AD && !byly[f.AA]) {
+          byly[f.AA] = 1;
+          var t = new Date(Number(f.AD) * 1000), st = f.AB === '3' ? 4 : f.AB === '2' ? 3 : 2;
+          wiersze.push(terminarzCsv([Utilities.formatDate(t, 'UTC', 'yyyy-MM-dd'), Utilities.formatDate(t, 'UTC', 'HH:mm'), sport,
+            kraj, turniej, f.ER || '', f.AE || f.FH || '', f.AF || f.FK || '', st]));
+          n++;
+        }
+      });
+      log.push('dzien ' + dzien + ' ' + sport + ': ' + n + ' meczów');
+    });
+  });
+  var folder = DriveApp.getFolderById(TERMINARZ_FOLDER_ID);
+  if (wiersze.length) {
+    var tresc = 'data,godzina_utc,sport,kraj,turniej,runda,gosp,gosc,status\n' + wiersze.join('\n');
+    var stare = folder.getFilesByName('terminarz_fs.csv.gz'), doKosza = [];
+    while (stare.hasNext()) doKosza.push(stare.next());
+    folder.createFile(Utilities.gzip(Utilities.newBlob(tresc, 'text/csv', 'terminarz_fs.csv')).setName('terminarz_fs.csv.gz'));
+    doKosza.forEach(function (f) { f.setTrashed(true); });
+  }
+  var sl = folder.getFilesByName('terminarz_fs_log.txt');
+  while (sl.hasNext()) sl.next().setTrashed(true);
+  folder.createFile('terminarz_fs_log.txt', log.join('\n') + '\nrazem ' + wiersze.length, 'text/plain');
 }
 
 function terminarzDiagnoza() {

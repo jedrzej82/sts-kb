@@ -2,7 +2,7 @@
 """Terminarz 365scores (faza 3b): mecz z oferty STS -> kraj i rozgrywki, po OBU druzynach naraz.
   python3 terminarz.py "Gosp" "Gosc" [--data RRRR-MM-DD]
 
-Plik zewn/terminarz_365.csv.gz zapisuje Apps Script „wyniki STS” co godzine (mecze dzis i jutro, takze
+Pliki zewn/terminarz_fs.csv.gz (Flashscore) i zewn/terminarz_365.csv.gz zapisuje Apps Script „wyniki STS” co godzine (mecze dzis i jutro, takze
 nierozegrane). Nazwy z oferty czesto nie pasuja pojedynczo ("Independiente Yumbo"), ale para
 (gospodarz + gosc + data) wskazuje jeden mecz — a z nim kraj i lige. typuj.py uzywa tego, zeby ODRZUCIC
 dopasowanie do klubu z innego kraju. Brak pliku albo brak meczu w terminarzu niczego nie blokuje.
@@ -21,6 +21,7 @@ from nazwy import LITERY, znaczniki
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PLIK = os.path.join(HERE, 'zewn', 'terminarz_365.csv.gz')
+PLIK_FS = os.path.join(HERE, 'zewn', 'terminarz_fs.csv.gz')   # Flashscore (od 29.09) — pelniejszy, sprawdzany najpierw
 _FORMY = frozenset('fc cf sc ac afc cfc fk nk sk bk hk hc kk rk ok ks sv ss ec fbc sad bc cd ca cs club de la'.split())
 
 
@@ -44,19 +45,31 @@ def pasuje(oferta, zrodlo):
     return a <= b or b <= a
 
 
-def wczytaj(plik=PLIK):
+def _czytaj(plik):
     if not os.path.exists(plik): return None
     try:
         return pd.read_csv(plik, dtype=str, keep_default_na=False)
     except Exception as e:
-        print(f'  UWAGA: terminarz nieczytelny ({e}) — kontrola terminarza pominieta', file=sys.stderr)
+        print(f'  UWAGA: terminarz {os.path.basename(plik)} nieczytelny ({e}) — pominiety', file=sys.stderr)
         return None
+
+
+def wczytaj(plik=None):
+    """Oba terminarze (kolumna zrodlo: fs, 365) albo None. 365scores od ok. 20.09 zwraca ~1/4 meczow pilki."""
+    if plik: return _czytaj(plik)
+    czesci = [t.assign(zrodlo=z) for z, p in (('fs', PLIK_FS), ('365', PLIK)) for t in [_czytaj(p)] if t is not None]
+    return pd.concat(czesci, ignore_index=True) if czesci else None
 
 
 def znajdz(gosp, gosc, t=None, data=None, sport='football'):
     """Zwraca dict(kraj, turniej, gosp, gosc, data, godzina_utc) jednego meczu albo None (brak / kilka)."""
     t = wczytaj() if t is None else t
     if t is None or not len(t): return None
+    if 'zrodlo' in t and t.zrodlo.nunique() > 1:   # zrodla nazywaja ligi inaczej — kazde osobno, Flashscore pierwszy
+        for z in ('fs', '365'):
+            m = znajdz(gosp, gosc, t[t.zrodlo == z].drop(columns='zrodlo'), data, sport)
+            if m: return m
+        return None
     x = t[t.sport == sport] if 'sport' in t else t
     if data:
         d0 = pd.Timestamp(data)
@@ -75,7 +88,7 @@ def main(a):
     if len(a) < 2: sys.exit(__doc__)
     data = a[a.index('--data') + 1] if '--data' in a else None
     t = wczytaj()
-    if t is None: sys.exit('BRAK zewn/terminarz_365.csv.gz — pobierz z Dysku (Apps Script „wyniki STS”)')
+    if t is None: sys.exit('BRAK zewn/terminarz_fs.csv.gz i terminarz_365.csv.gz — pobierz z Dysku (Apps Script „wyniki STS”)')
     m = znajdz(a[0], a[1], t, data)
     print(f'TERMINARZ: {m["gosp"]} – {m["gosc"]} | {m["kraj"]} | {m["turniej"]} | {m["data"]} {m["godzina_utc"]} UTC'
           if m else 'TERMINARZ: brak jednoznacznego meczu (nazwy nie pasuja albo kilka kandydatow)')

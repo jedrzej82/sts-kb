@@ -354,11 +354,29 @@ _KRAJ_KANON = {'turk': 'turkey', 'turkiye': 'turkey', 'turkey': 'turkey', 'saudi
 
 # nazwy "krajow" 365scores, ktore nie sa krajem (rozgrywki miedzynarodowe) — tu terminarz nie rozstrzyga
 _KRAJE_OGOLNE = frozenset({'world', 'international', 'intl', 'europe', 'asia', 'africa', 'oceania', 'southamerica',
-                           'northcentralamerica', 'northandcentralamerica', 'concacaf', 'intercontinental', 'americas'})
+                           'northcentralamerica', 'northandcentralamerica', 'concacaf', 'intercontinental', 'americas',
+                           'australiaoceania', 'australiaandoceania'})   # dwa ostatnie: Flashscore
+
+
+def _kanon_kraju(a):
+    # 'and' usuwane z obu stron: Flashscore „BOSNIA AND HERZEGOVINA”, SofaScore „Bosnia & Herzegovina”
+    return _KRAJ_KANON.get(a, a).replace('and', '')
 
 
 def _ten_sam_kraj(a, b):
-    return _KRAJ_KANON.get(a, a) == _KRAJ_KANON.get(b, b)
+    return _kanon_kraju(a) == _kanon_kraju(b)
+
+
+@functools.lru_cache(maxsize=1)
+def _kraje_znane():
+    """Kraje lig z bazy (SOFA_DIV) po kanonizacji — terminarz blokuje tylko przy kraju z tej listy."""
+    try:
+        from zewn import SOFA_DIV
+    except Exception:
+        SOFA_DIV = []
+    return frozenset(_kanon_kraju(norm(k)) for k, _, _ in SOFA_DIV if norm(k)) | \
+        frozenset(_kanon_kraju(v) for v in _KRAJ_KANON.values()) | \
+        frozenset(_kanon_kraju(norm(w)) for ws in _KRAJE_PL.values() for w in ws)   # nazwy panstw (reprezentacje)
 
 try:
     from kluby import SCAL_RECZNIE as _SR
@@ -649,11 +667,13 @@ def club(home, away, kursy, live=None):
         if mt:
             kt = norm(mt['kraj'])
             print(f'  TERMINARZ: {mt["gosp"]} – {mt["gosc"]} | {mt["kraj"]} | {mt["turniej"]}')
-            if kt and kt not in _KRAJE_OGOLNE:
+            if kt and kt not in _KRAJE_OGOLNE and _kanon_kraju(kt) not in _kraje_znane():
+                print(f'  (kraj terminarza „{mt["kraj"]}” spoza listy krajow lig — bez kontroli kraju)')
+            elif kt and kt not in _KRAJE_OGOLNE:
                 zle = [(n, t, k) for n, t, k in ((home, h, kh), (away, a, ka)) if k and not _ten_sam_kraj(k, kt)]
                 if zle:
                     sys.exit('NIEZGODNE Z TERMINARZEM: ' + '; '.join(f'"{n}" -> {t} (liga z kraju {k})' for n, t, k in zle)
-                             + f', a mecz w terminarzu 365scores jest w kraju {mt["kraj"]} ({mt["turniej"]}). '
+                             + f', a mecz w terminarzu jest w kraju {mt["kraj"]} ({mt["turniej"]}). '
                              f'Nazwa trafila w INNY klub. Analiza przerwana, noga MNIEJ.')
     # 29.09.2026 (faza 3, dopasowanie LACZNE): gdy nazwa zgubila czlon rozrozniajacy (przypadek (c)
     # w _skrot_albo_nic: "Independiente Yumbo" -> "Independiente"), sam napis nie rozstrzyga — para z oferty
