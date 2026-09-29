@@ -609,12 +609,7 @@ def _z_meczami(t, m):
 # "Panathinaikos Ateny"), a baza ma zapis zrodlowy. Zamiana calych CZLONOW nazwy, i to dopiero wtedy,
 # gdy nazwa oryginalna nie dala trafienia — dopasowanie po zamianie przechodzi przez te same
 # zabezpieczenia resolve() (znaczniki rezerw/kobiet, kontrola kraju), wiec nie omija zadnej blokady.
-EGZONIMY = {'madryt': 'Madrid', 'monachium': 'Munich', 'wieden': 'Wien', 'lizbona': 'Lisbon',
-            'mediolan': 'Milan', 'rzym': 'Roma', 'neapol': 'Napoli', 'turyn': 'Torino', 'ateny': 'Athens',
-            'sewilla': 'Sevilla', 'walencja': 'Valencia', 'stambul': 'Istanbul', 'kopenhaga': 'Copenhagen',
-            'bruksela': 'Brussels', 'belgrad': 'Belgrade', 'moskwa': 'Moscow', 'praga': 'Prague',
-            'bukareszt': 'Bucharest', 'sztokholm': 'Stockholm', 'kijow': 'Kyiv', 'lwow': 'Lviv',
-            'zagrzeb': 'Zagreb', 'genua': 'Genoa', 'saloniki': 'Thessaloniki', 'pireus': 'Piraeus'}
+from nazwy import EGZONIMY  # 29.09.2026: lista wspolna z sporty.py (nazwy.py)
 
 
 def _przez_egzonim(name, pool):

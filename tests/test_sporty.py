@@ -87,3 +87,12 @@ def test_aliasy_euroliga_i_siatkowka():
     assert sporty.resolve('Maccabi Playtika Tel Aviv', pula) == 'Maccabi Tel Aviv'
     assert sporty.resolve('Sir Sicoma Monini Perugia', pula) == 'Volley Perugia'
     assert sporty.resolve('Berlin Recycling Volleys', pula) == 'Berlin RV'
+
+
+def test_egzonimy_polskie_miasta():
+    """29.09.2026 (raport 12:00): „Hapoel Tel Awiw”, „Hapoel Beer Szewa” — polskie nazwy miast."""
+    pula = {'Hapoel Tel Aviv', 'Maccabi Tel Aviv', 'Hapoel Beer Sheva/Dimona', 'Tofas'}
+    assert sporty.resolve('Hapoel Tel Awiw', pula) == 'Hapoel Tel Aviv'
+    assert sporty.resolve('Maccabi Tel Awiw', pula) == 'Maccabi Tel Aviv'
+    assert sporty.resolve('Tofas Bursa', pula) == 'Tofas'
+    assert sporty.resolve('Hapoel Hajfa', pula) is None          # brak w puli -> nie zgadujemy

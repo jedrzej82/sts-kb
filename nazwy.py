@@ -75,3 +75,26 @@ def aliasy_z_pliku(modul, klucz, slownik, plik=None):
             if k and k not in slownik:
                 slownik[k] = r['cel'].strip(); n += 1
     return n
+
+
+# Polskie nazwy miast (egzonimy) -> zapis w zrodlach wynikow. Wspolne dla typuj.py i sporty.py (29.09.2026:
+# „Hapoel Tel Awiw”, „Hapoel Beer Szewa” nie dopasowywaly sie ani w pilce, ani w koszykowce). Tylko pojedyncze
+# czlony nazwy miasta; zamiana jest probą dodatkowa — nazwa oryginalna ma pierwszenstwo.
+EGZONIMY = {'madryt': 'Madrid', 'monachium': 'Munich', 'wieden': 'Wien', 'lizbona': 'Lisbon',
+            'mediolan': 'Milan', 'rzym': 'Roma', 'neapol': 'Napoli', 'turyn': 'Torino', 'ateny': 'Athens',
+            'sewilla': 'Sevilla', 'walencja': 'Valencia', 'stambul': 'Istanbul', 'kopenhaga': 'Copenhagen',
+            'bruksela': 'Brussels', 'belgrad': 'Belgrade', 'moskwa': 'Moscow', 'praga': 'Prague',
+            'bukareszt': 'Bucharest', 'sztokholm': 'Stockholm', 'kijow': 'Kyiv', 'lwow': 'Lviv',
+            'zagrzeb': 'Zagreb', 'genua': 'Genoa', 'saloniki': 'Thessaloniki', 'pireus': 'Piraeus',
+            'awiw': 'Aviv', 'szewa': 'Sheva', 'jerozolima': 'Jerusalem', 'hajfa': 'Haifa', 'kowno': 'Kaunas',
+            'wilno': 'Vilnius', 'ryga': 'Riga', 'bazylea': 'Basel', 'genewa': 'Geneve', 'zurych': 'Zurich',
+            'marsylia': 'Marseille', 'wenecja': 'Venezia', 'antwerpia': 'Antwerp',
+            'kolonia': 'Koln', 'norymberga': 'Nurnberg', 'akwizgran': 'Aachen', 'brema': 'Bremen',
+            'lipsk': 'Leipzig', 'drezno': 'Dresden', 'erywan': 'Yerevan',
+            'nikozja': 'Nicosia', 'lublana': 'Ljubljana', 'bratyslawa': 'Bratislava'}
+
+
+def egzonim(nazwa, klucz):
+    """Nazwa z polskimi nazwami miast zamienionymi na zapis zrodel (klucz = funkcja norm modulu)."""
+    czl = str(nazwa).split()
+    return ' '.join(EGZONIMY.get(klucz(c), c) for c in czl)
