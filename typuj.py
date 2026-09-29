@@ -627,11 +627,28 @@ def _przez_egzonim(name, pool):
     return r
 
 
+# 29.09.2026 (proba generalna): clubelo (xgabora) przestal aktualizowac AUT, DEN, FIN, NOR, POL, ROM, RUS, SWE
+# w 06.2025 — wartosc jest przepisywana z biezaca data, wiec „date” wyglada swiezo. Legia dostawala Elo 1491
+# sprzed 15 miesiecy jako biezace (mecze roznych lig licza sie z samego Elo). Liczy sie data OSTATNIEJ ZMIANY
+# wartosci; starsze niz MAKS_WIEK_ELO_DNI = brak Elo (200 dni: zimowa przerwa w Skandynawii ok. 4,5 mies.).
+MAKS_WIEK_ELO_DNI = 200
+
+
+def elo_aktualne(elo, dzis):
+    """clubelo (club, country, elo, date) -> (ostatni wiersz na klub z kolumna zmiana = data ostatniej zmiany Elo,
+    zbior klubow z Elo nieaktualnym)."""
+    e = elo.sort_values(['club', 'date'])
+    zm = e[e.groupby('club').elo.diff().fillna(1) != 0].groupby('club').date.max()
+    ost = e.groupby('club').last()
+    ost['zmiana'] = pd.to_datetime(zm.reindex(ost.index), errors='coerce')
+    stare = set(ost.index[ost.zmiana < pd.Timestamp(dzis) - pd.Timedelta(days=MAKS_WIEK_ELO_DNI)])
+    return ost, stare
+
+
 def club(home, away, kursy, live=None):
     con = db()
     m = pd.read_sql('select * from matches', con, parse_dates=['MatchDate'])
-    elo = pd.read_sql('select club, country, elo, date from clubelo', con)
-    elo = elo.sort_values('date').groupby('club').last()
+    elo, elo_stare = elo_aktualne(pd.read_sql('select club, country, elo, date from clubelo', con), dt.date.today())
     pool = set(m.HomeTeam) | set(m.AwayTeam) | set(elo.index)
     wczytaj_warianty(con)
     jh, ja = _jawny_kraj(home, pool, m), _jawny_kraj(away, pool, m)
@@ -719,6 +736,10 @@ def club(home, away, kursy, live=None):
         ostrz.append(f'Różne ligi ({dh} vs {da}) — tylko model Elo.')
     glm = cached(f'glm_{today.date()}', lambda: fit_elo_glm(m))
     eh, ea = (elo.elo.get(h), elo.elo.get(a))
+    for t_ in (h, a):
+        if t_ in elo_stare:
+            ostrz.append(f'Elo {t_} nieaktualne (ostatnia zmiana {elo.zmiana[t_]:%Y-%m-%d}, clubelo nie prowadzi juz tej ligi) — pominiete.')
+    eh, ea = (None if h in elo_stare else eh), (None if a in elo_stare else ea)
     lel = elo_lambdas(glm, eh, ea, dh if dh == da else None) if eh and ea else None
     if lel is None: ostrz.append('Brak Elo jednej z drużyn.')
     if dh != da and lel is None:
