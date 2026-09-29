@@ -76,3 +76,14 @@ def test_aliasy_polskie_nazwy_sponsorskie():
     assert sporty.resolve('Asseco Resovia', pula) == 'Resovia Rzeszów'
     assert sporty.resolve('PGE GiEK Skra Bełchatów', pula) == 'SKRA Bełchatów'
     assert sporty.resolve('Orlen Wisła Płock', {'Kielce'}) is None      # alias dziala tylko, gdy cel jest w puli
+
+
+def test_aliasy_euroliga_i_siatkowka():
+    pula = {'Fenerbahçe', 'Panathinaikos', 'Olimpia Milano', 'BC Dubai', 'Volley Perugia', 'Berlin RV', 'Maccabi Tel Aviv'}
+    assert sporty.resolve('Fenerbahçe Beko', pula) == 'Fenerbahçe'
+    assert sporty.resolve('Panathinaikos AKTOR', pula) == 'Panathinaikos'
+    assert sporty.resolve('EA7 Emporio Armani Mediolan', pula) == 'Olimpia Milano'
+    assert sporty.resolve('Dubai Basketball', pula) == 'BC Dubai'
+    assert sporty.resolve('Maccabi Playtika Tel Aviv', pula) == 'Maccabi Tel Aviv'
+    assert sporty.resolve('Sir Sicoma Monini Perugia', pula) == 'Volley Perugia'
+    assert sporty.resolve('Berlin Recycling Volleys', pula) == 'Berlin RV'
