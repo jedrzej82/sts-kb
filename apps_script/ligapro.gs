@@ -69,3 +69,26 @@ function ligaproDiagnoza2() {
   while (stare.hasNext()) stare.next().setTrashed(true);
   folder.createFile('ligapro_diagnoza.txt', out.join('\n'), 'text/plain');
 }
+
+/** Diagnoza 3: dane wbudowane w stronę scores24 (window.__…__) i fragmenty wokół dzisiejszej daty. */
+function ligaproDiagnoza3() {
+  var url = 'https://scores24.live/en/table-tennis/l-czech-liga-pro', d = Utilities.formatDate(new Date(), 'UTC', 'yyyy-MM-dd');
+  var r = UrlFetchApp.fetch(url, {muteHttpExceptions: true, followRedirects: true,
+    headers: {'User-Agent': TERMINARZ_UA['User-Agent'], 'Accept': 'text/html,*/*', 'Accept-Language': 'en-US,en;q=0.9'}});
+  var t = r.getContentText() || '', out = ['ligaproDiagnoza3 ' + new Date().toISOString() + ' | HTTP ' + r.getResponseCode() + ' | ' + t.length];
+  var re = /window\.(__[A-Z_]+__)\s*=\s*/g, m;
+  while ((m = re.exec(t)) !== null) {
+    var s = m.index + m[0].length, e = t.indexOf('</script>', s);
+    out.push('ZMIENNA ' + m[1] + ' | dlugosc ' + (e - s) + '\n    ' + t.substr(s, 1200).replace(/\s+/g, ' '));
+  }
+  var k = -1;
+  for (var i = 0; i < 4; i++) {
+    k = t.indexOf(d, k + 1); if (k < 0) break;
+    out.push('DATA ' + d + ' @' + k + '\n    ' + t.substr(Math.max(0, k - 700), 1400).replace(/\s+/g, ' '));
+  }
+  var j = t.search(/"(slug|name)":"[^"]*-[^"]*"[^{}]{0,300}"(score|startTime|start_time|timestamp)"/);
+  if (j >= 0) out.push('MECZ? @' + j + '\n    ' + t.substr(Math.max(0, j - 300), 1500).replace(/\s+/g, ' '));
+  var folder = DriveApp.getFolderById(TERMINARZ_FOLDER_ID), stare = folder.getFilesByName('ligapro_diagnoza.txt');
+  while (stare.hasNext()) stare.next().setTrashed(true);
+  folder.createFile('ligapro_diagnoza.txt', out.join('\n'), 'text/plain');
+}
