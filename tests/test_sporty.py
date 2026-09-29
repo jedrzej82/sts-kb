@@ -105,3 +105,12 @@ def test_aliasy_siatkowka_kobiet():
     assert sporty.resolve('Fenerbahce Medicana (K)', pula) == 'Fenerbahçe (W)'
     assert sporty.resolve('LKS Commercecon Łódź (K)', pula) == 'LKS Lodz (W)'
     assert sporty.resolve('Fenerbahce Medicana', pula) is None     # bez (K) niejednoznaczne (sekcja meska)
+
+
+def test_aliasy_hokej():
+    pula = {'Aksam Unia Oswiecim', 'Nesta Torun', 'Ciarko PBS Bank', 'Třinec', 'HIFK'}
+    assert sporty.resolve('Re-Plast Unia Oświęcim', pula) == 'Aksam Unia Oswiecim'
+    assert sporty.resolve('KH Energa Toruń', pula) == 'Nesta Torun'
+    assert sporty.resolve('Marma Ciarko STS Sanok', pula) == 'Ciarko PBS Bank'
+    assert sporty.resolve('HC Oceláři Třinec', pula) == 'Třinec'
+    assert sporty.resolve('HIFK Helsinki', pula) == 'HIFK'
