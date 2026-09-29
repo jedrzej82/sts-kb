@@ -37,3 +37,37 @@ def test_fsx_dubel_po_wyniku_i_nauczona_nazwa(tmp_path, monkeypatch):
     monkeypatch.setattr(zewn, 'ZD', str(tmp_path))
     x = zewn.inne()
     assert len(x) == 2 and 'HSV Handball' in set(x.gosc) and '3x3' not in ' '.join(x.liga)
+
+
+def test_fsx_nazwa_365_dla_kilku_klubow_fs_nie_zgadujemy(tmp_path, monkeypatch):
+    # 29.09: „Wybicki Kielce” i „ZPRP Kielce” (nizsze ligi) nie moga dostac nazwy „Kielce” (Industria);
+    # „China 3x3 W” nie moze zostac reprezentacja w koszykowce 5x5.
+    s365 = pd.DataFrame([_w('handball', 'Poland', 'Superliga', 'Kielce', 'Slask Wroclaw', 35, 25),
+                         _w('handball', 'Germany', 'Bundesliga', 'THW Kiel', 'HSG Wetzlar', 31, 29),
+                         _w('basketball', 'Asia', 'Asian Games Women', 'China (W)', 'Japan (W)', 80, 70)], columns=KOL)
+    fsx = pd.DataFrame([_w('handball', 'POLAND', 'I Liga', 'Wybicki Kielce', 'Opole', 30, 28),
+                        _w('handball', 'POLAND', 'Central League', 'ZPRP Kielce', 'Kalisz', 25, 27),
+                        _w('handball', 'EUROPE', 'European League', 'Kiel', 'Benfica', 33, 30),
+                        _w('basketball', 'ASIA', 'Asian Games 3x3 Women', 'China 3x3 W', 'Japan 3x3 W', 21, 15)], columns=KOL)
+    s365.to_csv(tmp_path / 'wyniki_365_inne_2026-09.csv.gz', index=False)
+    fsx.to_csv(tmp_path / 'wyniki_fsx_inne_2026-09.csv.gz', index=False)
+    monkeypatch.setattr(zewn, 'ZD', str(tmp_path))
+    x = zewn.inne()
+    nazwy = set(x.gosp) | set(x.gosc)
+    assert {'Wybicki Kielce', 'ZPRP Kielce', 'THW Kiel'} <= nazwy          # Kiel -> THW Kiel nadal (jednoznaczne)
+    assert (x.gosp == 'Kielce').sum() == 1                                 # tylko mecz Industrii z 365
+    assert not x.liga.str.contains('3x3').any() and len(x) == 6
+
+
+def test_fsx_nazwa_tylko_w_tym_samym_kraju(tmp_path, monkeypatch):
+    # 29.09: „Zamora” (Hiszpania, Division de Honor Plata) nie jest „SAG Lomas de Zamora” (Argentyna)
+    s365 = pd.DataFrame([_w('handball', 'Argentina', 'Liga de Honor Oro', 'SAG Lomas de Zamora', 'River Plate', 30, 25),
+                         _w('handball', 'Europe', 'Champions League', 'FC Porto', 'Veszprem', 28, 30)], columns=KOL)
+    fsx = pd.DataFrame([_w('handball', 'SPAIN', 'Division de Honor Plata', 'Zamora', 'Oviedo', 26, 26),
+                        _w('handball', 'EUROPE', 'European League', 'Porto', 'Benfica', 31, 29)], columns=KOL)
+    s365.to_csv(tmp_path / 'wyniki_365_inne_2026-09.csv.gz', index=False)
+    fsx.to_csv(tmp_path / 'wyniki_fsx_inne_2026-09.csv.gz', index=False)
+    monkeypatch.setattr(zewn, 'ZD', str(tmp_path))
+    x = zewn.inne()
+    nazwy = set(x.gosp) | set(x.gosc)
+    assert 'Zamora' in nazwy and 'FC Porto' in set(x[x.liga.str.contains('European League')].gosp)
