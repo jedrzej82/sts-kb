@@ -6,7 +6,7 @@ i szukania wynikow noga po nodze, ktore nie miescilo sie w czasie przebiegu (zal
       KATALOG = pobrane z Dysku delty (nazwa pliku zaczyna sie od typy_log / sporty_typy / ako_log, dowolny dopisek).
       Tworzy kb/typy_log.csv, kb/sporty_typy.csv, kb/ako_log.csv — pelne dzienniki bez duplikatow
       (przy powtorzonym wierszu wygrywa ten z wypelnionym wynikiem, potem pozniejszy plik).
-  python3 dzienniki.py rozlicz RRRR-MM-DD [--ako kb/ako_log.csv] [--wyjscie Rozliczenie_RRRR-MM-DD.csv]
+  python3 dzienniki.py rozlicz RRRR-MM-DD [--ako kb/ako_log.csv | KATALOG_Z_DELTAMI] [--wyjscie Rozliczenie_RRRR-MM-DD.csv]
       Rozlicza kupony z ako_log uruchomione tego dnia: wynik kazdej nogi z kb.sqlite (kluby, reprezentacje),
       zewn/wyniki_* (365scores, Flashscore, Liga Pro), sporty_hist.csv i tenis_hist.csv. Zapisuje plik
       „Rozliczenie” (kolumny KROKU 5.3 + wiersze RAZEM_*) i wypisuje wiersz Bilansu dnia.
@@ -161,12 +161,51 @@ def _szukaj(w, d0, gosp, gosc, rozwiaz, kol_h='h', kol_a='a'):
     if okno.empty: return None, 'brak wynikow z tych dni'
     pula = set(okno[kol_h]) | set(okno[kol_a])
     h, g = rozwiaz(gosp, pula), rozwiaz(gosc, pula)
+    if h and g:
+        x = okno[(okno[kol_h] == h) & (okno[kol_a] == g)]
+        if len(x): return x.iloc[-1], False
+        x = okno[(okno[kol_h] == g) & (okno[kol_a] == h)]
+        if len(x): return x.iloc[-1], True
+    k = _po_kotwicy(okno, h, g, gosp, gosc, rozwiaz, kol_h, kol_a)
+    if k is not None: return k
     if not h or not g: return None, f'nie dopasowano: {gosp if not h else gosc}'
-    x = okno[(okno[kol_h] == h) & (okno[kol_a] == g)]
-    if len(x): return x.iloc[-1], False
-    x = okno[(okno[kol_h] == g) & (okno[kol_a] == h)]
-    if len(x): return x.iloc[-1], True
     return None, f'{h} - {g}: brak meczu w oknie +-1 dnia'
+
+
+_WYNIK = (('g', 'ga'), ('pg', 'pa'))
+
+
+def _po_kotwicy(okno, h, g, gosp, gosc, rozwiaz, kol_h, kol_a):
+    """29.09.2026 (proba generalna, 28.09): dwa zrodla pisza ten sam mecz inaczej — Flashscore „Maccabi Bnei Raina –
+    H. Raanana”, 365 „Maccabi Bnei Reineh – Hapoel Raanana”. Kazda nazwa z oferty trafiala w INNE zrodlo i para nie
+    istniala nigdzie. Kotwica: druzyna dopasowana w puli, a jej rywal w tym wierszu musi dac sie dopasowac do drugiej
+    nazwy z oferty (resolve z pula JEDNEJ nazwy — tylko ten rywal). Wszystkie takie wiersze musza sie zgadzac co do
+    wyniku; inaczej nie rozstrzygamy (BRAK WYNIKU)."""
+    kand = []
+    for kotw, drugi, gosp_kotw in ((h, gosc, True), (g, gosp, False)):
+        if not kotw: continue
+        for r in okno[(okno[kol_h] == kotw) | (okno[kol_a] == kotw)].itertuples(index=False):
+            r = r._asdict()
+            na_gosp = r[kol_h] == kotw
+            rywal = r[kol_a] if na_gosp else r[kol_h]
+            if _cicho_bez_uwag(rozwiaz, drugi, {rywal}) != rywal: continue
+            kand.append((pd.Series(r), na_gosp != gosp_kotw, rywal))
+    if not kand: return None
+    def _wyn(s, odwr):
+        for a, b in _WYNIK:
+            if a in s and b in s: return (s[b], s[a]) if odwr else (s[a], s[b])
+        return tuple(s[c] for c in s.index if c not in (kol_h, kol_a, 'd'))
+    if len({_wyn(s, o) for s, o, _ in kand}) != 1: return None
+    s, odwr, rywal = kand[0]
+    _OSTRZEZENIA.append(f'dopasowano po jednej druzynie: {gosp} - {gosc} = {s[kol_h]} - {s[kol_a]} (sprawdz)')
+    return s, odwr
+
+
+def _cicho_bez_uwag(rozwiaz, nazwa, pula):
+    n = len(_OSTRZEZENIA)
+    r = rozwiaz(nazwa, pula)
+    del _OSTRZEZENIA[n:]
+    return r
 
 
 _OSTRZEZENIA = []   # komunikaty dopasowania nazw z biezacej nogi (ROZMYTO, po rdzeniu...) -> kolumna uwaga
@@ -339,6 +378,11 @@ def main(a):
     data = a[1]
     ako_p = a[a.index('--ako') + 1] if '--ako' in a else os.path.join(HERE, 'ako_log.csv')
     wyj = a[a.index('--wyjscie') + 1] if '--wyjscie' in a else os.path.join(HERE, f'Rozliczenie_{data}.csv')
+    if os.path.isdir(ako_p):
+        # 29.09.2026 (proba generalna): --ako KATALOG_Z_DELTAMI konczylo sie IsADirectoryError — scalamy tu
+        print(f'--ako wskazuje katalog — scalam delty z {ako_p}')
+        scal(ako_p, cel=HERE)
+        ako_p = os.path.join(HERE, 'ako_log.csv')
     if not os.path.exists(ako_p): sys.exit(f'brak {ako_p} — najpierw: python3 dzienniki.py scal KATALOG_Z_DELTAMI')
     ako = _czytaj(ako_p)
     W = dict(pilka=wyniki_pilka(), inne=wyniki_inne(), tenis=wyniki_tenis())
