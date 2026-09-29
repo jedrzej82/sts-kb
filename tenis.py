@@ -298,16 +298,21 @@ def _czlon_pasuje(a, b):
 def _wspolne_czlony(zrodlo, kandydat):
     """Ile czlonow nazwy ze zrodla ma odpowiednik u kandydata. Kazdy czlon kandydata
     moze byc zuzyty tylko raz, zeby "Tyler" nie liczyl sie dwa razy."""
+    return _zgodnosc(zrodlo, kandydat)[0]
+
+
+def _zgodnosc(zrodlo, kandydat):
+    """(zgodne czlony wg _wspolne_czlony, w tym zgodne jako PELNE slowa po obu stronach)."""
     tz, tk = _czl_norm(zrodlo), list(_czl_norm(kandydat))
     n = pelne = 0
     for z in tz:
         for i, k in enumerate(tk):
             if _czlon_pasuje(z, k):
-                n += 1; pelne += len(z) > 1 and len(k) > 1; tk.pop(i); break
+                n += 1; pelne += min(len(z), len(k)) > 1 and (z == k or min(len(z), len(k)) >= 4); tk.pop(i); break   # inicjal nie; „Hu” != „Hurkacz”
     # 29.09.2026 (proba generalna): NAZWISKO musi sie zgadzac jako pelne slowo. Inaczej inicjaly
     # robily z obcej osoby „dwa zgodne czlony”: „Linette M.” -> „Cinalli L. M.” (Linette~L., M~M.),
     # „Auger-Aliassime F.” -> „Alhogbani A. F.”, „De Minaur A.” -> „Sibanda M. D. A.”.
-    return n if pelne else min(n, 1)
+    return (n if pelne else min(n, 1)), pelne
 
 
 def _resolve1(name, players):

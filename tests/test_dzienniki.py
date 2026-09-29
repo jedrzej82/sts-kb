@@ -113,3 +113,13 @@ def test_rozlicz_ako_z_katalogu(tmp_path, monkeypatch, W):
     dzienniki.main(['rozlicz', D, '--ako', str(k), '--wyjscie', str(tmp_path / 'r.csv')])
     r = pd.read_csv(tmp_path / 'r.csv', dtype=str)
     assert r.loc[r.tag == 'RAZEM_AKOP-1200-1_1', 'TRAFIONY_PRZEGRANY'].iloc[0] == 'TRAFIONY 1/1'
+
+
+def test_tenis_para_rozstrzyga_kandydatow():
+    # 29.09.2026: „Hurkacz” = Hubert albo Nika — rozstrzyga para, ktora grala; obca osoba z inicjalami odpada
+    t = pd.DataFrame({'d': [DZIS, DZIS, DZIS], 'w': ['Hubert Hurkacz', 'Nika Hurkacz', 'Cinalli L. M.'],
+                      'l': ['Denis Shapovalov', 'Anna Nowak', 'Jan Kowalski'], 'score': ['6-3 6-3', '6-1 6-1', '6-0 6-0']})
+    W = dict(tenis=t, pilka=None, inne=None)
+    st, wyn, uw = dzienniki.rozlicz_noge(dict(sport='tenis', zdarzenie='Hurkacz - Shapovalov', rynek='Zwyciezca Hurkacz', data=D), W)
+    assert st == 'TRAFIONY' and wyn.startswith('Hubert Hurkacz') and 'jedyna pasujaca para' in uw
+    assert dzienniki._kandydaci_tenis('Linette M.', set(t.w) | set(t.l)) == set()

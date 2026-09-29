@@ -20,3 +20,9 @@ def test_aktywny_rozstrzyga_inicjal(monkeypatch):
     assert tenis.resolve('Ruud C.', PULA) == 'Casper Ruud'
     monkeypatch.setattr(tenis, 'OSTATNI', {'Casper Ruud': pd.Timestamp.today(), 'Christian Ruud': pd.Timestamp.today()})
     assert tenis.resolve('Ruud C.', PULA) is None                              # obaj aktywni -> nie zgadujemy
+
+
+def test_pelne_slowo_nie_inicjal_ani_krotki_przedrostek():
+    assert tenis._zgodnosc('Linette M.', 'Cinalli L. M.')[1] == 0          # M == M to inicjal, nie nazwisko
+    assert tenis._zgodnosc('Hurkacz', 'Jia Hu')[1] == 0                    # „Hu” to nie „Hurkacz”
+    assert tenis._zgodnosc('Auger-Aliassime F.', 'Felix Auger Aliassime')[1] == 1
