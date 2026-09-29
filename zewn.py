@@ -528,6 +528,8 @@ def _hokej_fs_nazwy(s, maska_fs):
     return s
 
 FSX_SPORTY = ('basketball', 'handball', 'volleyball')
+_MIEDZYNAR = {'europe', 'world', 'international', 'asia', 'africa', 'south america', 'north america', 'north & central america',
+              'americas', 'oceania', 'australia & oceania'}
 
 
 def _fsx_bez_dubli(s, fsx=None):
@@ -538,6 +540,8 @@ def _fsx_bez_dubli(s, fsx=None):
     from terminarz import pasuje
     fsx = czytaj('wyniki_fsx_inne_*.csv') if fsx is None else fsx
     if not len(fsx) or not len(s): return s
+    # 3x3 to inna dyscyplina (inne() i tak ja wycina) — tu wypada od razu, bo „China 3x3 W” pasowalo do „China (W)”
+    s = s[~(s.sport.isin(FSX_SPORTY) & (s.kraj + ' ' + s.turniej + ' ' + s.gosp + ' ' + s.gosc).str.contains('3x3', case=False))]
     kol = list(s.columns)
     klucz = set(map(tuple, fsx[kol].astype(str).values))
     jest = pd.Series([tuple(r) in klucz for r in s[kol].astype(str).values], index=s.index) & s.sport.isin(FSX_SPORTY)
@@ -559,15 +563,33 @@ def _fsx_bez_dubli(s, fsx=None):
                 dubel[i] = True; pary.setdefault((r.sport, r.gosp), set()).add(a); pary.setdefault((r.sport, r.gosc), set()).add(g); break
     zostaje = jest & ~dubel
     nazwy = {sp: sorted(set(g.gosp) | set(g.gosc)) for sp, g in baza.groupby('sport')}
+    fs_nazwy = {sp: set(g.gosp) | set(g.gosc) for sp, g in s[jest].groupby('sport')}
+    kraje = {}   # (sport, nazwa) -> kraje/rozgrywki miedzynarodowe, w ktorych druzyna grala (365 i FS osobno)
+    for zr, d in (('365', baza), ('fs', s[jest])):
+        for r in d[['sport', 'kraj', 'gosp', 'gosc']].itertuples(index=False):
+            k = _kraj_365(r.kraj).lower()
+            for n in (r.gosp, r.gosc): kraje.setdefault((zr, r.sport, n), set()).add(k)
     mapa, zle = {}, 0
     for sp, t in set(zip(s.sport[zostaje], s.gosp[zostaje])) | set(zip(s.sport[zostaje], s.gosc[zostaje])):
         if t in nazwy.get(sp, ()): continue
         z_dubli = pary.get((sp, t), set())
         if len(z_dubli) == 1: mapa[(sp, t)] = next(iter(z_dubli)); continue   # ten sam klub potwierdzony meczem
         if len(z_dubli) > 1: zle += 1; continue
-        kand = [n for n in nazwy.get(sp, ()) if pasuje(t, n)]
-        if len(kand) == 1: mapa[(sp, t)] = kand[0]
-        elif len(kand) > 1: zle += 1
+        # 29.09: hiszpanska „Zamora” (Division de Honor Plata) pasowala do argentynskiej „SAG Lomas de Zamora” —
+        # gdy obie druzyny graly w ligach krajowych, musza to byc te same kraje (puchary europejskie nic nie mowia)
+        kr = kraje.get(('fs', sp, t), set()) - _MIEDZYNAR
+        kand = [n for n in nazwy.get(sp, ()) if pasuje(t, n)
+                and not (kr and (k365 := kraje.get(('365', sp, n), set()) - _MIEDZYNAR) and not kr & k365)]
+        # 29.09: „Wybicki Kielce” i „ZPRP Kielce” (nizsze ligi) pasowaly do „Kielce” (Industria) — nazwa 365 musi
+        # pasowac do JEDNEJ nazwy z Flashscore, inaczej nie wiadomo, ktory to klub
+        if len(kand) == 1 and sum(pasuje(f, kand[0]) for f in fs_nazwy.get(sp, ())) == 1: mapa[(sp, t)] = kand[0]
+        elif kand: zle += 1
+    cele = {}
+    for k, v in mapa.items(): cele.setdefault((k[0], v), []).append(k)
+    for (sp, v), zr in cele.items():   # dwie nazwy FS -> jedna nazwa 365 bez potwierdzenia meczem: nie zgadujemy
+        niepewne = [k for k in zr if pary.get(k, set()) != {v}]
+        if len(zr) > 1 and niepewne:
+            for k in niepewne: del mapa[k]; zle += 1
     s = s.copy()
     s.loc[zostaje, 'kraj'] = s.loc[zostaje, 'kraj'].map(_kraj_365)
     for c in ('gosp', 'gosc'):
