@@ -80,9 +80,7 @@ K = 24
 # 21.09.2026: przez to norm("Wisla Plock" z polskimi znakami) dawalo "wisapock" zamiast
 # "wislaplock" i klub w ogole nie pasowal do bazy; ratowalo to tylko dopasowanie rozmyte,
 # czyli przypadek. Dotyczy wszystkich nazw z l z kreska, d z kreska, o z kreska itd.
-_LITERY = str.maketrans({'ł':'l','Ł':'L','đ':'d','Đ':'D','ø':'o','Ø':'O','ß':'ss',
-                         'æ':'ae','Æ':'AE','œ':'oe','Œ':'OE','þ':'th','Þ':'TH',
-                         'ð':'d','Ð':'D','ı':'i','ŋ':'n','ħ':'h','ŧ':'t'})
+from nazwy import LITERY as _LITERY   # 29.09.2026: jedna tabela dla wszystkich modulow (nazwy.py)
 
 def norm(s): return re.sub(r'[^a-z0-9]', '', unicodedata.normalize('NFKD', str(s).translate(_LITERY)).encode('ascii', 'ignore').decode().lower())
 
@@ -145,31 +143,9 @@ def _tok_seed(s):
 # dopasowanie tylko wtedy, gdy kandydat ma ich WIECEJ niz zrodlo. Samo "czy kandydat zawiera znacznik"
 # nie wystarczalo: "Boca Juniors" i "Young Boys" to pierwsze zespoly, a zawieraja "juniors" i "young",
 # przez co ochrona sie dla nich wylaczala i "Boca Juniors" lapalo sie na "Boca Juniors Sub-20".
-_ZNACZNIK = re.compile(r'^(b|ii|iii|2|3|c|k|u-?1[6-9]|u-?2[0-3]|sub-?2[0-3]|jun|juniors?|res|reserves?|'
-                       r'young|youth|yth|academy|akademia|w|women|kobiet[ay]?|damen|femenino|femenil|'
-                       r'feminin[oa]?|fem)\.?$', re.I)
 
 
-def _znaczniki(s):
-    # 22.09.2026: STS oznacza druzyny kobiece sufiksem "[K]", a czasem "(W)". Bez zdjecia
-    # nawiasow token "[K]" nie pasowal do wzorca i "Club Leon [K]" dopasowywalo sie
-    # do meskiego "Club Leon" — zmierzone na 5 meczach w przebiegu 21:00 dnia 21.09,
-    # bez zadnego ostrzezenia. Model liczyl mecze meskie dla zdarzen kobiecych.
-    # 23.09.2026 (wyd. 24, recenzja): liczyl tylko ILE jest znacznikow, nie JAKIE — "Barcelona (K)"
-    # (kobiety) trafiala na "Barcelona B" (rezerwy), a "Real Madryt [K]" na "Real Madrid C", bo po obu
-    # stronach byl jeden znacznik. Teraz porownujemy RODZAJE: kobiety / rezerwy B / zespol C /
-    # kategoria wiekowa (z rocznikiem) / mlodziez ogolnie.
-    out = []
-    for t in re.split(r'[\s]+', str(s).strip()):
-        t = t.strip('[](){}<>.,;:')
-        if not _ZNACZNIK.match(t): continue
-        t = t.lower().rstrip('.')
-        if re.match(r'^(k|w|women|kobiet[ay]?|damen|femenino|femenil|feminin[oa]?|fem)$', t): out.append('kobiety')
-        elif re.match(r'^(b|ii|2|res|reserves?)$', t): out.append('rezerwy')
-        elif re.match(r'^(c|iii|3)$', t): out.append('zespol_c')
-        elif re.match(r'^(u|sub)-?\d+$', t): out.append('u' + re.sub(r'\D', '', t))
-        else: out.append('mlodziez')
-    return tuple(sorted(out))
+from nazwy import znaczniki as _znaczniki   # historia zmian (22.09 [K]/(W), 23.09 rodzaje): nazwy.py
 
 
 def _rezerwa_a_nie_pierwsza(zrodlo, kandydat):
@@ -567,6 +543,16 @@ def _rdzen_rowny(name, kandydaci):
     return traf[0]
 
 
+def _osoba_rowna(a, b):
+    """Dwa czlony nazwy osoby: te same w dowolnej kolejnosci albo nazwisko + inicjal imienia ("stolfa","j")."""
+    if len(b) != 2 or not all(a) or not all(b): return False
+    for x, y in ((a, b), (a, b[::-1])):
+        if x == y: return True
+        if x[0] == y[0] and len(x[0]) >= 3 and (len(x[1]) == 1 and y[1].startswith(x[1]) or len(y[1]) == 1 and x[1].startswith(y[1])):
+            return True
+    return False
+
+
 def resolve(name, pool):
     """Zwraca nazwe z bazy albo None. None JEST POPRAWNYM WYNIKIEM — wolacz ma sie wtedy zatrzymac.
     21.09.2026: naprawiona ta sama usterka, ktora wykryto w typuj.py. Nazwa zapisana cyrylica
@@ -598,6 +584,16 @@ def resolve(name, pool):
         print(f'  UWAGA: "{name}" pasuje do {len(_kol[k_])} roznych wpisow w bazie '
               f'({", ".join(sorted(_kol[k_]))}) — sprawdz, ktory to.')
     if k_ in by: return by[k_]
+    # 29.09.2026 (Liga Pro): scores24 pisze gracza "Jakub Stolfa", STS "Stolfa Jakub" albo "Stolfa J." —
+    # dwuczlonowe nazwy osob porownujemy tez w odwrotnej kolejnosci i z inicjalem imienia; tylko jeden kandydat.
+    _cz = re.findall(r'[^\W\d_]+', str(name).translate(_LITERY))
+    if len(_cz) == 2:
+        _n2 = [norm(x) for x in _cz]
+        kand = sorted({p for p in by.values() if _osoba_rowna(_n2, [norm(x) for x in re.findall(r'[^\W\d_]+', str(p).translate(_LITERY))])})
+        if len(kand) == 1: return kand[0]
+        if len(kand) > 1:
+            print(f'  ODRZUCONO: "{name}" pasuje do {len(kand)} graczy ({", ".join(kand)}) — noga MNIEJ')
+            return None
     # Poprawka 51 (24.09.2026): rok zalozenia w nazwie ("TVB Stuttgart" w STS, "TVB 1898 Stuttgart" w bazie).
     # Rok wolno pominac TYLKO gdy rdzen bez roku ma >= 2 czlony (chroni "Metalist 1925" != "Metalist",
     # Poprawka 33, oraz "1860 Munich" != "Munich") i gdy pasuje DOKLADNIE jeden kandydat.
@@ -721,15 +717,25 @@ def drugie_zrodlo(d, sport, h, g, p_h):
     if abs(pm - pf_tego) > DZ_PROG:
         print(f'  ROZBIEZNE ({(pf_tego - pm) * 100:+.0f} pp) → NIE NA KUPON')
         return None
-    print(f'  ZGODNE → P do kuponu {min(pm, pf_tego):.1%} ({fm}; mniejsze z dwoch)')
+    # 29.09.2026 (Poprawka 58, docs/BACKTEST_P48.md): zgodnosc obowiazkowa, P do kuponu = P modelu. Backtest
+    # 3119 nog (dart, LoL, koszykowka, rugby, snooker; P >= 70%, 01-09.2026): min(P) 74,6% przy trafnosci 78,7%
+    # (P modelu 76,7%), gorszy Brier i log loss; odrzucone przez bramke trafialy 79,2% — nie gorzej.
+    print(f'  ZGODNE → P do kuponu {pm:.1%} ({fm}; P modelu, Poprawka 58)')
     print('  Zasada (Poprawka 51): gdy liga jest tez w arkuszu statystyk, noga musi byc zgodna rowniez z sezon.py.')
-    return min(pm, pf_tego)
+    return pm
 
 
-def werdykt_meczu(skala_ok, p_dz, n):
+# 29.09.2026 (Poprawka 60): ligi, w ktorych backtest nie znalazl przewagi modelu — WERDYKT zawsze NIE NA KUPON.
+# Liga Pro (CZ), walk-forward Elo na 4912 meczach 04-29.09 (2156 ocenionych, obaj gracze >= 15 meczow):
+# Brier 0,257 przy 0,250 dla rzutu moneta; faworyci P 70-80% wygrali 38% (n=65), P 60-70% — 54% (n=556).
+LIGI_BEZ_PRZEWAGI = {'Liga Pro': 'Liga Pro — backtest 29.09: model bez przewagi (Brier 0,257 > 0,25)'}
+
+
+def werdykt_meczu(skala_ok, p_dz, n, ligi=()):
     """29.09.2026: jedna linia WERDYKT zamiast bramek rozrzuconych po wyjsciu (wspolna skala, drugie
-    zrodlo z Poprawek 48/51, dane rywala z Poprawki 15). Zwraca (P do kuponu | None, lista powodow)."""
-    powody = []
+    zrodlo z Poprawek 48/51, dane rywala z Poprawki 15). Zwraca (P do kuponu | None, lista powodow).
+    ligi — ligi obu druzyn/graczy (Poprawka 60: LIGI_BEZ_PRZEWAGI)."""
+    powody = [p for k, p in LIGI_BEZ_PRZEWAGI.items() if any(k in str(l) for l in ligi)]
     if not skala_ok: powody.append('rozne ligi bez wspolnej skali')
     if p_dz is None: powody.append('brak zgodnego drugiego zrodla')
     if n < 5: powody.append(f'brak danych rywala ({n} mecz(e))')
@@ -761,7 +767,19 @@ def wspolna_skala(d, sport, h, g, dni=730):
 
 
 
+def nazwa_sportu(s):
+    """29.09.2026 (Raport 12:00, usterka 6): "koszykowka", "pilka_reczna", "tenis-stolowy" -> nazwa z bazy
+    ("koszykówka", "piłka ręczna", "tenis stołowy"). Nieznana nazwa wraca bez zmian (dalej BRAK W BAZIE)."""
+    s = str(s).strip().lower()
+    if s in SPORT: return s
+    k = norm(s.replace('_', ' ').replace('-', ' '))
+    return next((x for x in SPORT if norm(x) == k), s)
+
+
 def main(a):
+    a = list(a)
+    if a and a[0] in ('wynik', 'typ') and len(a) > 2: a[2] = nazwa_sportu(a[2])
+    elif len(a) > 1: a[1] = nazwa_sportu(a[1])
     if a[0] == 'wynik':
         row = dict(data=a[1], sport=a[2].lower(), liga=a[3], gosp=a[4], gosc=a[5], pg=float(a[6]), pa=float(a[7]),
                    dogrywka=int(a[8]) if len(a) > 8 else 0)
@@ -872,7 +890,7 @@ def main(a):
             print(f'  Wysokie EV na SLABSZEJ druzynie jest tu artefaktem, nie przewaga — nie graj go.')
             print(f'  P faworyta traktuj jako DOLNA granice. Mecze wyrownane sa wiarygodniejsze.')
         fav = h if ec >= 0.5 else g
-        p_k, powody = werdykt_meczu(ok_, p_dz, n)
+        p_k, powody = werdykt_meczu(ok_, p_dz, n, _ligi_druzyny(d[d.sport == sport], h, 1) | _ligi_druzyny(d[d.sport == sport], g, 1))
         if powody:
             print(f'\nWERDYKT: NIE NA KUPON — {"; ".join(powody)}')
         else:
@@ -907,6 +925,10 @@ def main(a):
         c['p_kalibr'] = c.groupby('sport').p_kalibr.transform(lambda s: np.maximum.accumulate(s.values))
         c.to_csv(CAL, index=False, float_format='%.4f')
 
+
+# 29.09.2026 (faza 3b): aliasy z pliku danych aliasy.csv (modul=sporty) — na koncu, zeby wpisy w kodzie wygrywaly
+from nazwy import aliasy_z_pliku as _aliasy_z_pliku
+_aliasy_z_pliku('sporty', norm, _ALIASY_RECZNE)
 
 if __name__ == '__main__':
     main(sys.argv[1:] or ['stan'])

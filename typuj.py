@@ -3,12 +3,15 @@
   python3 typuj.py "Athletic" "Alaves"                 # klubowe (auto-dopasowanie nazw)
   python3 typuj.py "Poland" "Netherlands" --intl [--neutral]
   python3 typuj.py A B --kurs 1X=1.35 --kurs O1.5=1.28   # kursy TYLKO po wyborze: EV po podatku 12%
+  python3 typuj.py A B --kurs 1X=1.35 --nogi nogi.csv    # nogi DOPUSZCZONE dopisywane do nogi.csv (dla kupon.py)
+  python3 typuj.py A B --para 1X+O1.5=1.62 [--nogi nogi.csv]  # para z jednego meczu (Bet Builder, Poprawka 59):
+                                                         # laczne P z siatki; kurs = kurs BUILDERA z aplikacji
   python3 typuj.py A B --live 60 1:0 [--czerwona-gosp] [--czerwona-gosc]   # na żywo: minuta i wynik
 Wynik: prawdopodobieństwa (skalibrowane backtestem), statystyki formy/H2H/rożnych/kartek, ostrzeżenia."""
 import os, sys, re, sqlite3, pickle, difflib, unicodedata, datetime as dt
 import functools
 import numpy as np, pandas as pd
-from model import fit_dc, dc_lambdas, fit_elo_glm, elo_lambdas, markets, blend, load_calibration, calibrate, live_markets
+from model import fit_dc, dc_lambdas, fit_elo_glm, elo_lambdas, markets, blend, load_calibration, calibrate, live_markets, p_pary
 import json
 # v5n (20.09.2026): zespół DC + Elo + pi-ratings (wagi z ensemble.py) i korekta per rynek (korekta_rynkow.py)
 
@@ -27,9 +30,7 @@ def db():
 # 21.09.2026: przez to norm("Wisla Plock" z polskimi znakami) dawalo "wisapock" zamiast
 # "wislaplock" i klub w ogole nie pasowal do bazy; ratowalo to tylko dopasowanie rozmyte,
 # czyli przypadek. Dotyczy wszystkich nazw z l z kreska, d z kreska, o z kreska itd.
-_LITERY = str.maketrans({'ł':'l','Ł':'L','đ':'d','Đ':'D','ø':'o','Ø':'O','ß':'ss',
-                         'æ':'ae','Æ':'AE','œ':'oe','Œ':'OE','þ':'th','Þ':'TH',
-                         'ð':'d','Ð':'D','ı':'i','ŋ':'n','ħ':'h','ŧ':'t'})
+from nazwy import LITERY as _LITERY   # 29.09.2026: jedna tabela dla wszystkich modulow (nazwy.py)
 
 def norm(s):
     s = unicodedata.normalize('NFKD', str(s).translate(_LITERY)).encode('ascii', 'ignore').decode().lower()
@@ -51,31 +52,9 @@ ALIASES = {'cdrecoleta': 'Recoleta FC', 'vinotintofc': 'Vinotinto del Ecuador FC
 # dopasowanie tylko wtedy, gdy kandydat ma ich WIECEJ niz zrodlo. Samo "czy kandydat zawiera znacznik"
 # nie wystarczalo: "Boca Juniors" i "Young Boys" to pierwsze zespoly, a zawieraja "juniors" i "young",
 # przez co ochrona sie dla nich wylaczala i "Boca Juniors" lapalo sie na "Boca Juniors Sub-20".
-_ZNACZNIK = re.compile(r'^(b|ii|iii|2|3|c|k|u-?1[6-9]|u-?2[0-3]|sub-?2[0-3]|jun|juniors?|res|reserves?|'
-                       r'young|youth|yth|academy|akademia|w|women|kobiet[ay]?|damen|femenino|femenil|'
-                       r'feminin[oa]?|fem)\.?$', re.I)
 
 
-def _znaczniki(s):
-    # 22.09.2026: STS oznacza druzyny kobiece sufiksem "[K]", a czasem "(W)". Bez zdjecia
-    # nawiasow token "[K]" nie pasowal do wzorca i "Club Leon [K]" dopasowywalo sie
-    # do meskiego "Club Leon" — zmierzone na 5 meczach w przebiegu 21:00 dnia 21.09,
-    # bez zadnego ostrzezenia. Model liczyl mecze meskie dla zdarzen kobiecych.
-    # 23.09.2026 (wyd. 24, recenzja): liczyl tylko ILE jest znacznikow, nie JAKIE — "Barcelona (K)"
-    # (kobiety) trafiala na "Barcelona B" (rezerwy), a "Real Madryt [K]" na "Real Madrid C", bo po obu
-    # stronach byl jeden znacznik. Teraz porownujemy RODZAJE: kobiety / rezerwy B / zespol C /
-    # kategoria wiekowa (z rocznikiem) / mlodziez ogolnie.
-    out = []
-    for t in re.split(r'[\s]+', str(s).strip()):
-        t = t.strip('[](){}<>.,;:')
-        if not _ZNACZNIK.match(t): continue
-        t = t.lower().rstrip('.')
-        if re.match(r'^(k|w|women|kobiet[ay]?|damen|femenino|femenil|feminin[oa]?|fem)$', t): out.append('kobiety')
-        elif re.match(r'^(b|ii|2|res|reserves?)$', t): out.append('rezerwy')
-        elif re.match(r'^(c|iii|3)$', t): out.append('zespol_c')
-        elif re.match(r'^(u|sub)-?\d+$', t): out.append('u' + re.sub(r'\D', '', t))
-        else: out.append('mlodziez')
-    return tuple(sorted(out))
+from nazwy import znaczniki as _znaczniki   # historia zmian (22.09 [K]/(W), 23.09 rodzaje): nazwy.py
 
 
 # 23.09.2026, USTERKA U5: Asociacion Deportivo Cali jest w bazie jako 'AD Cali'.
@@ -306,6 +285,9 @@ _OGOLNE = frozenset('fc cf sc ac as ss sv fk nk sk bk hk hc mhk vk kk rk ok ks c
                     'hockey sport sports de del la el the da do'.split())
 
 
+_SKROTY = {}   # nazwa z oferty -> klub, dopasowane przez przypadek (c) ponizej; sprawdza club()
+
+
 def _skrot_albo_nic(name, wyn, pula):
     """22.09.2026, USTERKA U1 z przebiegu 21:00: "Independiente Yumbo" (Kolumbia, II liga) zostalo
     policzone jako "Independiente" (Argentyna, Avellaneda) — oczekiwane gole 2,05 : 0,84 z sily
@@ -332,6 +314,7 @@ def _skrot_albo_nic(name, wyn, pula):
         return None
     print(f'  UWAGA: "{name}" dopasowane do KROTSZEJ nazwy "{wyn}" — pominieto czlon '
           f'rozrozniajacy. Rdzen jest w bazie jednoznaczny, ale sprawdz, czy to ten sam klub.')
+    _SKROTY[name] = wyn
     return wyn
 
 
@@ -369,8 +352,31 @@ _KRAJ_KANON = {'turk': 'turkey', 'turkiye': 'turkey', 'turkey': 'turkey', 'saudi
                'usa': 'usa', 'unitedstates': 'usa', 'unitedstatesofamerica': 'usa'}
 
 
+# nazwy "krajow" 365scores, ktore nie sa krajem (rozgrywki miedzynarodowe) — tu terminarz nie rozstrzyga
+_KRAJE_OGOLNE = frozenset({'world', 'international', 'intl', 'europe', 'asia', 'africa', 'oceania', 'southamerica',
+                           'northcentralamerica', 'northandcentralamerica', 'concacaf', 'intercontinental', 'americas',
+                           'australiaoceania', 'australiaandoceania'})   # dwa ostatnie: Flashscore
+
+
+def _kanon_kraju(a):
+    # 'and' usuwane z obu stron: Flashscore „BOSNIA AND HERZEGOVINA”, SofaScore „Bosnia & Herzegovina”
+    return _KRAJ_KANON.get(a, a).replace('and', '')
+
+
 def _ten_sam_kraj(a, b):
-    return _KRAJ_KANON.get(a, a) == _KRAJ_KANON.get(b, b)
+    return _kanon_kraju(a) == _kanon_kraju(b)
+
+
+@functools.lru_cache(maxsize=1)
+def _kraje_znane():
+    """Kraje lig z bazy (SOFA_DIV) po kanonizacji — terminarz blokuje tylko przy kraju z tej listy."""
+    try:
+        from zewn import SOFA_DIV
+    except Exception:
+        SOFA_DIV = []
+    return frozenset(_kanon_kraju(norm(k)) for k, _, _ in SOFA_DIV if norm(k)) | \
+        frozenset(_kanon_kraju(v) for v in _KRAJ_KANON.values()) | \
+        frozenset(_kanon_kraju(norm(w)) for ws in _KRAJE_PL.values() for w in ws)   # nazwy panstw (reprezentacje)
 
 try:
     from kluby import SCAL_RECZNIE as _SR
@@ -648,6 +654,37 @@ def club(home, away, kursy, live=None):
                  f'W meczu ligi krajowej obie druzyny sa z jednego kraju — jedna z nazw zostala '
                  f'dopasowana do INNEGO klubu. Analiza przerwana, noga MNIEJ. '
                  f'Puchary kontynentalne (Libertadores, Liga Mistrzow...) i sparingi: dodaj --kontynentalny.')
+    # 29.09.2026 (faza 3b, TERMINARZ): mecz z oferty szukany w terminarzu 365scores po OBU druzynach naraz
+    # (zewn/terminarz_365.csv.gz, Apps Script). Terminarz podaje kraj rozgrywek — klub dopasowany do ligi
+    # z innego kraju to pomylony klub. Brak pliku / meczu / kraj ogolny (World, Europe…) = bez kontroli.
+    if '--kontynentalny' not in sys.argv:
+        try:
+            import terminarz as _tm
+            mt = _tm.znajdz(home, away)
+        except Exception as e:
+            mt = None
+            print(f'  UWAGA: kontrola terminarza pominieta ({type(e).__name__}: {e})')
+        if mt:
+            kt = norm(mt['kraj'])
+            print(f'  TERMINARZ: {mt["gosp"]} – {mt["gosc"]} | {mt["kraj"]} | {mt["turniej"]}')
+            if kt and kt not in _KRAJE_OGOLNE and _kanon_kraju(kt) not in _kraje_znane():
+                print(f'  (kraj terminarza „{mt["kraj"]}” spoza listy krajow lig — bez kontroli kraju)')
+            elif kt and kt not in _KRAJE_OGOLNE:
+                zle = [(n, t, k) for n, t, k in ((home, h, kh), (away, a, ka)) if k and not _ten_sam_kraj(k, kt)]
+                if zle:
+                    sys.exit('NIEZGODNE Z TERMINARZEM: ' + '; '.join(f'"{n}" -> {t} (liga z kraju {k})' for n, t, k in zle)
+                             + f', a mecz w terminarzu jest w kraju {mt["kraj"]} ({mt["turniej"]}). '
+                             f'Nazwa trafila w INNY klub. Analiza przerwana, noga MNIEJ.')
+    # 29.09.2026 (faza 3, dopasowanie LACZNE): gdy nazwa zgubila czlon rozrozniajacy (przypadek (c)
+    # w _skrot_albo_nic: "Independiente Yumbo" -> "Independiente"), sam napis nie rozstrzyga — para z oferty
+    # tak: dwa kluby jednego meczu ligowego graja w jednej lidze. Kontrola kraju (wyzej) nie lapie dwoch lig
+    # tego samego kraju ani pucharu. Brak wspolnej ligi w 2 latach = noga MNIEJ (bezpieczny kierunek bledu).
+    from nazwy import wspolna_liga
+    skroty = [(n, t) for n, t in ((home, h), (away, a)) if _SKROTY.get(n) == t]
+    if skroty and not wspolna_liga(m, h, a):
+        sys.exit('NIEPEWNE DOPASOWANIE: ' + '; '.join(f'"{n}" -> {t} (zgubiony czlon rozrozniajacy)' for n, t in skroty)
+                 + f', a {h} i {a} nie graly w jednej lidze w ostatnich 2 latach — to prawdopodobnie INNY klub. '
+                 f'Analiza przerwana, noga MNIEJ. Jesli to ten sam klub, dopisz pare do ALIASES (typuj.py).')
     # 22.09.2026, USTERKA U3: KROK 2b wymaga ostrzezenia dla ligi bez meczow z ostatnich 60 dni,
     # a skrypt go nie wypisywal. Liga PAR konczyla sie w bazie 2025-07-31, Sol de America mial ostatni
     # mecz 2024-06-06 (838 dni), a model podawal dla tego meczu rynki z dokladnoscia do dziesiatych
@@ -789,7 +826,9 @@ def club(home, away, kursy, live=None):
         print('\nH2H (ost. 8):', ' | '.join(f"{r.MatchDate.date()} {r.HomeTeam} {int(r.FTHome)}:{int(r.FTAway)} {r.AwayTeam}" for r in hh.itertuples()))
     _mm = m[(m.HomeTeam.isin([h, a]) | m.AwayTeam.isin([h, a])) & m.FTHome.notna() & m.FTAway.notna()].sort_values('MatchDate')
     dz = drugie_zrodlo([(r.MatchDate, r.HomeTeam, r.AwayTeam, int(r.FTHome), int(r.FTAway)) for r in _mm.itertuples()], h, a, rows)
-    value(rows, kursy, dz)
+    value(rows, kursy, dz, mecz=f'{home} - {away}', szacunek=bool(szac), polski='poland' in (kh, ka))
+    for a_, b_, k_ in PARY:
+        para(rows, lam, rho, a_, b_, k_, dz, mecz=f'{home} - {away}', szacunek=bool(szac), polski='poland' in (kh, ka))
     if ostrz: print('\nOSTRZEŻENIA:', *ostrz, sep='\n - ')
     print('\nUwaga: model nie zna składów, kontuzji i motywacji z dnia meczu — sprawdź je osobno (korekta maks. ±6 pp).')
 
@@ -829,15 +868,18 @@ def drugie_zrodlo(w, h, a, rows, n=10):
          'BTTS_tak': sr(lambda z, s: z > 0 and s > 0), 'BTTS_nie': sr(lambda z, s: z == 0 or s == 0),
          'gosp_O0.5': (r(*cz(fh, lambda z, s: z > 0)) + r(*cz(fa, lambda z, s: s > 0))) / 2,
          'gość_O0.5': (r(*cz(fa, lambda z, s: z > 0)) + r(*cz(fh, lambda z, s: s > 0))) / 2}
+    # 29.09.2026 (Poprawka 58, docs/BACKTEST_P48.md): zgodnosc zostaje OBOWIAZKOWA, ale P do kuponu = P modelu,
+    # nie mniejsze z dwoch. Backtest 54 699 nog (P >= 70%, 01-09.2026): min(P) srednio 77,1% przy trafnosci
+    # 82,2% (P modelu 80,4%), gorszy Brier (0,1441 vs 0,1411) i log loss — zanizal EV o ok. 5 pp.
     wynik = {}
     print(f'  {"Rynek":<12}{"P_model":>8}{"P_forma":>9}  werdykt')
     for k, p, pc in sorted(rows, key=lambda x: -x[2]):
         if k not in P or pc < 0.60: continue
         pf = P[k]; ok = abs(pc - pf) <= 0.10
-        wynik[k] = min(pc, pf) if ok else None
-        print(f'  {k:<12}{pc:8.1%}{pf:9.1%}  ' + (f'ZGODNE → P do kuponu {min(pc, pf):.1%}' if ok
+        wynik[k] = pc if ok else None
+        print(f'  {k:<12}{pc:8.1%}{pf:9.1%}  ' + (f'ZGODNE → P do kuponu {pc:.1%} (P modelu)' if ok
               else f'ROZBIEZNE ({(pf - pc) * 100:+.0f} pp) → NIE NA KUPON'))
-    print('  Zasada (Poprawka 48): na kupon tylko ZGODNE; P do kuponu = mniejsze z dwoch; do tego sprawdz nieobecnosci w sieci.')
+    print('  Zasada (Poprawki 48 i 58): na kupon tylko ZGODNE; P do kuponu = P modelu; do tego sprawdz nieobecnosci w sieci.')
     return wynik
 
 
@@ -847,20 +889,45 @@ def ev_kelly(p, o):
     return ev, (max(0.0, ev / (o * TAX - 1)) if o * TAX > 1 else 0.0)
 
 
+# 29.09.2026 (Poprawka 58.5, docs/BACKTEST_P48.md): rynki, na ktorych model przy P >= 70% mocno ZAWYZA.
+# Backtest walk-forward 01-09.2026 (po korektach, jak w kuponie): U2.5 n=64 P 74,5% -> trafnosc 53,1%;
+# BTTS_nie n=60 79,7% -> 51,7%; BTTS_tak n=8 83,3% -> 50,0%; "2" n=69 75,7% -> 65,2%. Wlasnie takie nogi
+# wygladaja na wartosc (wysokie P, wysoki kurs). Do czasu ponownego backtestu: NIE NA KUPON przy P >= 70%.
+RYNKI_ZAWYZONE_P70 = {'U2.5': (64, 0.745, 0.531), 'BTTS_nie': (60, 0.797, 0.517),
+                      'BTTS_tak': (8, 0.833, 0.500), '2': (69, 0.757, 0.652)}
+
+
 def werdykt_nogi(k, dz):
-    """P do kuponu wg Poprawki 48 i powod, gdy noga odpada.
+    """P do kuponu wg Poprawek 48/58 i powod, gdy noga odpada.
     dz = wynik drugie_zrodlo(): {} (brak drugiego zrodla), {rynek: P | None}."""
     if dz is None: return None, 'drugie zrodlo nie liczone'
     if not dz: return None, 'BRAK DRUGIEGO ZRODLA'
     if k not in dz: return None, 'rynek bez drugiego zrodla'
     if dz[k] is None: return None, 'ROZBIEZNE zrodla'
+    if k in RYNKI_ZAWYZONE_P70 and dz[k] >= 0.70:
+        n, p, t = RYNKI_ZAWYZONE_P70[k]
+        return None, f'rynek {k} przy P >= 70% ZAWYZONY w backtescie (n={n}: P {p:.0%} -> trafnosc {t:.0%}; Poprawka 58.5)'
     return dz[k], None
 
 
-def value(rows, kursy, dz=None):
-    """29.09.2026: wczesniej EV liczone bylo z P modelu, a wynik drugie_zrodlo() byl wyrzucany — bramka
-    z Poprawki 48 istniala tylko jako tekst do przeczytania. Teraz: EV i Kelly do kuponu liczone z P po
-    bramce (mniejsze z dwoch), a noga bez zgodnego drugiego zrodla ma wprost werdykt NIE NA KUPON."""
+NOGI_PLIK = None   # --nogi PLIK: nogi DOPUSZCZONE dopisywane do CSV dla kupon.py (faza 4)
+
+
+def _dopisz_noge(mecz, rynek, p, kurs, szacunek, polski):
+    """Wiersz dla kupon.py. marza i kryteria (A4.3) zostaja puste — uzupelnia przebieg; bez kryteriow kupon.py
+    daje poziom D, czyli PAPIEROWY (bezpieczny kierunek)."""
+    import csv
+    nowy = not os.path.exists(NOGI_PLIK)
+    with open(NOGI_PLIK, 'a', encoding='utf-8', newline='') as fh:
+        w = csv.writer(fh)
+        if nowy: w.writerow(['mecz', 'rynek', 'p', 'kurs', 'szacunek', 'polski', 'marza', 'kryteria'])
+        w.writerow([mecz, rynek, f'{p:.4f}', kurs, int(szacunek), int(polski), '', ''])
+
+
+def value(rows, kursy, dz=None, mecz=None, szacunek=False, polski=False):
+    """29.09.2026: wczesniej wynik drugie_zrodlo() byl wyrzucany — bramka z Poprawki 48 istniala tylko jako tekst
+    do przeczytania. Teraz: noga bez zgodnego drugiego zrodla ma wprost werdykt NIE NA KUPON, a EV i Kelly do
+    kuponu licza sie z P po bramce (od Poprawki 58: P modelu, gdy zrodla zgodne)."""
     if not kursy: return
     d = {k: pc for k, p, pc in rows}
     print('\nWARTOŚĆ (kurs użyty dopiero po wyliczeniu P; podatek 12%):')
@@ -876,6 +943,50 @@ def value(rows, kursy, dz=None):
             evk, kk = ev_kelly(pk, o)
             print(f'      → P do kuponu {pk:.1%}: EV={evk:+.1%}, ¼ Kelly={kk / 4:.1%}'
                   + ('  ✔ NOGA DOPUSZCZONA' if evk > 0 else '  ✘ NIE NA KUPON: EV ≤ 0 po bramce'))
+            if evk > 0 and NOGI_PLIK and mecz:
+                _dopisz_noge(mecz, k, pk, o, szacunek, polski)
+                print(f'      (zapisano do {NOGI_PLIK} — uzupelnij marza i kryteria A4.3 przed kupon.py)')
+
+
+PARY = []   # --para A+B[=kurs Buildera]
+
+
+def para(rows, lam, rho, a, b, kurs, dz, mecz=None, szacunek=False, polski=False):
+    """29.09.2026 (Poprawka 59, A5 pkt 1 i 5): para z jednego meczu na zwyklym AKO jest w STS niedozwolona
+    (liczy sie tylko wyzszy kurs, reszta po 1,0), wiec za pieniadze tylko przez Bet Builder, ktorego kurs NIE jest
+    iloczynem kursow. Laczne P z siatki wynikow, skorygowane w dol tak jak nogi (korekta rynkow i bramka 48/58);
+    kazda noga musi sama przejsc werdykt_nogi. EV wylacznie z kursu Buildera."""
+    d = {k: (p, pc) for k, p, pc in rows}
+    print(f'\nPARA {a} + {b} (jeden mecz — tylko Bet Builder; zwykly AKO niedozwolony, Poprawka 59):')
+    if a == b or a not in d or b not in d:
+        print('  → NIE NA KUPON: nieznany rynek albo ten sam rynek dwa razy'); return
+    pj = p_pary(lam[0], lam[1], rho, a, b)
+    if pj is None:
+        print('  → NIE NA KUPON: rynek spoza siatki wyniku koncowego (DNB, HT, pierwszy gol) — brak lacznego P'); return
+    (pa, pca), (pb, pcb) = d[a], d[b]
+    naiw = pca * pcb
+    powody = []
+    ka, ra = werdykt_nogi(a, dz); kb, rb = werdykt_nogi(b, dz)
+    if ra: powody.append(f'{a}: {ra}')
+    if rb: powody.append(f'{b}: {rb}')
+    ka, kb = ka if ka is not None else pca, kb if kb is not None else pcb
+    pk = min(pj * min(1.0, ka / pa if pa else 0) * min(1.0, kb / pb if pb else 0), ka, kb)
+    if pk < 1e-6: powody.append('laczne P = 0 (rynki wykluczaja sie)')
+    print(f'  P1 {a} {ka:.1%} | P2 {b} {kb:.1%} | iloczyn naiwny {naiw:.1%} | P z siatki {pj:.1%} (model) '
+          f'→ P do kuponu {pk:.1%} ({(pk - naiw) * 100:+.1f} pp vs iloczyn)')
+    if pk >= 1e-6: print(f'  kurs sprawiedliwy po podatku {1 / pk / TAX:.2f}')
+    if kurs is None:
+        powody.append('brak kursu Buildera (--para A+B=KURS z aplikacji)')
+    else:
+        ev, kelly = ev_kelly(pk, kurs)
+        print(f'  kurs Buildera {kurs:.2f}: EV={ev:+.1%}, ¼ Kelly={kelly / 4:.1%}')
+        if ev <= 0: powody.append('EV ≤ 0 z kursu Buildera')
+    if powody:
+        print('  → NIE NA KUPON: ' + '; '.join(powody)); return
+    print('  ✔ PARA DOPUSZCZONA (jedna noga kuponu; maks. 2 nogi z meczu — A5 pkt 4)')
+    if NOGI_PLIK and mecz:
+        _dopisz_noge(mecz, f'{a}+{b}', pk, kurs, szacunek, polski)
+        print(f'  (zapisano do {NOGI_PLIK} jako jedna noga — uzupelnij marza i kryteria A4.3 przed kupon.py)')
 
 
 # ---------------- reprezentacje ----------------
@@ -956,12 +1067,24 @@ def intl(home, away, neutral, kursy):
     if len(hh): print('\nH2H:', ' | '.join(f'{r.date} {r.home_team} {int(r.home_score)}:{int(r.away_score)} {r.away_team}' for r in hh.itertuples()))
     dz = drugie_zrodlo([(r.date, r.home_team, r.away_team, int(r.home_score), int(r.away_score)) for r in df.itertuples()
                         if pd.notna(r.home_score) and pd.notna(r.away_score)], h, a, rows)
-    value(rows, kursy, dz)
+    value(rows, kursy, dz, mecz=f'{home} - {away}', szacunek=bool(szac), polski='Poland' in (h, a))
+    for a_, b_, k_ in PARY:
+        para(rows, (lh, la), -0.05, a_, b_, k_, dz, mecz=f'{home} - {away}', szacunek=bool(szac), polski='Poland' in (h, a))
 
+
+# 29.09.2026 (faza 3b): aliasy z pliku danych aliasy.csv (modul=typuj) — na koncu, zeby wpisy w kodzie wygrywaly
+from nazwy import aliasy_z_pliku as _aliasy_z_pliku
+_aliasy_z_pliku('typuj', norm, ALIASES)
 
 if __name__ == '__main__':
     args = [x for x in sys.argv[1:]]
     kursy = {}
+    if '--nogi' in args:
+        i = args.index('--nogi'); NOGI_PLIK = args[i + 1]; del args[i:i + 2]
+    while '--para' in args:
+        i = args.index('--para'); x = args[i + 1]; del args[i:i + 2]
+        ab, _, k = x.partition('='); a_, _, b_ = ab.partition('+')
+        PARY.append((a_, b_, float(k.replace(',', '.')) if k else None))
     while '--kurs' in args:
         i = args.index('--kurs'); k, v = args[i + 1].split('='); kursy[k] = float(v.replace(',', '.')); del args[i:i + 2]
     live = None

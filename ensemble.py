@@ -32,6 +32,7 @@ def outcomes(fh, fa, hth, hta):
 def build_rows():
     cp = os.path.join(HERE, 'cache', f'bt_v5n_{START}_{END}.pkl')
     if os.path.exists(cp): return pickle.load(open(cp, 'rb'))
+    os.makedirs(os.path.dirname(cp), exist_ok=True)   # 29.09.2026: na swiezym klonie cache/ nie istnial -> FileNotFoundError
     m = pd.read_sql('select * from matches', sqlite3.connect(os.path.join(HERE, 'kb.sqlite')), parse_dates=['MatchDate'])
     m = m.dropna(subset=['FTHome', 'FTAway'])
     m, _, _ = prepare(m)

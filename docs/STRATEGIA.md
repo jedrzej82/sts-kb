@@ -61,18 +61,40 @@ z EV > 0 po bramce, glownie pojedyncze (K3), gdzie przewaga ma szanse przetrwac 
 - Przeliczyc `ensemble.py` i `korekta_rynkow.py` na poprawionej bazie; `przebieg.py` ostrzega, gdy
   kalibracja starsza niz 7 dni.
 
-### Faza 3 — tozsamosc druzyn (2 tygodnie)
-- Rejestr encji: `entity(id, sport, rodzaj, kraj, nazwa, rok_zal, plec, poziom)` + `alias(entity_id, zrodlo, nazwa, liga)`.
-  Migracja ~20 tabel do danych; jedna funkcja `normalize()`.
-- Dopasowanie oferty **po meczu**: liga + data ±1 dzien + obie druzyny naraz; akceptacja tylko przy
-  jednoznacznym trafieniu. Usuwa klase bledow Independiente Yumbo / CD Inca / Athletic Club.
-- Zdjecie `xfail` z dwoch testow znanych defektow.
+### Faza 3 — tozsamosc druzyn
+**3a (29.09, zrobione):**
+- [x] `nazwy.py` — jedna tabela liter i jedne znaczniki druzyn (kobiety/rezerwy/mlodziez) zamiast kopii w typuj/sporty/sezon/tenis;
+  nowe znaczniki `talang`, `jong`, `primavera` (Hammarby Talang, Jong Ajax, Juventus Primavera nie trafiaja juz do pierwszej druzyny)
+- [x] dopasowanie LACZNE w typuj.py: nazwa, ktora zgubila czlon rozrozniajacy, przechodzi tylko gdy oba kluby meczu
+  graly w jednej lidze w 2 latach (Temperley–Quilmes przechodzi, Temperley–River Plate: NIEPEWNE DOPASOWANIE)
+- [x] `rejestr.py` — 982 wpisy z 10 tabel w jednej liscie; sprzecznosci (ta sama nazwa -> rozne kluby) wypisane,
+  4 znane sprawdzone w `rejestr_konflikty_znane.csv`; test CI blokuje NOWE sprzecznosci
+- [x] oba testy znanych defektow (xfail) zamienione na zwykle testy
+
+**3b (29.09):**
+- rejestr jako plik danych (`encje.csv` + `aliasy.csv` z ID) i przeniesienie tabel z kodu do danych
+- dopasowanie oferty po terminarzu (liga + data +-1 + obie druzyny) z plikow 365scores/Flashscore z meczami zaplanowanymi
+- [x] terminarz 365scores (Apps Script `terminarz()` -> `terminarz_365.csv.gz`, `terminarz.py`, kontrola kraju w typuj.py)
+  — **wymaga wklejenia nowej wersji apps_script/wyniki_sts.gs w projekcie Apps Script uzytkownika**
+- [x] aliasy jako dane: `aliasy.csv` wczytywane przez typuj/sporty/sezon (kod wygrywa), objete rejestrem i testem
+- [x] `build_kb.norm`: l/o/ss przez nazwy.LITERY (baza identyczna); zachowanie lat ODRZUCONE po przebudowie —
+  odklejalo Basel/Hoffenheim II, niczego nie naprawialo (hipoteza z audytu nie potwierdzona danymi)
+- [x] przeniesienie starych tabel do aliasy.csv — ODRZUCONE (29.09): tabele sa pogrupowane wg poprawek z uzasadnieniem
+  kazdej pary; przeniesienie nie zmieniloby dzialania, a pogorszyloby czytelnosc. Nowe pary -> aliasy.csv.
+  'GKS Jastrzêbie' w sporty.py to NIE blad aliasu — tak (z zepsutym kodowaniem) zapisuje ja zrodlo danych.
 
 ### Faza 4 — model i przewaga (do 15.11)
-- CLV: kurs w chwili typu i kurs zamkniecia dla kazdej nogi (takze papierowej).
-- Backtest bramki P48; zastapienie `min(P)` mieszanka w logit z waga z backtestu + kalibracja na holdoucie.
-- `kupon.py`: skladanie kuponow w kodzie (JSON), LLM tylko prezentuje i weryfikuje kursy.
-- Instrukcja v7: poprawki 1–56 scalone, sprzecznosci usuniete, cel < 30 tys. znakow.
+- [x] CLV: `clv.py` + `kurs_typu`/`pieniadze` w `ucz.py typ` / `sporty.py typ` (Poprawka 56.3)
+- [x] Backtest bramki P48 (`bt_drugie_zrodlo.py`, docs/BACKTEST_P48.md): min(P) zanizal P o 4–5 pp ->
+  Poprawka 58: P do kuponu = P modelu przy zgodnych zrodlach (pilka i sporty.py); zgodnosc nadal obowiazkowa
+- [x] Kalibracja per rynek: U2.5 / BTTS / „2” przy P >= 70% mocno zawyzone -> NIE NA KUPON (Poprawka 58.5);
+  „ponizej −4 pp” potwierdzone danymi
+- [x] Rekalibracja na poprawionej bazie (wagi 0,4/0/0,6, nie gorsze na tescie; korekta rynkow przeliczona)
+- [x] `kupon.py`: K1/K2/K3/K5 wg v7 w kodzie; `typuj.py --nogi` zapisuje nogi dopuszczone
+- [x] Instrukcja v7 opublikowana (29 tys. znakow zamiast ~130 tys.)
+- [x] Czas budowy bazy ~13 min -> ~4–6 min (build_kb 332 s -> 38 s, hist_import szybszy; bazy identyczne)
+- [ ] Backtest tenisa i sezon.py (arkusze nie maja historii — potrzebny zapis dzienny arkuszy)
+- [ ] Po >= 100 nogach z CLV: ocena przewagi (clv.py) i decyzja o fazie 2
 
 ## 5. Kryteria sukcesu na 15.11
 

@@ -48,9 +48,7 @@ def f(x, d=None):
 # "hearts otland", "Sporting Achaia" -> "sporting haia". Do tego ł/ø/ß byly kasowane ("Slask Wroclaw"
 # z polskimi znakami -> "slask wrocaw"). Teraz formy prawne odpadaja tylko jako CALE czlony, a litery
 # nierozkladalne przez NFKD dostaja te sama tabele co typuj.py i sporty.py.
-_LITERY = str.maketrans({'ł': 'l', 'Ł': 'L', 'đ': 'd', 'Đ': 'D', 'ø': 'o', 'Ø': 'O', 'ß': 'ss',
-                         'æ': 'ae', 'Æ': 'AE', 'œ': 'oe', 'Œ': 'OE', 'þ': 'th', 'Þ': 'TH',
-                         'ð': 'd', 'Ð': 'D', 'ı': 'i', 'ŋ': 'n', 'ħ': 'h', 'ŧ': 't'})
+from nazwy import LITERY as _LITERY   # 29.09.2026: jedna tabela dla wszystkich modulow (nazwy.py)
 _FORMY_NORM = frozenset(('fc', 'cf', 'sc', 'ac', 'afc', 'cp', 'sad'))
 
 
@@ -504,6 +502,10 @@ def druzyny(plik, frag):
         if norm(frag) in norm(w['druzyna']):
             print(w.get('liga') or w.get('rozgrywki'), '|', w['druzyna'], '| mecze', w.get('mecze'))
 
+
+# 29.09.2026 (faza 3b): aliasy z pliku danych aliasy.csv (modul=sezon; cel = zapis z arkusza statystyk)
+from nazwy import aliasy_z_pliku as _aliasy_z_pliku
+_aliasy_z_pliku('sezon', lambda n: ''.join(ch for ch in norm(n) if ch.isalnum()), _ALIASY_PILKA)
 
 if __name__ == '__main__':
     a = sys.argv[1:]

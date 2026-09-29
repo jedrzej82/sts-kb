@@ -39,7 +39,12 @@ def fetch(refresh):
 
 
 def norm(s):
-    s = unicodedata.normalize('NFKD', str(s)).encode('ascii', 'ignore').decode().lower()
+    # 29.09.2026: litery l/o/ss przez nazwy.LITERY (jak w pozostalych modulach). Sprawdzone pelna przebudowa:
+    # baza identyczna (uzupelnij_ligi zamienial je juz przez ZNAKI). Lat (\d{4}) celowo NIE zachowujemy —
+    # proba z 29.09 odkleila "FC Basel 1893" od "Basel" i "TSG 1899 Hoffenheim II" od "Hoffenheim II"
+    # (5 zdublowanych meczow), a zadnego blednego sklejenia w danych nie naprawila.
+    from nazwy import LITERY
+    s = unicodedata.normalize('NFKD', str(s).translate(LITERY)).encode('ascii', 'ignore').decode().lower()
     s = re.sub(r"\b(fc|cf|afc|ac|sc|ssc|as|us|ud|cd|rc|rcd|sd|ca|sv|vfl|vfb|tsg|fk|sk|bk|if|club|calcio|balompie|de|futbol|football|1\.|\d{4})\b", ' ', s)
     return re.sub(r'[^a-z]', '', s)
 
@@ -203,6 +208,10 @@ def _zawiera(x, y):
     return bool(tx) and bool(ty) and (tx <= ty or ty <= tx)
 
 
+from collections import namedtuple
+_Wiersz = namedtuple('_Wiersz', ['Division', 'HomeTeam', 'AwayTeam'])
+
+
 def _aliasy_raz(allm):
     """Znajduje pary nazw oznaczajace TEN SAM klub, na podstawie terminarza, nie napisow.
 
@@ -241,11 +250,19 @@ def _aliasy_raz(allm):
     # 29.09.2026: petla szla po WSZYSTKICH grupach (liga, dzien, wynik) — setkach tysiecy, z ktorych
     # ogromna wiekszosc ma jeden wiersz i byla od razu pomijana; samo iterowanie trwalo ok. 150 s.
     # Grupy 2..12 wierszy wybieramy wektorowo; kolejnosc grup i wynik sa te same.
+    # Druga runda (29.09): itertuples() na kazdej z ~74 tys. malych grup tworzyl za kazdym razem nowa klase
+    # namedtuple i ramke — ok. 240 s pod profilerem. Grupy skladamy raz, z list Pythona (ngroup: ta sama
+    # kolejnosc grup co groupby, wiersze w grupie w kolejnosci oryginalnej).
     klucz = ['Division', 'MatchDate', 'FTHome', 'FTAway']
     rozm = d.groupby(klucz, dropna=False).HomeTeam.transform('size')
+    sub = d[(rozm >= 2) & (rozm <= 12)]
+    gid = sub.groupby(klucz, dropna=False).ngroup()
+    grupy = {}
+    for g_, dv, hh, aa in zip(gid.values, sub.Division.values, sub.HomeTeam.values, sub.AwayTeam.values):
+        grupy.setdefault(g_, []).append(_Wiersz(dv, hh, aa))
     kandydaci = {}
-    for _, g in d[(rozm >= 2) & (rozm <= 12)].groupby(klucz, dropna=False):
-        w = list(g.itertuples())
+    for g_ in sorted(grupy):
+        w = grupy[g_]
         oceny = []
         for i in range(len(w)):
             for j in range(i + 1, len(w)):

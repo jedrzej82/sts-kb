@@ -23,6 +23,8 @@
  *  wyniki_sofa_inne_RRRR-MM.csv.gz   — tenis (z Challenger/ITF), tenis stołowy, siatkówka, ręczna, hokej, koszykówka,
  *                                   futsal, dart, snooker, esport, rugby, baseball, unihokej, piłka wodna, krykiet, badminton…
  *     kolumny sofa: data,sport,kraj,turniej,runda,gosp,gosc,wg,wa,okresy_g,okresy_a,zwyciezca,nawierzchnia
+ *  terminarz_365.csv.gz              — mecze DZIŚ i JUTRO (także nierozegrane), nadpisywany co godzinę (29.09.2026):
+ *                                      data,godzina_utc,sport,kraj,turniej,runda,gosp,gosc,status
  * Kursy NIE są pobierane.
  */
 var FOLDER_ID = 'WKLEJ_ID_FOLDERU_BAZA_WIEDZY';
@@ -41,6 +43,12 @@ var UZYJ_SOFA = false;   // Sofascore blokuje serwery Google (404) — wyłączo
 var LS_SPORTY = {soccer: 'football', hockey: 'ice-hockey', basketball: 'basketball', tennis: 'tennis', cricket: 'cricket'};
 var S365_MAX = 40;   // 365scores: sprawdzane są WSZYSTKIE identyfikatory sportów 1..40 (nazwa sportu z odpowiedzi API)
 var UZYJ_LS = false, UZYJ_ESPN = false;   // LiveScore i ESPN odrzucają serwery Google (403)
+// 29.09.2026 (faza 3b): TERMINARZ — mecze dziś i jutro (także nierozegrane) → terminarz_365.csv.gz (nadpisywany).
+// Po co: oferta STS pisze nazwy inaczej niż bazy; mecz z terminarza (obie drużyny + data) wskazuje KRAJ i ROZGRYWKI,
+// więc typuj.py może odrzucić dopasowanie do klubu z innego kraju/ligi. Koszt: ~80 pobrań na godzinę.
+// UWAGA: ten plik jest STARSZĄ wersją skryptu (bez Flashscore) — działający projekt użytkownika jest nowszy.
+// Terminarz instaluje się jako osobny plik apps_script/terminarz.gs (bez podmiany kodu), dlatego tu wyłączony.
+var UZYJ_TERMINARZ = false;
 var UA = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36',
   'Accept': 'application/json, text/plain, */*', 'Accept-Language': 'en-US,en;q=0.9', 'Referer': 'https://www.sofascore.com/',
   'Origin': 'https://www.sofascore.com'};
@@ -62,6 +70,7 @@ function pracuj() {
     P.setProperty('hist_wstecz', dodaj(dzis, -3)); P.setProperty('wersja', '5');
   }
   ponowBledy(bufor, log);
+  if (UZYJ_TERMINARZ) { try { terminarz(log); } catch (e) { log.push('terminarz: BŁĄD ' + e); } }
   // 1) raz dziennie: wczoraj i przedwczoraj (wyniki późnych meczów)
   if (P.getProperty('biezace') !== dzis) {
     [dodaj(dzis, -1), dodaj(dzis, -2)].forEach(function (d) { inneDzien(d, bufor, log); });
@@ -234,6 +243,48 @@ function s365Dzien(d, bufor, log, tylko) {
   }
   log.push('365scores ' + d + ': ' + n + ' meczów (' + Object.keys(ile).map(function (s) { return s + ' ' + ile[s]; }).join(', ') + ')' +
     (zle.length ? ' BŁĘDY (ponowię): ' + zle.join(',') : ''));
+}
+
+/** Terminarz 365scores: dziś i jutro (UTC), wszystkie sporty, każdy status (2 = przed meczem, 3 = trwa, 4 = koniec).
+ *  kolumny: data,godzina_utc,sport,kraj,turniej,runda,gosp,gosc,status */
+function terminarz(log) {
+  var dzis = Utilities.formatDate(new Date(), 'UTC', 'yyyy-MM-dd'), wiersze = [], n = 0;
+  var P = PropertiesService.getScriptProperties(), nazwy = JSON.parse(P.getProperty('sporty365') || '{}');
+  [dzis, dodaj(dzis, 1)].forEach(function (d) {
+    var dm = d.substr(8, 2) + '/' + d.substr(5, 2) + '/' + d.substr(0, 4), ids = [];
+    for (var i = 1; i <= S365_MAX; i++) ids.push(i);
+    pobierz(ids.map(function (id) {
+      return 'https://webws.365scores.com/web/games/allscores/?appTypeId=5&langId=1&timezoneName=UTC&userCountryId=1&sports=' + id +
+        '&startDate=' + dm + '&endDate=' + dm + '&showOdds=false&onlyMajorGames=false&withTop=false';
+    })).forEach(function (r, i) {
+      if (r.getResponseCode() !== 200) return;
+      var j; try { j = JSON.parse(r.getContentText()); } catch (e) { return; }
+      var id = ids[i], strony = [j];
+      for (var p = 0; p < 30 && j.paging && j.paging.nextPage; p++) {
+        var r2 = pobierz(['https://webws.365scores.com' + j.paging.nextPage])[0];
+        if (r2.getResponseCode() !== 200) break;
+        try { j = JSON.parse(r2.getContentText()); } catch (e) { break; }
+        strony.push(j);
+      }
+      var kraje = {}, komp = {};
+      strony.forEach(function (x) {
+        (x.countries || []).forEach(function (c) { kraje[c.id] = c.name; });
+        (x.competitions || []).forEach(function (c) { komp[c.id] = c; });
+      });
+      var sport = id === 1 ? 'football' : String(nazwy[id] || ('s' + id)).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      strony.forEach(function (x) {
+        (x.games || []).forEach(function (g) {
+          var st = String(g.startTime || ''); if (st.substr(0, 10) !== d) return;
+          var h = g.homeCompetitor || {}, a = g.awayCompetitor || {}, k = komp[g.competitionId] || {};
+          wiersze.push(csv([d, st.substr(11, 5), sport, kraje[k.countryId] || '', k.name || g.competitionDisplayName || '',
+            g.roundName || g.stageName || '', h.name, a.name, g.statusGroup]));
+          n++;
+        });
+      });
+    });
+  });
+  if (n) plik('terminarz_365.csv.gz', 'data,godzina_utc,sport,kraj,turniej,runda,gosp,gosc,status\n' + wiersze.join('\n'), false);
+  log.push('terminarz 365: ' + n + ' meczów (dziś i jutro)');
 }
 
 function ponowBledy(bufor, log) {

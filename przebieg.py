@@ -2,6 +2,7 @@
 """Caly przebieg budowy bazy JEDNYM poleceniem, w jedynej poprawnej kolejnosci, z twarda kontrola danych.
   python3 przebieg.py            — kontrola plikow zewn/ → build_kb → uzupelnij_ligi → build_kb → hist_import → swiezosc
   python3 przebieg.py --kontrola — tylko kontrola plikow zewn/ (sekundy), bez budowy
+  python3 przebieg.py --archiwum-arkuszy — spakuj statystyki_*.csv do arkusze_RRRR-MM-DD.tar.gz (historia arkuszy)
   Pliki zwrocone przez Dysk W TRESCI (base64): zapisz tekst jako zewn/NAZWA.csv.gz.b64 — przebieg sam je zdekoduje.
 
 Ostatnia linia wyniku to WERDYKT:
@@ -112,6 +113,29 @@ def kontrola_zewn():
                   else '  (UWAGA: stary — przy e-sporcie w ofercie pobierz z Dysku; nie blokuje przebiegu)'))
         except Exception as e:
             print(f'  UWAGA: zewn/{os.path.basename(f)} nieczytelny ({e}) — e-sport bez swiezych danych')
+    # 29.09.2026 (faza 3b): terminarz 365scores (Apps Script, co godzine) — opcjonalny; bez niego typuj.py
+    # po prostu nie robi kontroli kraju meczu z terminarza. Tylko informacja, nie blad.
+    # 29.09.2026: Liga Pro (tenis stolowy) ze scores24 — opcjonalna; brak pliku = tenis stolowy Ligi Pro bez danych
+    f = os.path.join(ZD, f'wyniki_lp_inne_{DZIS.strftime("%Y-%m")}.csv.gz')
+    if os.path.exists(f):
+        try:
+            t = pd.read_csv(f, usecols=['data'], dtype=str)
+            print(f'  zewn/{os.path.basename(f)}: {len(t)} meczow Ligi Pro, ostatni {t.data.max()}')
+        except Exception as e:
+            print(f'  UWAGA: zewn/{os.path.basename(f)} nieczytelny ({e}) — tenis stolowy Ligi Pro bez danych')
+    else:
+        print(f'  zewn/{os.path.basename(f)}: brak (opcjonalny — Liga Pro, Apps Script „ligapro”)')
+    # od 29.09 takze terminarz_fs.csv.gz (Flashscore) — wiecej sportow i nizszych lig niz 365scores
+    for nazwa in ('terminarz_fs.csv.gz', 'terminarz_365.csv.gz'):
+        f = os.path.join(ZD, nazwa)
+        if os.path.exists(f):
+            try:
+                t = pd.read_csv(f, usecols=['data', 'sport'], dtype=str)
+                print(f'  zewn/{nazwa}: mecze do {t.data.max()} (pilka {int((t.sport == "football").sum())}, razem {len(t)})')
+            except Exception as e:
+                print(f'  UWAGA: zewn/{nazwa} nieczytelny ({e}) — kontrola terminarza w typuj.py bez tego pliku')
+        else:
+            print(f'  zewn/{nazwa}: brak (opcjonalny — pobierz z Dysku, jesli Apps Script go zapisuje)')
     arch = glob.glob(os.path.join(ZD, 'wyniki_365_pilka_archiwum_*.csv.gz'))
     if not arch:
         bledy.append('brak zewn/wyniki_365_pilka_archiwum_*.csv.gz (sezon 2025/26) — pobierz z Dysku; '
@@ -175,7 +199,24 @@ def kontrola_kalibracji():
              f'python3 ensemble.py && python3 korekta_rynkow.py (wpisz do USTERKI)'))
 
 
+def archiwum_arkuszy():
+    """29.09.2026 (faza 4): arkusze statystyki_*.csv sa nadpisywane co godzine, wiec nie ma ich historii — a bez
+    niej nie da sie sprawdzic backtestem regul z sezon.py i tenisa (docs/BACKTEST_P48.md). Pakuje biezace arkusze
+    do arkusze_RRRR-MM-DD.tar.gz; pierwszy przebieg dnia zapisuje ten plik na Dysku (Poprawka 57.7)."""
+    import tarfile
+    pliki = sorted(glob.glob(os.path.join(HERE, 'statystyki_*.csv')))
+    if not pliki:
+        print('BRAK arkuszy statystyki_*.csv — nic do spakowania'); return 1
+    cel = os.path.join(HERE, f'arkusze_{DZIS}.tar.gz')
+    with tarfile.open(cel, 'w:gz') as t:
+        for f in pliki: t.add(f, arcname=os.path.basename(f))
+    print(f'spakowano {len(pliki)} arkuszy -> {os.path.basename(cel)} ({os.path.getsize(cel) // 1024} KB)')
+    return 0
+
+
 def main():
+    if '--archiwum-arkuszy' in sys.argv:
+        return archiwum_arkuszy()
     print(f'PRZEBIEG {teraz_pl():%Y-%m-%d %H:%M} (czas polski)\n1) Pliki zewn/:')
     bledy = kontrola_zewn()
     print('   Arkusze statystyk (drugie zrodlo):')
@@ -187,7 +228,7 @@ def main():
     if '--kontrola' in sys.argv:
         print('\nKONTROLA PLIKOW I ARKUSZY OK — uruchom: python3 przebieg.py')
         return 0
-    print('2) Budowa (5 krokow, razem ok. 15–20 min):')
+    print('2) Budowa (5 krokow, razem ok. 4–6 min):')
     for skrypt, tag in KROKI:
         kod, tb = uruchom(skrypt, tag)
         if tb or (kod != 0 and skrypt != 'swiezosc.py'):     # swiezosc zwraca 1 przy ostrzezeniach — to nie awaria

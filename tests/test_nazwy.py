@@ -72,13 +72,62 @@ def test_typuj_resolve(nazwa, oczekiwana):
     assert typuj.resolve(nazwa, PULA) == oczekiwana
 
 
-@pytest.mark.xfail(strict=True, reason='ZNANY DEFEKT: rezerwy/mlodziez dopasowywane do pierwszej druzyny '
-                                        '(raport 25.09 12:00). Naprawa: rejestr encji z poziomem druzyny.')
-def test_rezerwy_nie_do_pierwszej_druzyny():
-    assert typuj.resolve('Hammarby Talang', PULA) is None
+@pytest.mark.parametrize('nazwa', ['Hammarby Talang', 'Jong Ajax', 'Juventus Primavera'])
+def test_mlodziez_i_rezerwy_nie_do_pierwszej_druzyny(nazwa):
+    # 29.09.2026 (faza 3): nowe znaczniki w nazwy.py — raport 25.09 12:00 (Hammarby Talang -> Hammarby)
+    assert typuj.resolve(nazwa, PULA | {'Ajax', 'Juventus'}) is None
 
 
-@pytest.mark.xfail(strict=True, reason='ZNANY DEFEKT: pominiety czlon rozrozniajacy daje tylko ostrzezenie '
-                                        '(Independiente Yumbo -> Independiente). Naprawa: dopasowanie po meczu.')
-def test_czlon_rozrozniajacy_nie_moze_odpasc():
-    assert typuj.resolve('Independiente Yumbo', PULA) is None
+def test_druga_druzyna_pasuje_do_siebie():
+    assert typuj.resolve('Jong Ajax', {'Ajax', 'Jong Ajax'}) == 'Jong Ajax'
+
+
+def test_znaczniki_wspolne_dla_modulow():
+    import sporty
+    assert typuj._znaczniki is sporty._znaczniki
+
+
+def test_skrot_jest_zapamietywany_do_kontroli_lacznej():
+    # "Independiente Yumbo" -> "Independiente" nadal zwraca klub (rdzen jednoznaczny), ale jest zapisany
+    # w _SKROTY — club() wymaga wtedy wspolnej ligi obu druzyn meczu (dopasowanie laczne, faza 3)
+    typuj._SKROTY.clear()
+    assert typuj.resolve('Independiente Yumbo', PULA) == 'Independiente'
+    assert typuj._SKROTY == {'Independiente Yumbo': 'Independiente'}
+
+
+def test_wspolna_liga():
+    import pandas as pd
+    from nazwy import wspolna_liga
+    m = pd.DataFrame({'MatchDate': pd.to_datetime(['2026-08-01', '2026-08-08', '2026-08-15', '2023-01-01']),
+                      'HomeTeam': ['Independiente', 'Quindio', 'Cortulua', 'Independiente'],
+                      'AwayTeam': ['Racing', 'Cortulua', 'Quindio', 'Quindio'],
+                      'Division': ['ARG', 'COL2', 'COL2', 'COL2']})
+    assert wspolna_liga(m, 'Quindio', 'Cortulua')
+    assert not wspolna_liga(m, 'Independiente', 'Quindio')   # wspolna liga tylko sprzed 2 lat
+    assert not wspolna_liga(m, 'Independiente', None)
+
+
+def test_brak_nowych_sprzecznosci_w_aliasach():
+    # faza 3: nowy alias, ktory kieruje znana nazwe do INNEGO klubu niz inna tabela, musi zostac
+    # swiadomie przejrzany i dopisany do rejestr_konflikty_znane.csv (albo poprawiony)
+    import rejestr
+    n = rejestr.nowe_konflikty()
+    assert n.empty, n.to_string()
+
+
+def test_aliasy_z_pliku_kod_wygrywa(tmp_path):
+    from nazwy import aliasy_z_pliku
+    f = tmp_path / 'aliasy.csv'
+    f.write_text('modul,nazwa,cel,uzasadnienie,data\n'
+                 'typuj,Independiente Yumbo,Independiente Valle del Cauca,Primera B COL,2026-09-29\n'
+                 'typuj,Legia Warszawa,Inny Klub,probuje nadpisac kod,2026-09-29\n'
+                 'sporty,Lukko Rauma,Lukko,inny modul,2026-09-29\n', encoding='utf-8')
+    d = {'legiawarszawa': 'Legia'}
+    assert aliasy_z_pliku('typuj', typuj.norm, d, str(f)) == 1
+    assert d == {'legiawarszawa': 'Legia', 'independienteyumbo': 'Independiente Valle del Cauca'}
+
+
+def test_aliasy_csv_ma_naglowek():
+    import csv
+    from nazwy import ALIASY_CSV
+    assert csv.DictReader(open(ALIASY_CSV, encoding='utf-8')).fieldnames == ['modul', 'nazwa', 'cel', 'uzasadnienie', 'data']

@@ -175,6 +175,11 @@ def czytaj(wzor, bez=None):
         d = d.assign(_wyn=d[_kw].astype(str).agg(':'.join, axis=1).where(_dw, ''))
     else:
         d = d.assign(_wyn='')
+    # 29.09.2026 (Liga Pro): ta sama para gra kilka razy dziennie — mecze ze scores24 maja id w kolumnie
+    # runda ("sc24:…"), wiec to id rozroznia mecze (powtorny zapis ma to samo id i dalej jest odsiewany).
+    if 'runda' in d.columns:
+        _id = d.runda.astype(str).str.startswith('sc24:')
+        if _id.any(): d.loc[_id, '_wyn'] = d.loc[_id, 'runda']
     klucz = [c for c in ('data', 'sport', 'liga', 'turniej', 'gosp', 'gosc', '_wyn') if c in d.columns]
     if 'okresy_g' in d.columns:   # ten sam mecz pobrany ponownie: zostaje wiersz z pełniejszymi danymi (okresy/nawierzchnia)
         d = d.assign(_pel=(d.okresy_g != '').astype(int) + (d.get('nawierzchnia', '') != '').astype(int)).sort_values('_pel', kind='stable')
@@ -188,7 +193,8 @@ def czytaj(wzor, bez=None):
         v1, v2 = pd.to_numeric(d[g1], errors='coerce'), pd.to_numeric(d[g2], errors='coerce')
         d = d.assign(_v1=v1, _v2=v2)
         wynik_kl = list(klucz)   # z '_wyn': w baseballu rozne wyniki to rozne mecze (dwumecz), nie sprzecznosc
-        rozne = d.groupby(wynik_kl, dropna=False)[[g1, g2]].transform(lambda s_: s_.nunique()).max(axis=1) > 1
+        # 29.09.2026: transform('nunique') zamiast lambdy wolanej dla kazdej grupy (ok. 20 s na przebieg)
+        rozne = d.groupby(wynik_kl, dropna=False)[[g1, g2]].transform('nunique').max(axis=1) > 1
         if rozne.any():
             zostaw, sprzeczne = [], 0
             for _, gr in d[rozne].groupby(wynik_kl, dropna=False):

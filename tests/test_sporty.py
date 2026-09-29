@@ -14,12 +14,11 @@ def _baza(wyg_h, wyg_g, n=10):
     return pd.DataFrame(w)
 
 
-def test_zgodne_daje_mniejsze_z_dwoch():
-    # forma H 8/10 -> 0.75, G 3/10 -> 1/3; log5 = 0.75*(2/3) / (0.75*(2/3) + (1/3)*0.25) = 6/7
-    p = sporty.drugie_zrodlo(_baza(8, 3), 'hokej', 'H', 'G', 0.80)
-    assert p == pytest.approx(0.80)
-    p = sporty.drugie_zrodlo(_baza(8, 3), 'hokej', 'H', 'G', 0.90)
-    assert p == pytest.approx(6 / 7)
+def test_zgodne_daje_p_modelu():
+    # forma H 8/10 -> 0.75, G 3/10 -> 1/3; log5 = 0.75*(2/3) / (0.75*(2/3) + (1/3)*0.25) = 6/7 ~ 0.857
+    # Poprawka 58: przy zgodnych zrodlach P do kuponu = P modelu (docs/BACKTEST_P48.md)
+    assert sporty.drugie_zrodlo(_baza(8, 3), 'hokej', 'H', 'G', 0.80) == pytest.approx(0.80)
+    assert sporty.drugie_zrodlo(_baza(8, 3), 'hokej', 'H', 'G', 0.90) == pytest.approx(0.90)
 
 
 def test_rozni_faworyci_to_none():
@@ -40,3 +39,28 @@ def test_mala_proba_to_none():
 ])
 def test_werdykt_meczu(skala, p_dz, n, oczekiwane):
     assert sporty.werdykt_meczu(skala, p_dz, n) == oczekiwane
+
+
+@pytest.mark.parametrize('oferta, oczekiwane', [
+    ('Stolfa Jakub', 'Jakub Stolfa'), ('Stolfa J.', 'Jakub Stolfa'), ('Jan Trefny', 'Trefny Jan'),
+    ('Novak J.', None),            # dwaj Novakowie na J. — noga MNIEJ, nie zgadujemy
+    ('Stolfa Petr', None),         # inne imie to inny gracz
+])
+def test_gracz_w_odwrotnej_kolejnosci(oferta, oczekiwane):
+    # Liga Pro (29.09.2026): scores24 "Imie Nazwisko" albo "Nazwisko Imie", STS "Nazwisko Imie" / "Nazwisko I."
+    pula = ['Jakub Stolfa', 'Trefny Jan', 'Jan Novak', 'Jiri Novak', 'Lukas Jindrak']
+    assert sporty.resolve(oferta, pula) == oczekiwane
+
+
+def test_liga_pro_zawsze_nie_na_kupon():
+    # Poprawka 60: backtest 29.09 — Elo w Lidze Pro bez przewagi
+    p, powody = sporty.werdykt_meczu(True, 0.75, 30, {'CZECH REPUBLIC | Liga Pro'})
+    assert p is None and any('Liga Pro' in x for x in powody)
+    assert sporty.werdykt_meczu(True, 0.75, 30, {'POLAND | Superliga'}) == (0.75, [])
+
+
+@pytest.mark.parametrize('arg, nazwa', [('koszykowka', 'koszykówka'), ('pilka_reczna', 'piłka ręczna'),
+                                        ('tenis-stolowy', 'tenis stołowy'), ('hokej', 'hokej'), ('xyz', 'xyz')])
+def test_nazwa_sportu_bez_ogonkow(arg, nazwa):
+    # Raport 29.09 12:00, usterka 6: "sporty.py typuj koszykowka" dawalo BRAK W BAZIE
+    assert sporty.nazwa_sportu(arg) == nazwa
