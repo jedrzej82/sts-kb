@@ -468,6 +468,8 @@ _DRUZYNA_FS = {('Finland | Liiga', 'IFK Helsinki'): 'HIFK',
                ('Sweden | SHL', 'Leksand'): 'Leksands IF',
                # 24.09: pelny tydzien 17-23.09 (kazda para sprawdzona)
                ('Canada | OHL', 'Ottawa 67s'): "Ottawa 67's",
+               ('Canada | OHL', 'Soo Greyhounds'): 'Sault Ste. Marie Greyhounds',     # 29.09.2026
+               ('Netherlands | Eredivisie', 'Den Haag'): 'Hys The Hague',            # 29.09.2026 (HYS Den Haag)
                ('Czechia | Extraliga', 'Mountfield HK'): 'HC Mountfield Hradec Kralove',
                ('Czechia | Extraliga', 'Sparta Prague'): 'Sparta Praha',
                ('Finland | Liiga', 'JYP'): 'Jyvaskyla',
