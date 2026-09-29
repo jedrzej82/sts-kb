@@ -208,6 +208,10 @@ def _zawiera(x, y):
     return bool(tx) and bool(ty) and (tx <= ty or ty <= tx)
 
 
+from collections import namedtuple
+_Wiersz = namedtuple('_Wiersz', ['Division', 'HomeTeam', 'AwayTeam'])
+
+
 def _aliasy_raz(allm):
     """Znajduje pary nazw oznaczajace TEN SAM klub, na podstawie terminarza, nie napisow.
 
@@ -246,11 +250,19 @@ def _aliasy_raz(allm):
     # 29.09.2026: petla szla po WSZYSTKICH grupach (liga, dzien, wynik) — setkach tysiecy, z ktorych
     # ogromna wiekszosc ma jeden wiersz i byla od razu pomijana; samo iterowanie trwalo ok. 150 s.
     # Grupy 2..12 wierszy wybieramy wektorowo; kolejnosc grup i wynik sa te same.
+    # Druga runda (29.09): itertuples() na kazdej z ~74 tys. malych grup tworzyl za kazdym razem nowa klase
+    # namedtuple i ramke — ok. 240 s pod profilerem. Grupy skladamy raz, z list Pythona (ngroup: ta sama
+    # kolejnosc grup co groupby, wiersze w grupie w kolejnosci oryginalnej).
     klucz = ['Division', 'MatchDate', 'FTHome', 'FTAway']
     rozm = d.groupby(klucz, dropna=False).HomeTeam.transform('size')
+    sub = d[(rozm >= 2) & (rozm <= 12)]
+    gid = sub.groupby(klucz, dropna=False).ngroup()
+    grupy = {}
+    for g_, dv, hh, aa in zip(gid.values, sub.Division.values, sub.HomeTeam.values, sub.AwayTeam.values):
+        grupy.setdefault(g_, []).append(_Wiersz(dv, hh, aa))
     kandydaci = {}
-    for _, g in d[(rozm >= 2) & (rozm <= 12)].groupby(klucz, dropna=False):
-        w = list(g.itertuples())
+    for g_ in sorted(grupy):
+        w = grupy[g_]
         oceny = []
         for i in range(len(w)):
             for j in range(i + 1, len(w)):
