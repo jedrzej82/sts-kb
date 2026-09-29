@@ -13,7 +13,7 @@
 var LIGAPRO_LIGI = {'czech-liga-pro-1': ['CZECH REPUBLIC', 'Liga Pro'], 'tt-cup': ['CZECH REPUBLIC', 'TT Cup'],
   'setka-cup': ['UKRAINE', 'Setka Cup']};   // slug scores24 -> [kraj, turniej]; nieistniejący slug = 0 meczów w logu
 var LIGAPRO_DNI_WSTECZ = 60;
-var LIGAPRO_OKNO_H = 2;          // okno zapytania w godzinach (limit 100 meczów na odpowiedź)
+var LIGAPRO_OKNO_H = 1;          // okno zapytania w godzinach (API: first <= 50 meczów na odpowiedź)
 var LIGAPRO_LIMIT_MS = 4.5 * 60 * 1000;
 
 function ligaproUstaw() {
@@ -56,9 +56,9 @@ function ligaproOkres(od, doo, nowe, log) {
   Object.keys(LIGAPRO_LIGI).forEach(function (slug) {
     for (var a = od; a < doo; a += LIGAPRO_OKNO_H * 3600000) {
       var b = Math.min(a + LIGAPRO_OKNO_H * 3600000, doo);
-      zad.push({url: 'https://scores24.live/rapi/leagues/table-tennis/' + slug + '/matches?lang=en&audience=en&first=100' +
-        '&status=ended&with_statistics=false&date_between[]=' + encodeURIComponent(ligaproCzas(a)) +
-        '&date_between[]=' + encodeURIComponent(ligaproCzas(b)), muteHttpExceptions: true,
+      zad.push({url: 'https://scores24.live/rapi/leagues/table-tennis/' + slug + '/matches?lang=en&audience=en&first=50' +
+        '&status=ended&with_statistics=false&date_between%5B%5D=' + encodeURIComponent(ligaproCzas(a)) +
+        '&date_between%5B%5D=' + encodeURIComponent(ligaproCzas(b)), muteHttpExceptions: true,
         headers: {'User-Agent': TERMINARZ_UA['User-Agent'], 'Accept': 'application/json'}});
       opis.push(slug);
     }
@@ -75,7 +75,7 @@ function ligaproOkres(od, doo, nowe, log) {
       }
       var j; try { j = JSON.parse(r.getContentText()); } catch (e) { bledy[slug] = 'json'; return; }
       var e = ((j.data && j.data.edges) || j.edges || []);
-      if (e.length >= 100) pelne++;
+      if (e.length >= 50) pelne++;
       e.forEach(function (x) {
         var w = ligaproWiersz(x.node || x, LIGAPRO_LIGI[slug]);
         if (!w) return;
@@ -85,20 +85,21 @@ function ligaproOkres(od, doo, nowe, log) {
     });
   }
   log.push(ligaproCzas(od).substr(0, 13) + ' – ' + ligaproCzas(doo).substr(0, 13) + ': ' + JSON.stringify(ile) +
-    (Object.keys(bledy).length ? ' | HTTP ' + JSON.stringify(bledy) : '') + (pelne ? ' | UWAGA: ' + pelne + ' okien z limitem 100' : '') +
+    (Object.keys(bledy).length ? ' | HTTP ' + JSON.stringify(bledy) : '') + (pelne ? ' | UWAGA: ' + pelne + ' okien z limitem 50 (część meczów pominięta)' : '') +
     (tresc ? '\n    odpowiedź: ' + tresc : ''));
   return !('czech-liga-pro-1' in bledy);   // pozostałe ligi mogą nie istnieć — nie blokują historii
 }
 
 /** Węzeł scores24 -> {id, mies, csv} w kolumnach wyniki_fs_inne albo null (mecz bez wyniku). */
 function ligaproWiersz(n, liga) {
-  var t = n.teams || [], wynik = String(n.resultScore || '').split(':');
-  if (t.length !== 2 || wynik.length !== 2 || !n.matchDate) return null;
+  // API rapi zwraca pola z podkreśleniem (match_date, result_score), strona — camelCase; obsługujemy oba
+  var t = n.teams || [], data = n.match_date || n.matchDate, wynik = String(n.result_score || n.resultScore || '').split(':');
+  if (t.length !== 2 || wynik.length !== 2 || !data) return null;
   var wg = Number(wynik[0]), wa = Number(wynik[1]);
   if (isNaN(wg) || isNaN(wa) || wg === wa) return null;
-  var sety = (n.resultScores || []).filter(function (s) { return /^\d+$/.test(String(s.type)); })
+  var sety = (n.result_scores || n.resultScores || []).filter(function (s) { return /^\d+$/.test(String(s.type)); })
     .sort(function (x, y) { return Number(x.type) - Number(y.type); }).map(function (s) { return String(s.value).split(':'); });
-  var d = String(n.matchDate).substr(0, 10);
+  var d = String(data).substr(0, 10);
   return {id: String(n.id), mies: d.substr(0, 7), csv: terminarzCsv([d, 'table-tennis', liga[0], liga[1], 'sc24:' + n.id,
     t[0].name, t[1].name, wg, wa, sety.map(function (s) { return s[0]; }).join(';'), sety.map(function (s) { return s[1]; }).join(';'),
     wg > wa ? 1 : 2, ''])};
