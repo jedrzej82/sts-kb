@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Skladanie kuponow W KODZIE wg INSTRUKCJI v7 (faza 4, 29.09.2026) — zamiast liczenia kombinacji w prozie.
-  python3 kupon.py nogi.csv [--depozyt 45.35] [--faza 1] [--wydane-dzis 0] [--kupony-dzis 0] [--wydane-lacznie 9]
+  python3 kupon.py nogi.csv [--depozyt 45.35] [--faza 1] [--wydane-dzis 0] [--kupony-dzis 0] [--wydane-lacznie 9] [--k5-dzis 0]
 
 nogi.csv — jedna noga na wiersz, TYLKO nogi dopuszczone przez kod (linia „✔ NOGA DOPUSZCZONA” / „WERDYKT: NOGA
 DOPUSZCZONA”), z P do kuponu z tej linii:
@@ -104,13 +104,16 @@ def za_pieniadze(o, rodzaj, a, wydane_dzis, kupony_dzis):
     if o['szacunki'] > 1: return 0, 'dwie nogi „szacunek” (A1 e)'
     if o['marza_max'] > 1.10: return 0, f'marza {o["marza_max"]:.1%} > 110% (6.3)'
     if o['poziom'] == 'D': return 0, 'poziom D (A4.3)'
-    if a.wydane_lacznie >= BUDZET: return 0, f'budzet {BUDZET} zl wyczerpany (A4.4)'
+    lacznie = getattr(a, 'lacznie', a.wydane_lacznie)   # 29.09.2026: z kuponami tego przebiegu (main)
+    if lacznie >= BUDZET: return 0, f'budzet {BUDZET} zl wyczerpany (A4.4)'
     if kupony_dzis >= LIMIT_DZIEN_KUPONY: return 0, f'limit {LIMIT_DZIEN_KUPONY} kuponow dziennie (A4.4)'
     kw = FAZY[a.faza][o['poziom']]
     kelly = kelly_cwiartka(o['p'], o['kurs']) * a.depozyt
-    st = min(kw, math.floor(kelly), LIMIT_DZIEN_ZL - wydane_dzis, BUDZET - a.wydane_lacznie)
+    st = min(kw, math.floor(kelly), LIMIT_DZIEN_ZL - wydane_dzis, BUDZET - lacznie)
     if rodzaj == 'K5':
-        st = min(st, 8)                          # suma K5 dnia maks. 8 zl (6.7) — wolajacy podaje wydane-dzis
+        # suma K5 dnia maks. 8 zl (6.7). 29.09.2026 (przeglad): dawniej min(st, 8) bez K5 z wczesniejszych
+        # przebiegow — 12:00 K5 5 zl + 15:00 K5 5 zl = 10 zl. Wolajacy podaje --k5-dzis.
+        st = min(st, 8 - getattr(a, 'k5_dzis', 0))
         if o['kurs'] < 2.0: st = min(st, 2)      # A10: K5 z kursem < 2,0 -> maks. 2 zl
     if st < 1: return 0, f'stawka < 1 zl (¼ Kelly {kelly:.2f} zl, limit dnia)'
     return int(st), None
@@ -122,11 +125,13 @@ def main(argv):
     ap.add_argument('--faza', type=int, default=1, choices=(1, 2, 3))
     ap.add_argument('--wydane-dzis', type=float, default=0); ap.add_argument('--kupony-dzis', type=int, default=0)
     ap.add_argument('--wydane-lacznie', type=float, default=0)
+    ap.add_argument('--k5-dzis', type=float, default=0, help='suma stawek K5 postawionych dzis we wczesniejszych przebiegach (limit 8 zl, 6.7)')
     a = ap.parse_args(argv)
     d = wczytaj(a.plik)
     print(f'KUPON.PY — {len(d)} nog dopuszczonych, faza {a.faza}, depozyt {a.depozyt:.2f} zl, '
           f'dzis {a.wydane_dzis:.0f} zl / {a.kupony_dzis} kup., lacznie {a.wydane_lacznie:.0f}/{BUDZET} zl')
     wydane, kupony, uzyte = a.wydane_dzis, a.kupony_dzis, set()
+    a.lacznie = a.wydane_lacznie   # 29.09.2026 (przeglad): budzet 300 zl liczony RAZEM z kuponami tego przebiegu
     for rodzaj in ('K1', 'K2', 'K3', 'K5'):
         dd = d[~d.index.isin(uzyte)] if rodzaj in ('K2', 'K3') else d   # w K1–K3 zdarzenie tylko w jednym kuponie
         # najpierw nogi, ktore moga isc za pieniadze (bez polskich klubow A1 d i marzy > 110% z 6.3);
@@ -144,7 +149,7 @@ def main(argv):
         if powod:
             print(f'   → PAPIEROWY — POWÓD ODRZUCENIA: {powod}')
         else:
-            wydane += st; kupony += 1
+            wydane += st; kupony += 1; a.lacznie += st
             print(f'   → DO GRY: stawka {st} zl (wyplata {st * TAX * o["kurs"]:.2f} zl); kurs minimalny {1 / (o["p"] * TAX):.2f}'
                   f' — PRZED POSTAWIENIEM przepisz kursy z aplikacji i przelicz EV')
 

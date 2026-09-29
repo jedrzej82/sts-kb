@@ -14,6 +14,7 @@ i szukania wynikow noga po nodze, ktore nie miescilo sie w czasie przebiegu (zal
 
 Kod NIE zgaduje: nazwa dopasowana niejednoznacznie albo brak meczu w oknie +-1 dnia = BRAK WYNIKU."""
 import glob
+import math
 import os
 import re
 import sqlite3
@@ -162,10 +163,11 @@ def _szukaj(w, d0, gosp, gosc, rozwiaz, kol_h='h', kol_a='a'):
     pula = set(okno[kol_h]) | set(okno[kol_a])
     h, g = rozwiaz(gosp, pula), rozwiaz(gosc, pula)
     if h and g:
-        x = okno[(okno[kol_h] == h) & (okno[kol_a] == g)]
-        if len(x): return x.iloc[-1], False
-        x = okno[(okno[kol_h] == g) & (okno[kol_a] == h)]
-        if len(x): return x.iloc[-1], True
+        for odw, (a_, b_) in ((False, (h, g)), (True, (g, h))):
+            x = okno[(okno[kol_h] == a_) & (okno[kol_a] == b_)]
+            if len(x):
+                x, powod = _jeden_mecz(x, d0)
+                return (x, odw) if x is not None else (None, f'{h} - {g}: {powod}')
     k = _po_kotwicy(okno, h, g, gosp, gosc, rozwiaz, kol_h, kol_a)
     if k is not None: return k
     if not h or not g: return None, f'nie dopasowano: {gosp if not h else gosc}'
@@ -173,6 +175,18 @@ def _szukaj(w, d0, gosp, gosc, rozwiaz, kol_h='h', kol_a='a'):
 
 
 _WYNIK = (('g', 'ga'), ('pg', 'pa'))
+
+
+def _jeden_mecz(x, d0):
+    """29.09.2026 (przeglad): ta sama para 2 dni z rzedu (seria MLB, koszykowka) — x.iloc[-1] bral przypadkowy
+    mecz z okna +-1 dnia. Pierwszenstwo ma dzien meczu; gdy go nie ma, a w oknie sa rozne dni, albo tego dnia
+    sa rozne wyniki (dwumecz) — nie zgadujemy."""
+    tego = x[x.d == d0]
+    if len(tego): x = tego
+    elif x.d.nunique() > 1: return None, 'kilka meczow tej pary w oknie +-1 dnia — nie zgadujemy'
+    kol = [c for c in ('g', 'ga', 'pg', 'pa') if c in x.columns]
+    if kol and len(x.drop_duplicates(kol)) > 1: return None, 'kilka meczow tej pary tego dnia (rozne wyniki) — nie zgadujemy'
+    return x.iloc[-1], ''
 
 
 def _po_kotwicy(okno, h, g, gosp, gosc, rozwiaz, kol_h, kol_a):
@@ -300,6 +314,10 @@ def _rozlicz_noge(r, W):
     regulamin = not re.search(r'dogryw|z OT|incl', rynek, re.I) and sp in sporty.DRAW_PRIOR
     if regulamin and x.ot == 1: return 'PRZEGRANY', wyn, 'rozstrzygniety w dogrywce, a rynek w czasie regulaminowym'
     if regulamin and x.ot == -1: return 'BRAK WYNIKU', wyn, 'brak informacji o dogrywce'
+    # 29.09.2026 (przeglad): remis byl liczony jako wygrana goscia („2” TRAFIONY przy 3:3 w futsalu)
+    if pg == pa:
+        if regulamin: return 'PRZEGRANY', wyn, 'remis w czasie regulaminowym'
+        return 'BRAK WYNIKU', wyn, 'remis przy rynku zwyciezcy — sprawdz recznie'
     zw = gosp if pg > pa else gosc
     return ('TRAFIONY' if typ == zw else 'PRZEGRANY'), wyn, ''
 
@@ -342,8 +360,14 @@ def rozlicz_dzien(data, ako, W):
             stany.append(stan)
         if not stany: continue
         r0 = razem.iloc[0] if len(razem) else pd.Series(dtype=str)
-        kurs = _liczba(r0.get('kurs', '')) or 1.0
-        m = re.search(r'stawka\s+(\d+(?:[.,]\d+)?)\s*z', str(r0.get('uwaga', '')), re.I)
+        # 29.09.2026 (przeglad): pusty kurs RAZEM dawal kurs 1,0 (wygrana ksiegowana jako strata) —
+        # teraz iloczyn kursow nog, a gdy i tego brak: kupon NIEROZLICZONY (brak kursu)
+        kurs = _liczba(r0.get('kurs', ''))
+        if not kurs:
+            kn = [_liczba(v) for v in nogi.get('kurs', pd.Series(dtype=str))]
+            kurs = float(math.prod(kn)) if kn and all(kn) else None
+        # „stawka: 5 zl”, „stawka 5 zl”, „stawka=5” — dawniej tylko „stawka 5 z…”, a reszta robila z kuponu papierowy
+        m = re.search(r'stawka\W*(\d+(?:[.,]\d+)?)', str(r0.get('uwaga', '')), re.I)
         stawka = _liczba(m.group(1)) if m else 0.0
         status = str(r0.get('status', '')).upper()
         pien = stawka > 0 and not any(x in status for x in ('PAPIER', 'ODWOL', 'NIE GRAC'))
@@ -351,12 +375,20 @@ def rozlicz_dzien(data, ako, W):
         if 'PRZEGRANY' in stany: wynik = f'PRZEGRANY {traf}/{n}'
         elif 'BRAK WYNIKU' in stany: wynik = f'NIEROZLICZONY ({stany.count("BRAK WYNIKU")} bez wyniku)'
         else: wynik = f'TRAFIONY {traf}/{n}'
+        if not pien and stawka == 0 and re.search(r'ZAGRAN|DO GRY', status):
+            wynik = 'NIEROZLICZONY (status gry bez stawki)'   # nie wolno go po cichu uznac za papierowy
+        if kurs is None:
+            if wynik.startswith('TRAFIONY'): wynik = 'NIEROZLICZONY (brak kursu)'
+            kurs = 1.0 if not wynik.startswith('NIEROZL') else 0.0
         wygral = wynik.startswith('TRAFIONY')
         if pien:
             wypl = round(stawka * kurs * TAX, 2) if wygral else 0.0
             if not wynik.startswith('NIEROZL'):
                 bil['postawione'] += stawka; bil['wyplacone'] += wypl; bil['pien'] += 1; bil['pien_traf'] += int(wygral)
             uw = f'stawka {stawka:.2f} zl; kurs laczny {kurs:.3f}; wyplata {wypl:.2f} zl; zysk/strata {wypl - stawka:+.2f} zl'
+        elif wynik == 'NIEROZLICZONY (status gry bez stawki)':
+            uw = 'status ZAGRANY / DO GRY, ale stawki nie odczytano — uzupelnij „stawka N zl” w RAZEM (poza Bilansem i papierowymi)'
+            _OSTRZEZENIA.append(f'{tag}#{nr}: {uw}')
         else:
             bil['pap_liczba'] += 1
             if wynik.startswith('NIEROZL'): bil['pap_nierozl'] += 1
