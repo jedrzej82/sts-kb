@@ -233,14 +233,15 @@ def _rozwiaz_inne(nazwa, pula):
     return _cicho(sporty.resolve, nazwa, pula)
 
 
-def _rozwiaz_tenis(nazwa, pula):
-    """STS: samo nazwisko ("Grabher") albo "Nazwisko I." — jednoznaczny gracz o tym nazwisku."""
-    import sporty
-    r = _rozwiaz_inne(nazwa, pula)
-    if r: return r
-    k = sporty.norm(str(nazwa).split()[0] if nazwa else '')
-    kand = [p for p in pula if k and any(sporty.norm(x) == k for x in str(p).split())]
-    return kand[0] if len(kand) == 1 else None
+def _kandydaci_tenis(nazwa, pula):
+    """29.09.2026: WSZYSCY zawodnicy zgodni z nazwa ze STS („Hurkacz”, „De Minaur A.”, „Cerundolo J. M.”):
+    kazdy czlon nazwy musi miec odpowiednik, a co najmniej jeden jako pelne slowo (tenis._wspolne_czlony) —
+    inicjal nie zastapi nazwiska („Linette M.” != „Cinalli L. M.”). Wczesniej sporty.resolve wybieral po
+    cichu jednego z kilku („Hurkacz” -> „Nika Hurkacz”, w puli byl tez Hubert)."""
+    import tenis
+    n = len(tenis._czl_norm(nazwa))
+    if not n: return set()
+    return {p for p in pula if (lambda z: z[0] >= n and z[1] >= 1)(tenis._zgodnosc(nazwa, p))}
 
 
 def rozlicz_noge(r, W):
@@ -272,10 +273,17 @@ def _rozlicz_noge(r, W):
         t = W['tenis']
         okno = t[(t.d >= d0 - pd.Timedelta(days=1)) & (t.d <= d0 + pd.Timedelta(days=1))]
         pula = set(okno.w) | set(okno.l)
-        h, g = _rozwiaz_tenis(gosp, pula), _rozwiaz_tenis(gosc, pula)
-        if not h or not g: return 'BRAK WYNIKU', '', f'nie dopasowano: {gosp if not h else gosc}'
-        x = okno[((okno.w == h) & (okno.l == g)) | ((okno.w == g) & (okno.l == h))]
-        if x.empty: return 'BRAK WYNIKU', '', f'{h} - {g}: brak meczu w oknie +-1 dnia'
+        H, G = _kandydaci_tenis(gosp, pula), _kandydaci_tenis(gosc, pula)
+        if not H or not G: return 'BRAK WYNIKU', '', f'nie dopasowano: {gosp if not H else gosc}'
+        # mecz rozstrzyga PARA: kilku kandydatow po jednej stronie jest dopuszczalne, jesli dokladnie
+        # jedna para (kandydat, kandydat) grala w oknie +-1 dnia
+        x = okno[(okno.w.isin(H) & okno.l.isin(G)) | (okno.w.isin(G) & okno.l.isin(H))]
+        pary = {frozenset((a, b)) for a, b in zip(x.w, x.l)}
+        if not pary: return 'BRAK WYNIKU', '', f'{"/".join(sorted(H))} - {"/".join(sorted(G))}: brak meczu w oknie +-1 dnia'
+        if len(pary) > 1: return 'BRAK WYNIKU', '', f'kilka pasujacych meczow ({len(pary)}) — nie zgadujemy'
+        h = x.iloc[-1].w if x.iloc[-1].w in H else x.iloc[-1].l
+        g = x.iloc[-1].l if h == x.iloc[-1].w else x.iloc[-1].w
+        if len(H) > 1 or len(G) > 1: _OSTRZEZENIA.append(f'tenis: {gosp} - {gosc} = {h} - {g} (jedyna pasujaca para, sprawdz)')
         zw = x.iloc[-1].w
         typ = _typ_zwyciezcy(rynek, gosp, gosc, h, g)
         if typ is None: return 'BRAK WYNIKU', x.iloc[-1].score, f'rynek „{rynek}” nieobslugiwany'
