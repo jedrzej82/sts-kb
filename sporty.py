@@ -584,6 +584,14 @@ def resolve(name, pool):
         print(f'  UWAGA: "{name}" pasuje do {len(_kol[k_])} roznych wpisow w bazie '
               f'({", ".join(sorted(_kol[k_]))}) — sprawdz, ktory to.')
     if k_ in by: return by[k_]
+    # 29.09.2026 (po dokladnym dopasowaniu): polskie nazwy miast („Hapoel Tel Awiw”, „Hapoel Beer Szewa”) — lista w nazwy.py
+    from nazwy import egzonim
+    _alt = egzonim(name, norm)
+    if _alt != str(name):
+        r = resolve(_alt, pool)
+        if r:
+            print(f'  UWAGA: "{name}" dopasowane po zamianie polskiej nazwy miasta -> "{_alt}" -> {r}.')
+            return r
     # 29.09.2026 (Liga Pro): scores24 pisze gracza "Jakub Stolfa", STS "Stolfa Jakub" albo "Stolfa J." —
     # dwuczlonowe nazwy osob porownujemy tez w odwrotnej kolejnosci i z inicjalem imienia; tylko jeden kandydat.
     _cz = re.findall(r'[^\W\d_]+', str(name).translate(_LITERY))
