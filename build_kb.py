@@ -224,18 +224,27 @@ def _aliasy_raz(allm):
     zagraly tego samego dnia z takim samym wynikiem."""
     d = allm.dropna(subset=['MatchDate', 'HomeTeam', 'AwayTeam']).copy()
 
+    _sim = {}
+
     def sim(a, b):
+        if (a, b) in _sim: return _sim[(a, b)]
         ka, kb_ = norm(a), norm(b)
-        if not ka or not kb_: return 0.0
-        if ka == kb_: return 1.0
-        o = difflib.SequenceMatcher(None, ka, kb_).ratio()
-        ta, tb = set(_czlony(a)), set(_czlony(b))
-        if ta and tb and (ta <= tb or tb <= ta): o = max(o, 0.85)
+        if not ka or not kb_: o = 0.0
+        elif ka == kb_: o = 1.0
+        else:
+            o = difflib.SequenceMatcher(None, ka, kb_).ratio()
+            ta, tb = set(_czlony(a)), set(_czlony(b))
+            if ta and tb and (ta <= tb or tb <= ta): o = max(o, 0.85)
+        _sim[(a, b)] = o
         return o
 
+    # 29.09.2026: petla szla po WSZYSTKICH grupach (liga, dzien, wynik) — setkach tysiecy, z ktorych
+    # ogromna wiekszosc ma jeden wiersz i byla od razu pomijana; samo iterowanie trwalo ok. 150 s.
+    # Grupy 2..12 wierszy wybieramy wektorowo; kolejnosc grup i wynik sa te same.
+    klucz = ['Division', 'MatchDate', 'FTHome', 'FTAway']
+    rozm = d.groupby(klucz, dropna=False).HomeTeam.transform('size')
     kandydaci = {}
-    for _, g in d.groupby(['Division', 'MatchDate', 'FTHome', 'FTAway'], dropna=False):
-        if len(g) < 2 or len(g) > 12: continue
+    for _, g in d[(rozm >= 2) & (rozm <= 12)].groupby(klucz, dropna=False):
         w = list(g.itertuples())
         oceny = []
         for i in range(len(w)):
@@ -270,9 +279,8 @@ def _aliasy_raz(allm):
                 kl = (a.Division,) + tuple(sorted((str(x), str(y))))
                 kandydaci[kl] = kandydaci.get(kl, 0) + 1
 
-    spotkania = set()
-    for r in d.itertuples():
-        spotkania.add((r.Division,) + tuple(sorted((str(r.HomeTeam), str(r.AwayTeam)))))
+    spotkania = {(dv,) + tuple(sorted((h, a)))
+                 for dv, h, a in zip(d.Division, d.HomeTeam.astype(str), d.AwayTeam.astype(str))}
 
     ile = pd.concat([d.HomeTeam, d.AwayTeam]).value_counts()
     mapa, odrzucone = {}, 0
@@ -634,9 +642,12 @@ def usun_dubel_miedzy_ligami(allm):
     gg = dl.groupby(['_k', '_dt', 't'])
     # wiersz spoza xgabora musi miec PRAWDZIWA date (wiki ma daty przyblizone — nie moze niczego wypierac)
     wiki = b['src_zrodlo'].astype(str).eq('wiki') if 'src_zrodlo' in b.columns else pd.Series(False, index=b.index)
-    dl = dl.assign(_p=(dl.src.ne('xgabora') & ~dl._i.map(wiki).fillna(False).astype(bool)).values)
-    konf = dl[(gg.Division.transform('nunique') > 1) & (dl.groupby(['_k', '_dt', 't'])._p.transform('any')) &
-              (gg.src.transform(lambda x: (x == 'xgabora').any()))]
+    dl = dl.assign(_p=(dl.src.ne('xgabora') & ~dl._i.map(wiki).fillna(False).astype(bool)).values,
+                   _x=dl.src.eq('xgabora').values)
+    # 29.09.2026: transform('any') na kolumnie logicznej zamiast lambdy wolanej osobno dla kazdej
+    # z ~480 tys. grup — ten sam wynik, a ta jedna linia zajmowala ok. 200 s kazdego przebiegu build_kb.
+    g2 = dl.groupby(['_k', '_dt', 't'])
+    konf = dl[(gg.Division.transform('nunique') > 1) & g2._p.transform('any') & g2._x.transform('any')]
     kolid = sorted(set(konf.loc[konf.src == 'xgabora', '_i']))
     if not kolid: return allm
     # Recenzja 23.09: czesc takich wierszy to NIE widma, tylko mecze z zamienionym dniem i miesiacem w xgabora

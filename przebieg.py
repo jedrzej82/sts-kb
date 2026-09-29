@@ -155,6 +155,26 @@ def kontrola_bazy():
     return bledy
 
 
+MAKS_WIEK_KALIBRACJI_DNI = 7
+
+
+def kontrola_kalibracji():
+    """29.09.2026: pliki kalibracji (ensemble_wagi.json, korekta_rynkow_v5n.csv) mialy jeden commit z 21.09
+    i byly dopasowane na bazie sprzed naprawy 19 392 dat (Poprawka 47). Nic tego nie zglaszalo.
+    Znacznik daty to pole "data" w ensemble_wagi.json (zapisuje je ensemble.py). Tylko ostrzezenie."""
+    import json
+    try:
+        d = dt.date.fromisoformat(json.load(open(os.path.join(HERE, 'ensemble_wagi.json')))['data'])
+    except Exception as e:
+        print(f'  UWAGA: nie da sie odczytac daty kalibracji z ensemble_wagi.json ({e})')
+        return
+    wiek = (DZIS - d).days
+    print(f'  kalibracja (ensemble_wagi.json): {d} ({wiek} d)'
+          + ('' if wiek <= MAKS_WIEK_KALIBRACJI_DNI else
+             f'  UWAGA: starsza niz {MAKS_WIEK_KALIBRACJI_DNI} dni — przelicz w bloku poniedzialkowym: '
+             f'python3 ensemble.py && python3 korekta_rynkow.py (wpisz do USTERKI)'))
+
+
 def main():
     print(f'PRZEBIEG {teraz_pl():%Y-%m-%d %H:%M} (czas polski)\n1) Pliki zewn/:')
     bledy = kontrola_zewn()
@@ -179,6 +199,7 @@ def main():
         for b in bledy: print('  BLAD: ' + b)
         print(f'\nPRZEBIEG BLAD: {bledy[0]} — ZADNEGO kuponu za pieniadze')
         return 4
+    kontrola_kalibracji()
     print('\nPRZEBIEG OK — mozna typowac (ostrzezenia swiezosc.py: patrz przebieg_sw.txt, wklej do raportu)')
     return 0
 

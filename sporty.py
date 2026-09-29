@@ -4,7 +4,7 @@ futbol amerykański, rugby, snooker, dart, MMA/boks …): Elo z przewagą gospod
 codziennie do sporty_delta.csv. Model uczy się od zera — im więcej wyników, tym pewniejszy; kalibracja z własnych prognoz.
   python3 sporty.py wynik RRRR-MM-DD SPORT LIGA "Gosp" "Gość" PKT_G PKT_A [dogrywka:0/1]
   python3 sporty.py typuj SPORT "Gosp" "Gość" [--neutral]
-  python3 sporty.py typ RRRR-MM-DD SPORT "Gosp" "Gość" RYNEK P     — zapis prognozy (RYNEK: 1 / 2 / X / 1_60min …)
+  python3 sporty.py typ RRRR-MM-DD SPORT "Gosp" "Gość" RYNEK P [KURS_TYPU [PIENIADZE]] — zapis prognozy (RYNEK: 1 / 2 / X / 1_60min …)
   python3 sporty.py rozlicz                                         — rozliczenie + kalibracja per sport
   python3 sporty.py stan                                            — ile meczów/drużyn w bazie per sport
   python3 sporty.py druzyny SPORT FRAGMENT                           — nazwy drużyn w bazie (Elo, liczba meczów)
@@ -880,8 +880,9 @@ def main(a):
                   + f', P do kuponu {p_k:.1%}' + (' (SZACUNEK: < 10 meczow)' if n < 10 else '')
                   + '; EV licz z TEGO P: P × kurs × 0,88 − 1')
     elif a[0] == 'typ':
+        from clv import dopisz_typ   # opcjonalnie KURS_TYPU [PIENIADZE] na koncu (P56.3, CLV)
         row = dict(data=a[1], sport=a[2].lower(), gosp=a[3], gosc=a[4], rynek=a[5], p=float(a[6]), trafiony=None)
-        pd.DataFrame([row]).to_csv(LOG, mode='a', header=not os.path.exists(LOG), index=False); print('zapisano', row)
+        print('zapisano', dopisz_typ(LOG, row, a[7:9]))
     elif a[0] == 'rozlicz':
         if not os.path.exists(LOG): sys.exit('brak prognoz')
         L = pd.read_csv(LOG); d = load()
