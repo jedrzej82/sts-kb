@@ -63,6 +63,24 @@ MAKS_WIEK_ARKUSZA_OPCJ_H = 30
 MAKS_WIEK_ARKUSZA_H = 24
 
 
+ARKUSZ_SPORT = {'statystyki_hokej': 'hockey', 'statystyki_reczna': 'handball', 'statystyki_baseball': 'baseball',
+                'statystyki_futbol_amerykanski': 'american-football', 'statystyki_rugby': 'rugby-union'}
+DO_POBRANIA = []
+
+
+def mecze_w_terminarzu(sport, dzien=None):
+    """Liczba meczow sportu (kod Flashscore/365) w terminarzu na dany dzien; None = brak terminarza."""
+    if not sport: return None
+    try:
+        import terminarz
+        t = terminarz.wczytaj()
+    except Exception:
+        return None
+    if t is None or not len(t) or 'sport' not in t or 'data' not in t: return None
+    d = str(dzien or DZIS)
+    return int(((t.sport == sport) & (t.data.astype(str).str[:10] == d)).sum())
+
+
 def kontrola_arkuszy():
     """Poprawka 53 (24.09, przebieg 21:00): arkusze statystyk to DRUGIE ZRODLO dla pilki klubowej (sezon.py),
     tenisa, koszykowki i siatkowki. Przebieg 21:00 ich nie pobral i sezon.py konczyl sie „BRAK PLIKU”.
@@ -90,8 +108,15 @@ def kontrola_arkuszy():
     for a in ARKUSZE_OPCJ:
         f = os.path.join(HERE, a + '.csv')
         if not os.path.exists(f):
-            print(f'  {a}.csv: brak — arkusz „{a}” jest na Dysku (baza-wiedzy, odswiezany raz na dobe); '
-                  f'pobierz jako CSV, gdy ten sport jest w ofercie')
+            n = mecze_w_terminarzu(ARKUSZ_SPORT.get(a))
+            if n:
+                # 29.09.2026 (Raport 15:00, usterka 7): hokej i reczna byly w ofercie, arkuszy nie pobrano
+                print(f'  {a}.csv: BRAK, a ten sport JEST DZIS W TERMINARZU ({n} meczow) — POBIERZ arkusz „{a}” '
+                      f'z Dysku jako CSV do kb/ przed typowaniem (Poprawka 63.2)')
+                DO_POBRANIA.append(a)
+            else:
+                print(f'  {a}.csv: brak — arkusz „{a}” jest na Dysku (baza-wiedzy, odswiezany raz na dobe); '
+                      f'pobierz jako CSV, gdy ten sport jest w ofercie')
             continue
         try:
             d = pd.read_csv(f, usecols=['data_aktualizacji'], low_memory=False).data_aktualizacji.astype(str).max()
@@ -261,6 +286,8 @@ def main():
         return 4
     kontrola_kalibracji()
     print('\nPRZEBIEG OK — mozna typowac (ostrzezenia swiezosc.py: patrz przebieg_sw.txt, wklej do raportu)')
+    if DO_POBRANIA:
+        print('DO POBRANIA PRZED TYPOWANIEM (sport dzis w terminarzu, brak arkusza): ' + ', '.join(DO_POBRANIA))
     return 0
 
 
