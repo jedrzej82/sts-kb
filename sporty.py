@@ -558,7 +558,7 @@ def _osoba_rowna(a, b):
     return False
 
 
-def resolve(name, pool):
+def resolve(name, pool, sport=None):
     """Zwraca nazwe z bazy albo None. None JEST POPRAWNYM WYNIKIEM — wolacz ma sie wtedy zatrzymac.
     21.09.2026: naprawiona ta sama usterka, ktora wykryto w typuj.py. Nazwa zapisana cyrylica
     (np. "Pyx") po norm() daje PUSTY klucz, a pusty ciag zawiera sie w kazdym napisie, wiec
@@ -625,6 +625,12 @@ def resolve(name, pool):
             return None
     r = _rdzen_rowny(name, by.values())
     if r: return r
+    # 29.09.2026: Wikidata PRZED dopasowaniem po zawieraniu — „Kouvot Kouvola” odpadalo tam jako „gubi czlon”,
+    # a Wikidata potwierdza, ze to ten sam klub co „Kouvot”
+    w = _wikidata(name, by.values(), sport) if sport else None
+    if w:
+        print(f'  UWAGA: "{name}" dopasowane przez Wikidata (ten sam klub, inna nazwa) -> "{w}"')
+        return w
     c = [p for p in by.values() if _zaw_nazwy(name, p)]
     if c:
         if len(c) == 1:
@@ -654,6 +660,45 @@ def resolve(name, pool):
         print(f'  UWAGA: "{name}" dopasowane ROZMYTO do "{by[m[0]]}" — upewnij sie, ze to ta sama druzyna.')
         return by[m[0]]
     return None
+
+
+WIKIDATA_CSV = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'wikidata_kluby.csv.gz')
+
+
+@functools.lru_cache(maxsize=1)
+def _wikidata_indeks():
+    """wikidata_kluby.csv.gz (qid, sport, nazwy „|”): etykiety i aliasy klubow z Wikidata (CC0), pobrane 29.09.2026
+    skryptem Termux (hokej, pilka reczna, koszykowka, siatkowka). Zwraca (klucz->qid, qid->klucze, czlon->qid) na sport."""
+    from collections import defaultdict
+    klucz, nazwy, czlon = defaultdict(lambda: defaultdict(set)), {}, defaultdict(lambda: defaultdict(set))
+    if not os.path.exists(WIKIDATA_CSV): return klucz, nazwy, czlon
+    w = pd.read_csv(WIKIDATA_CSV, dtype=str, keep_default_na=False)
+    for q, sp, ns in zip(w.qid, w.sport, w.nazwy):
+        surowe = [x for x in ns.split('|') if x]
+        nazwy[(sp, q)] = {norm(x) for x in surowe} - {''}
+        for k in nazwy[(sp, q)]: klucz[sp][k].add(q)
+        for x in surowe:
+            for t in _tokeny(x): czlon[sp][t].add(q)
+    return klucz, nazwy, czlon
+
+
+def _wikidata(name, pula, sport):
+    """29.09.2026: ten sam klub pod inna nazwa wg Wikidata („Langnau Tigers” = „SCL Tigers”, „Kouvot Kouvola” = „Kouvot”).
+    Tylko gdy: nazwa z oferty jest nazwa DOKLADNIE jednego klubu Wikidata tego sportu; z jego nazw w puli jest
+    dokladnie jedna; ta nazwa z puli nie jest nazwa innego klubu Wikidata i nie zawiera sie w nazwie innego
+    klubu (samo „Metallurg” to i Nowokuznieck, i Magnitogorsk). Druzyny kobiet/rezerwy/mlodziezowe — pomijane."""
+    if _znaczniki(name): return None
+    klucz, nazwy, czlon = _wikidata_indeks()
+    it = klucz.get(sport, {}).get(norm(name), set())
+    if len(it) != 1: return None
+    q = next(iter(it)); N = nazwy[(sport, q)]
+    traf = sorted({p for p in pula if isinstance(p, str) and not _znaczniki(p) and norm(p) in N})
+    if len({norm(p) for p in traf}) != 1: return None
+    p = traf[0]
+    if klucz[sport].get(norm(p), set()) != {q}: return None
+    tp = _tokeny(p)
+    if not tp or set.intersection(*[czlon[sport].get(t, set()) for t in tp]) - {q}: return None
+    return p
 
 
 def calibrate(sport, p):
@@ -867,7 +912,7 @@ def main(a):
             print(biezacy_sezon(d).to_string())
     elif a[0] == 'typuj':
         sport = a[1].lower(); d = load(); inf = {}; R, N, hfa, draws, pdraw = elo(d, sport, info=inf); L_ = inf['last']
-        pool = set(R); h, g = resolve(a[2], pool), resolve(a[3], pool)
+        pool = set(R); h, g = resolve(a[2], pool, sport), resolve(a[3], pool, sport)
         # 21.09.2026 (POPRAWKA 11): dawniej bylo "resolve(...) or a[2]" — przy nieznanej nazwie
         # skrypt podstawial surowa nazwe z oferty, nadawal jej domyslne Elo 1500 i mimo ostrzezenia
         # DRUKOWAL PELNA TABELE P. To ten sam typ usterki co joker w resolve(): zamiast bledu

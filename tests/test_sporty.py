@@ -182,3 +182,12 @@ def test_biezacy_sezon_kolejki():
     b = sporty.biezacy_sezon(d, min_meczow=20)
     assert b.loc[('hokej', 'Finland | Liiga'), 'kolejki'] == 4 and b.loc[('hokej', 'Finland | Liiga'), 'szacunek'] == 'nie'
     assert b.loc[('hokej', 'Canada | OHL'), 'szacunek'].startswith('TAK')
+
+
+def test_wikidata_ten_sam_klub_inna_nazwa():
+    # 29.09.2026: wikidata_kluby.csv.gz — tylko jednoznaczne; bez sportu (np. rozliczenia) nieuzywane
+    assert sporty.resolve('Langnau Tigers', {'SCL Tigers', 'Kloten Flyers'}, 'hokej') == 'SCL Tigers'
+    assert sporty.resolve('Kouvot Kouvola', {'Kouvot', 'Tampereen Pyrinto'}, 'koszykówka') == 'Kouvot'
+    assert sporty.resolve('Langnau Tigers', {'SCL Tigers'}) is None                                   # brak sportu
+    assert sporty.resolve('Metallurg Novokuznetsk', {'Metallurg'}, 'hokej') is None                   # „Metallurg” to tez Magnitogorsk
+    assert sporty.resolve('Langnau Tigers', {'SCL Tigers'}, 'koszykówka') is None                     # inny sport
