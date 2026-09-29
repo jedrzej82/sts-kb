@@ -40,3 +40,32 @@ function ligaproDiagnoza() {
   while (stare.hasNext()) stare.next().setTrashed(true);
   folder.createFile('ligapro_diagnoza.txt', out.join('\n'), 'text/plain');
 }
+
+/** Diagnoza 2: jak wyglądają dane na stronach, które odpowiadają z Google (Flashscore, scores24). */
+function ligaproDiagnoza2() {
+  var zrodla = {
+    'fs_wyniki': 'https://www.flashscore.com/table-tennis/others-men/liga-pro-cz/results/',
+    'fs_terminarz': 'https://www.flashscore.com/table-tennis/others-men/liga-pro-cz/fixtures/',
+    'scores24': 'https://scores24.live/en/table-tennis/l-czech-liga-pro',
+    'scores24_wyniki': 'https://scores24.live/en/table-tennis/l-czech-liga-pro/results'
+  };
+  var nazwy = Object.keys(zrodla), out = ['ligaproDiagnoza2 ' + new Date().toISOString()];
+  var odp = UrlFetchApp.fetchAll(nazwy.map(function (n) {
+    return {url: zrodla[n], muteHttpExceptions: true, followRedirects: true,
+      headers: {'User-Agent': TERMINARZ_UA['User-Agent'], 'Accept': 'text/html,*/*', 'Accept-Language': 'en-US,en;q=0.9'}};
+  }));
+  odp.forEach(function (r, i) {
+    var t = r.getContentText() || '', ad = (t.match(/AD÷(\d{10})/g) || []).map(function (x) { return Number(x.substr(3)); });
+    var linia = nazwy[i] + ' | HTTP ' + r.getResponseCode() + ' | ' + t.length + ' znakow | AA÷ x' + (t.match(/AA÷/g) || []).length +
+      (ad.length ? ' | AD od ' + new Date(Math.min.apply(null, ad) * 1000).toISOString() + ' do ' + new Date(Math.max.apply(null, ad) * 1000).toISOString() : '') +
+      ' | ld+json x' + (t.match(/application\/ld\+json/g) || []).length + ' | SportsEvent x' + (t.match(/SportsEvent/g) || []).length +
+      ' | __NEXT_DATA__ ' + (t.indexOf('__NEXT_DATA__') >= 0) + ' | window.__ x' + (t.match(/window\.__[A-Z_]+/g) || []).length +
+      ' ' + ((t.match(/window\.__[A-Z_]+/g) || []).slice(0, 5).join(','));
+    var k = t.indexOf('AA÷'); if (k < 0) k = t.search(/SportsEvent/); if (k < 0) k = t.search(/"homeTeam"|"competitors"|"teams"/);
+    linia += '\n    ' + (k >= 0 ? t.substr(Math.max(0, k - 200), 1500) : '(brak znacznikow danych)').replace(/\s+/g, ' ');
+    out.push(linia);
+  });
+  var folder = DriveApp.getFolderById(TERMINARZ_FOLDER_ID), stare = folder.getFilesByName('ligapro_diagnoza.txt');
+  while (stare.hasNext()) stare.next().setTrashed(true);
+  folder.createFile('ligapro_diagnoza.txt', out.join('\n'), 'text/plain');
+}
