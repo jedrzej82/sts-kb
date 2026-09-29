@@ -57,6 +57,9 @@ def dekoduj_inline():
 
 
 ARKUSZE = ('statystyki_druzyn', 'statystyki_tenis', 'statystyki_koszykowka', 'statystyki_siatkowka')
+# opcjonalne — odswiezane raz na dobe (wieczorem), wiec aktualne do ok. 30 h
+ARKUSZE_OPCJ = ('statystyki_hokej', 'statystyki_reczna', 'statystyki_baseball', 'statystyki_futbol_amerykanski', 'statystyki_rugby')
+MAKS_WIEK_ARKUSZA_OPCJ_H = 30
 MAKS_WIEK_ARKUSZA_H = 24
 
 
@@ -81,6 +84,22 @@ def kontrola_arkuszy():
                      if h < -0.5 else ''))
         except Exception as e:
             bledy.append(f'{a}.csv nieczytelny ({e}) — pobierz ponownie jako CSV')
+    # 29.09.2026 (Raport 12:00, usterka 5): hokej / reczna / baseball / futbol amerykanski / rugby Apps Script odswieza
+    # RAZ NA DOBE wieczorem — w poludnie maja 14-20 h i sa aktualne. Przebieg uznal je za „niezapisane” i pominal.
+    # Opcjonalne: brak nie blokuje przebiegu, ale jest wypisany z nazwa pliku na Dysku.
+    for a in ARKUSZE_OPCJ:
+        f = os.path.join(HERE, a + '.csv')
+        if not os.path.exists(f):
+            print(f'  {a}.csv: brak — arkusz „{a}” jest na Dysku (baza-wiedzy, odswiezany raz na dobe); '
+                  f'pobierz jako CSV, gdy ten sport jest w ofercie')
+            continue
+        try:
+            d = pd.read_csv(f, usecols=['data_aktualizacji'], low_memory=False).data_aktualizacji.astype(str).max()
+            h = (teraz_pl() - dt.datetime.strptime(d[:16], '%Y-%m-%d %H:%M')).total_seconds() / 3600
+            print(f'  {a}.csv: aktualizacja {d[:16]} ({h:.0f} h)' + ('' if h <= MAKS_WIEK_ARKUSZA_OPCJ_H else
+                  f'  UWAGA: starszy niz {MAKS_WIEK_ARKUSZA_OPCJ_H} h — sezon.py tego sportu tylko informacyjnie'))
+        except Exception as e:
+            print(f'  UWAGA: {a}.csv nieczytelny ({e}) — pobierz ponownie jako CSV')
     return bledy
 
 
