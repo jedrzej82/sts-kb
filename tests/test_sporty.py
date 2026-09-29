@@ -64,3 +64,15 @@ def test_liga_pro_zawsze_nie_na_kupon():
 def test_nazwa_sportu_bez_ogonkow(arg, nazwa):
     # Raport 29.09 12:00, usterka 6: "sporty.py typuj koszykowka" dawalo BRAK W BAZIE
     assert sporty.nazwa_sportu(arg) == nazwa
+
+
+def test_aliasy_polskie_nazwy_sponsorskie():
+    """29.09.2026: STS pisze nazwy sponsorskie (Orlen Wisla Plock, Aluron CMC Warta Zawiercie, King Szczecin)."""
+    pula = {'Wisla Plock', 'Kielce', 'Zawiercie', 'Wilki Morskie Szczecin', 'Resovia Rzeszów', 'SKRA Bełchatów'}
+    assert sporty.resolve('Orlen Wisła Płock', pula) == 'Wisla Plock'
+    assert sporty.resolve('Barlinek Industria Kielce', pula) == 'Kielce'
+    assert sporty.resolve('Aluron CMC Warta Zawiercie', pula) == 'Zawiercie'
+    assert sporty.resolve('King Szczecin', pula) == 'Wilki Morskie Szczecin'
+    assert sporty.resolve('Asseco Resovia', pula) == 'Resovia Rzeszów'
+    assert sporty.resolve('PGE GiEK Skra Bełchatów', pula) == 'SKRA Bełchatów'
+    assert sporty.resolve('Orlen Wisła Płock', {'Kielce'}) is None      # alias dziala tylko, gdy cel jest w puli
