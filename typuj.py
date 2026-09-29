@@ -864,13 +864,24 @@ def ev_kelly(p, o):
     return ev, (max(0.0, ev / (o * TAX - 1)) if o * TAX > 1 else 0.0)
 
 
+# 29.09.2026 (Poprawka 58.5, docs/BACKTEST_P48.md): rynki, na ktorych model przy P >= 70% mocno ZAWYZA.
+# Backtest walk-forward 01-09.2026 (po korektach, jak w kuponie): U2.5 n=64 P 74,5% -> trafnosc 53,1%;
+# BTTS_nie n=60 79,7% -> 51,7%; BTTS_tak n=8 83,3% -> 50,0%; "2" n=69 75,7% -> 65,2%. Wlasnie takie nogi
+# wygladaja na wartosc (wysokie P, wysoki kurs). Do czasu ponownego backtestu: NIE NA KUPON przy P >= 70%.
+RYNKI_ZAWYZONE_P70 = {'U2.5': (64, 0.745, 0.531), 'BTTS_nie': (60, 0.797, 0.517),
+                      'BTTS_tak': (8, 0.833, 0.500), '2': (69, 0.757, 0.652)}
+
+
 def werdykt_nogi(k, dz):
-    """P do kuponu wg Poprawki 48 i powod, gdy noga odpada.
+    """P do kuponu wg Poprawek 48/58 i powod, gdy noga odpada.
     dz = wynik drugie_zrodlo(): {} (brak drugiego zrodla), {rynek: P | None}."""
     if dz is None: return None, 'drugie zrodlo nie liczone'
     if not dz: return None, 'BRAK DRUGIEGO ZRODLA'
     if k not in dz: return None, 'rynek bez drugiego zrodla'
     if dz[k] is None: return None, 'ROZBIEZNE zrodla'
+    if k in RYNKI_ZAWYZONE_P70 and dz[k] >= 0.70:
+        n, p, t = RYNKI_ZAWYZONE_P70[k]
+        return None, f'rynek {k} przy P >= 70% ZAWYZONY w backtescie (n={n}: P {p:.0%} -> trafnosc {t:.0%}; Poprawka 58.5)'
     return dz[k], None
 
 

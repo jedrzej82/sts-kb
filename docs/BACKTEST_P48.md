@@ -53,3 +53,23 @@ Ten sam wzor co w pilce, mocniej: min(P) zaniza, a bramka nie odsiewa gorszych n
 ## Decyzja (29.09.2026, Poprawka 58)
 Zgodnosc drugiego zrodla zostaje obowiazkowa (wymog uzytkownika). P do kuponu = P modelu w typuj.py i sporty.py.
 Bez zmian (nie testowane): sezon.py (arkusz statystyk) i tenis — tam nadal mniejsze z dwoch.
+
+## Kalibracja per rynek (pilka, P po korektach, jak w kuponie) — Poprawka 58.5
+
+| rynek | n | srednie P | trafnosc | roznica |
+|---|---|---|---|---|
+| O0.5 | 9 212 | 92,2% | 93,5% | +1,3 pp |
+| U4.5 | 8 949 | 82,7% | 85,5% | +2,8 pp |
+| 12 | 8 089 | 74,7% | 74,8% | +0,2 pp |
+| O1.5 | 7 120 | 77,1% | 78,6% | +1,5 pp |
+| gosp_O0.5 | 6 967 | 79,3% | 82,1% | +2,7 pp |
+| 1X | 4 528 | 78,5% | 78,9% | +0,4 pp |
+| U3.5 | 3 771 | 74,6% | 75,7% | +1,2 pp |
+| **U2.5** | 64 | 74,5% | **53,1%** | **−21 pp** |
+| **2** | 69 | 75,7% | **65,2%** | **−10 pp** |
+| **BTTS_nie** | 60 | 79,7% | **51,7%** | **−28 pp** |
+| **BTTS_tak** | 8 | 83,3% | 50,0% | −33 pp |
+
+- Regula „ponizej −4 pp” jest z grubsza trafna (U3.5 +1,2 pp, U4.5 +2,8 pp po jej zastosowaniu) — zostaje.
+- U2.5, BTTS i „2” przy P >= 70% sa mocno zawyzone (przy n ~ 60 blad standardowy ~6 pp, wiec to nie przypadek).
+  Decyzja: `typuj.werdykt_nogi` — NIE NA KUPON na tych rynkach przy P >= 70% (tylko zaostrza).

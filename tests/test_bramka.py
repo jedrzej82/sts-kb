@@ -51,3 +51,12 @@ def test_value_liczy_ev_z_p_po_bramce(capsys):
     typuj.value([('1X', 0.80, 0.82)], {'1X': 1.40}, {'1X': 0.80})
     out = capsys.readouterr().out
     assert '✔ wartość' in out and 'NIE NA KUPON: EV ≤ 0 po bramce' in out
+
+
+@pytest.mark.parametrize('k, p, dopuszczona', [('U2.5', 0.72, False), ('BTTS_nie', 0.80, False), ('2', 0.71, False),
+                                               ('U2.5', 0.65, True), ('U3.5', 0.75, True), ('1', 0.75, True)])
+def test_rynki_zawyzone_przy_p70(k, p, dopuszczona):
+    # Poprawka 58.5: U2.5/BTTS/2 przy P >= 70% mocno zawyzone w backtescie (docs/BACKTEST_P48.md)
+    pk, powod = typuj.werdykt_nogi(k, {k: p})
+    assert (pk is not None) == dopuszczona
+    if not dopuszczona: assert 'ZAWYZONY' in powod
