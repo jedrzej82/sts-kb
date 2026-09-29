@@ -532,12 +532,17 @@ _MIEDZYNAR = {'europe', 'world', 'international', 'asia', 'africa', 'south ameri
               'americas', 'oceania', 'australia & oceania'}
 
 
+def _bez_kraju(n):
+    """Flashscore w pucharach dopisuje kraj: „Seoul Knights (Kor)”, „Penarol (Uru)” (znacznik kobiet (W) zostaje)."""
+    return re.sub(r'\s*\([A-Z][a-z]{2}\)$', '', str(n))
+
+
 def _fsx_bez_dubli(s, fsx=None):
     """29.09.2026: wyniki koszykowki/recznej/siatkowki z Flashscore (wyniki_fsx_inne_*, Apps Script wynikiFsDruzynowe).
     Mecz z Flashscore jest DUBLEM, gdy 365scores ma tego dnia mecz tego sportu z obiema pasujacymi druzynami
     (terminarz.pasuje, w dowolnej kolejnosci) — wtedy zostaje wiersz 365. Nazwy druzyn z Flashscore, ktore maja
     w 365 (ten sam sport) DOKLADNIE jeden pasujacy odpowiednik, dostaja zapis 365 (inaczej klub mialby dwa Elo)."""
-    from terminarz import pasuje
+    from terminarz import pasuje, _czlony
     fsx = czytaj('wyniki_fsx_inne_*.csv') if fsx is None else fsx
     if not len(fsx) or not len(s): return s
     # 3x3 to inna dyscyplina (inne() i tak ja wycina) — tu wypada od razu, bo „China 3x3 W” pasowalo do „China (W)”
@@ -563,7 +568,7 @@ def _fsx_bez_dubli(s, fsx=None):
                 dubel[i] = True; pary.setdefault((r.sport, r.gosp), set()).add(a); pary.setdefault((r.sport, r.gosc), set()).add(g); break
     zostaje = jest & ~dubel
     nazwy = {sp: sorted(set(g.gosp) | set(g.gosc)) for sp, g in baza.groupby('sport')}
-    fs_nazwy = {sp: set(g.gosp) | set(g.gosc) for sp, g in s[jest].groupby('sport')}
+    fs_nazwy = {sp: {_bez_kraju(n) for n in set(g.gosp) | set(g.gosc)} for sp, g in s[jest].groupby('sport')}
     kraje = {}   # (sport, nazwa) -> kraje/rozgrywki miedzynarodowe, w ktorych druzyna grala (365 i FS osobno)
     for zr, d in (('365', baza), ('fs', s[jest])):
         for r in d[['sport', 'kraj', 'gosp', 'gosc']].itertuples(index=False):
@@ -578,8 +583,12 @@ def _fsx_bez_dubli(s, fsx=None):
         # 29.09: hiszpanska „Zamora” (Division de Honor Plata) pasowala do argentynskiej „SAG Lomas de Zamora” —
         # gdy obie druzyny graly w ligach krajowych, musza to byc te same kraje (puchary europejskie nic nie mowia)
         kr = kraje.get(('fs', sp, t), set()) - _MIEDZYNAR
-        kand = [n for n in nazwy.get(sp, ()) if pasuje(t, n)
+        tb = _bez_kraju(t)
+        kand = [n for n in nazwy.get(sp, ()) if pasuje(tb, n)
                 and not (kr and (k365 := kraje.get(('365', sp, n), set()) - _MIEDZYNAR) and not kr & k365)]
+        if len(kand) > 1:   # „China W”: „China (W)”, nie „China Univ. (W)” — wygrywa JEDYNA nazwa o tych samych czlonach
+            rowne = [n for n in kand if _czlony(n) == _czlony(tb)]
+            if len(rowne) == 1: kand = rowne
         # 29.09: „Wybicki Kielce” i „ZPRP Kielce” (nizsze ligi) pasowaly do „Kielce” (Industria) — nazwa 365 musi
         # pasowac do JEDNEJ nazwy z Flashscore, inaczej nie wiadomo, ktory to klub
         if len(kand) == 1 and sum(pasuje(f, kand[0]) for f in fs_nazwy.get(sp, ())) == 1: mapa[(sp, t)] = kand[0]
@@ -588,7 +597,7 @@ def _fsx_bez_dubli(s, fsx=None):
     for k, v in mapa.items(): cele.setdefault((k[0], v), []).append(k)
     for (sp, v), zr in cele.items():   # dwie nazwy FS -> jedna nazwa 365 bez potwierdzenia meczem: nie zgadujemy
         niepewne = [k for k in zr if pary.get(k, set()) != {v}]
-        if len(zr) > 1 and niepewne:
+        if len({_bez_kraju(k[1]) for k in zr}) > 1 and niepewne:   # „Seoul Knights” i „Seoul Knights (Kor)” to jeden klub
             for k in niepewne: del mapa[k]; zle += 1
     s = s.copy()
     s.loc[zostaje, 'kraj'] = s.loc[zostaje, 'kraj'].map(_kraj_365)
