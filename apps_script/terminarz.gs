@@ -302,7 +302,7 @@ function wyniki365Historia() {
   var wczoraj = Utilities.formatDate(new Date(Date.now() - 86400000), 'UTC', 'yyyy-MM-dd');
   for (var t = new Date(HIST365_OD + 'T12:00:00Z'); Utilities.formatDate(t, 'UTC', 'yyyy-MM-dd') <= wczoraj; t = new Date(t.getTime() + 86400000)) {
     var dd = Utilities.formatDate(t, 'UTC', 'yyyy-MM-dd');
-    if (!gotowe[dd]) dni.push(dd);
+    if (!gotowe[dd] && !(dd <= (props.getProperty('H365_DO') || ''))) dni.push(dd);
   }
   var wiersze = {}, stare = folder.getFilesByName(HIST365_PLIK), doKosza = [];
   while (stare.hasNext()) {
@@ -355,6 +355,16 @@ function wyniki365Historia() {
   var tresc = naglowek + '\n' + Object.keys(wiersze).map(function (k) { return wiersze[k]; }).join('\n');
   folder.createFile(Utilities.gzip(Utilities.newBlob(tresc, 'text/csv', HIST365_PLIK.replace('.gz', ''))).setName(HIST365_PLIK));
   doKosza.forEach(function (f) { f.setTrashed(true); });   // stary plik dopiero PO zapisie nowego
+  // 29.09.2026 (przeglad): wlasciwosc skryptu ma limit 9 KB — pelna lista dni (ok. 15 B/dzien) przekroczylaby go w 2027.
+  // Zapamietujemy date, do ktorej WSZYSTKIE dni sa pobrane (H365_DO), i tylko pojedyncze dni po niej.
+  var ciag = props.getProperty('H365_DO') || '';
+  for (var t2 = new Date((ciag || HIST365_OD) + 'T12:00:00Z'); ; t2 = new Date(t2.getTime() + 86400000)) {
+    var d2 = Utilities.formatDate(t2, 'UTC', 'yyyy-MM-dd');
+    if (d2 > wczoraj || (d2 > ciag && !gotowe[d2])) break;
+    ciag = d2;
+  }
+  Object.keys(gotowe).forEach(function (k) { if (k <= ciag) delete gotowe[k]; });
+  if (ciag) props.setProperty('H365_DO', ciag);
   props.setProperty('H365_DNI', JSON.stringify(gotowe));
   var zostalo = dni.length - zrobione;
   log.push('sport 365 id ' + sid + '; dni pobrane teraz: ' + zrobione + ', nowych meczow: ' + nowe + ', w pliku: ' + Object.keys(wiersze).length);
