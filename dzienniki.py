@@ -163,11 +163,13 @@ def _szukaj(w, d0, gosp, gosc, rozwiaz, kol_h='h', kol_a='a'):
     pula = set(okno[kol_h]) | set(okno[kol_a])
     h, g = rozwiaz(gosp, pula), rozwiaz(gosc, pula)
     if h and g:
-        for odw, (a_, b_) in ((False, (h, g)), (True, (g, h))):
-            x = okno[(okno[kol_h] == a_) & (okno[kol_a] == b_)]
-            if len(x):
-                x, powod = _jeden_mecz(x, d0)
-                return (x, odw) if x is not None else (None, f'{h} - {g}: {powod}')
+        # 29.09.2026 (przeglad): obie orientacje RAZEM — mecz dnia ma pierwszenstwo takze wtedy, gdy wczoraj ta sama
+        # para grala u drugiej druzyny (dwumecz „u siebie / na wyjezdzie” dzien po dniu)
+        x = pd.concat([okno[(okno[kol_h] == h) & (okno[kol_a] == g)].assign(_odw=False),
+                       okno[(okno[kol_h] == g) & (okno[kol_a] == h)].assign(_odw=True)])
+        if len(x):
+            x, powod = _jeden_mecz(x, d0)
+            return (x.drop(labels='_odw'), bool(x['_odw'])) if x is not None else (None, f'{h} - {g}: {powod}')
     k = _po_kotwicy(okno, h, g, gosp, gosc, rozwiaz, kol_h, kol_a)
     if k is not None: return k
     if not h or not g: return None, f'nie dopasowano: {gosp if not h else gosc}'
@@ -233,7 +235,7 @@ def _cicho(f, nazwa, pula):
     with contextlib.redirect_stdout(buf):
         r = f(nazwa, pula)
     for l in buf.getvalue().splitlines():
-        if r and re.search(r'ROZMYTO|rdzeniu|pominieciu roku', l): _OSTRZEZENIA.append(f'sprawdz dopasowanie: {nazwa} -> {r}')
+        if r and re.search(r'ROZMYTO|rdzeniu|pominieciu roku|Wikidata', l): _OSTRZEZENIA.append(f'sprawdz dopasowanie: {nazwa} -> {r}')
     return r
 
 
@@ -305,7 +307,9 @@ def _rozlicz_noge(r, W):
     import sporty
     sp = sporty.nazwa_sportu({'koszykowka': 'koszykówka', 'pilka reczna': 'piłka ręczna'}.get(sport, sport))
     w = W['inne'][W['inne'].sport == sp]
-    x, odw = _szukaj(w, d0, gosp, gosc, _rozwiaz_inne)
+    # 29.09.2026 (przeglad): ze sportem — jak w typuj (krok Wikidata), inaczej noga dopuszczona przez Wikidata
+    # nigdy by sie nie rozliczyla
+    x, odw = _szukaj(w, d0, gosp, gosc, lambda n, p: _cicho(lambda a_, b_: sporty.resolve(a_, b_, sp), n, p))
     if x is None: return 'BRAK WYNIKU', '', odw
     pg, pa = (x.pa, x.pg) if odw else (x.pg, x.pa)
     wyn = f'{int(pg)}:{int(pa)}' + (' (dogr.)' if x.ot == 1 else '')
@@ -375,7 +379,7 @@ def rozlicz_dzien(data, ako, W):
         if 'PRZEGRANY' in stany: wynik = f'PRZEGRANY {traf}/{n}'
         elif 'BRAK WYNIKU' in stany: wynik = f'NIEROZLICZONY ({stany.count("BRAK WYNIKU")} bez wyniku)'
         else: wynik = f'TRAFIONY {traf}/{n}'
-        if not pien and stawka == 0 and re.search(r'ZAGRAN|DO GRY', status):
+        if not pien and stawka == 0 and re.search(r'ZAGRAN|DO GRY', status) and not re.search(r'NIE\s*(ZAGRAN|DO GRY)', status):
             wynik = 'NIEROZLICZONY (status gry bez stawki)'   # nie wolno go po cichu uznac za papierowy
         if kurs is None:
             if wynik.startswith('TRAFIONY'): wynik = 'NIEROZLICZONY (brak kursu)'

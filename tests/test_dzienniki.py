@@ -167,3 +167,25 @@ def test_kurs_i_stawka_kuponu():
         assert (b['postawione'], b['wyplacone'], b['pien'], b['pap_liczba']) == (5.0, 7.04, 1, 0)
     r, b = dzienniki.rozlicz_dzien('2026-09-28', _ako_pilka('1.60', 'bez kwoty'), W)
     assert b['postawione'] == 0 and b['pap_liczba'] == 0 and 'bez stawki' in r.iloc[1].TRAFIONY_PRZEGRANY
+
+
+# 29.09.2026 — przeglad dzisiejszych zmian (3 bledy rozliczen)
+def test_dwumecz_dzien_po_dniu_odwrocona_para():
+    T = pd.Timestamp
+    w = _W_inne([(T('2026-09-28'), 'hokej', 'Tappara', 'Ilves', 5, 1, 0), (T('2026-09-29'), 'hokej', 'Ilves', 'Tappara', 4, 1, 0)])
+    assert dzienniki.rozlicz_noge(dict(sport='hokej', zdarzenie='Tappara - Ilves', rynek='2', data='2026-09-29'), w)[:2] == ('TRAFIONY', '1:4')
+
+
+def test_status_nie_zagrany_to_papierowy():
+    T = pd.Timestamp
+    W = dict(pilka=pd.DataFrame([(T('2026-09-28'), 'Legia Warszawa', 'Lech Poznan', 2, 0, None, None)], columns=['d', 'h', 'a', 'g', 'ga', 'hg', 'ha']),
+             tenis=pd.DataFrame(columns=['d', 'w', 'l', 'score']), inne=pd.DataFrame(columns=['d', 'sport', 'h', 'a', 'pg', 'pa', 'ot']))
+    r, b = dzienniki.rozlicz_dzien('2026-09-28', _ako_pilka('1.60', '', status='NIE ZAGRANY'), W)
+    assert b['pap_liczba'] == 1 and not r.iloc[1].TRAFIONY_PRZEGRANY.startswith('NIEROZL')
+
+
+def test_rozliczenie_z_wikidata_jak_typowanie():
+    T = pd.Timestamp
+    w = _W_inne([(T('2026-09-29'), 'hokej', 'SCL Tigers', 'HC Davos', 4, 1, 0), (T('2026-09-29'), 'hokej', 'EV Zug', 'HC Lugano', 2, 3, 0)])
+    stan, wyn, uw = dzienniki.rozlicz_noge(dict(sport='hokej', zdarzenie='Langnau Tigers - HC Davos', rynek='1', data='2026-09-29'), w)
+    assert (stan, wyn) == ('TRAFIONY', '4:1') and 'SCL Tigers' in uw

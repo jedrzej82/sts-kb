@@ -242,7 +242,7 @@ def main(a):
         if not os.path.exists(CAL) or pd.read_csv(CAL).query('sport == @sport').empty: print('  BRAK KALIBRACJI linii dla tego sportu — traktuj jak „szacunek”.')
     elif a[0] == 'mapy':   # python3 linie.py mapy esport_cs2|esport_lol "A" "B" [--bo5]
         import sporty as sp
-        sport = a[1]; d = sp.load(); R, N, *_ = sp.elo(d, sport); A, B = sp.resolve(a[2], set(R)), sp.resolve(a[3], set(R))
+        sport = a[1]; d = sp.load(); R, N, *_ = sp.elo(d, sport); A, B = sp.resolve(a[2], set(R), sport), sp.resolve(a[3], set(R), sport)
         e = 1 / (1 + 10 ** ((R.get(B, 1500) - R.get(A, 1500)) / 400)); bo = 5 if '--bo5' in a else 3
         ec, _ = sp.calibrate(sport, e)
         pm = ec if sport == 'esport_lol' else _inv(ec, 3)   # LoL: Elo liczone na mapach; CS2: na seriach
