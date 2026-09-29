@@ -570,14 +570,6 @@ def resolve(name, pool):
     if _al and _al in pool: return _al
     _kr = _kraj_pl(name, pool)
     if _kr: return _kr
-    # 29.09.2026: polskie nazwy miast („Hapoel Tel Awiw”, „Hapoel Beer Szewa”) — lista w nazwy.py
-    from nazwy import egzonim
-    _alt = egzonim(name, norm)
-    if _alt != str(name):
-        r = resolve(_alt, pool)
-        if r:
-            print(f'  UWAGA: "{name}" dopasowane po zamianie polskiej nazwy miasta -> "{_alt}" -> {r}.')
-            return r
     # sorted(): pool to zbior, a kolejnosc iteracji zbioru zalezy od losowego ziarna
     # hasha w danym procesie. Bez tego przy dwoch nazwach o tym samym kluczu wynik
     # bywal RAZ jeden, RAZ drugi — ta sama nazwa z oferty dawala rozne druzyny.
@@ -592,6 +584,14 @@ def resolve(name, pool):
         print(f'  UWAGA: "{name}" pasuje do {len(_kol[k_])} roznych wpisow w bazie '
               f'({", ".join(sorted(_kol[k_]))}) — sprawdz, ktory to.')
     if k_ in by: return by[k_]
+    # 29.09.2026 (po dokladnym dopasowaniu): polskie nazwy miast („Hapoel Tel Awiw”, „Hapoel Beer Szewa”) — lista w nazwy.py
+    from nazwy import egzonim
+    _alt = egzonim(name, norm)
+    if _alt != str(name):
+        r = resolve(_alt, pool)
+        if r:
+            print(f'  UWAGA: "{name}" dopasowane po zamianie polskiej nazwy miasta -> "{_alt}" -> {r}.')
+            return r
     # 29.09.2026 (Liga Pro): scores24 pisze gracza "Jakub Stolfa", STS "Stolfa Jakub" albo "Stolfa J." —
     # dwuczlonowe nazwy osob porownujemy tez w odwrotnej kolejnosci i z inicjalem imienia; tylko jeden kandydat.
     _cz = re.findall(r'[^\W\d_]+', str(name).translate(_LITERY))
