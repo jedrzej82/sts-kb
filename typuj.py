@@ -3,6 +3,7 @@
   python3 typuj.py "Athletic" "Alaves"                 # klubowe (auto-dopasowanie nazw)
   python3 typuj.py "Poland" "Netherlands" --intl [--neutral]
   python3 typuj.py A B --kurs 1X=1.35 --kurs O1.5=1.28   # kursy TYLKO po wyborze: EV po podatku 12%
+  python3 typuj.py A B --kurs 1X=1.35 --nogi nogi.csv    # nogi DOPUSZCZONE dopisywane do nogi.csv (dla kupon.py)
   python3 typuj.py A B --live 60 1:0 [--czerwona-gosp] [--czerwona-gosc]   # na żywo: minuta i wynik
 Wynik: prawdopodobieństwa (skalibrowane backtestem), statystyki formy/H2H/rożnych/kartek, ostrzeżenia."""
 import os, sys, re, sqlite3, pickle, difflib, unicodedata, datetime as dt
@@ -803,7 +804,7 @@ def club(home, away, kursy, live=None):
         print('\nH2H (ost. 8):', ' | '.join(f"{r.MatchDate.date()} {r.HomeTeam} {int(r.FTHome)}:{int(r.FTAway)} {r.AwayTeam}" for r in hh.itertuples()))
     _mm = m[(m.HomeTeam.isin([h, a]) | m.AwayTeam.isin([h, a])) & m.FTHome.notna() & m.FTAway.notna()].sort_values('MatchDate')
     dz = drugie_zrodlo([(r.MatchDate, r.HomeTeam, r.AwayTeam, int(r.FTHome), int(r.FTAway)) for r in _mm.itertuples()], h, a, rows)
-    value(rows, kursy, dz)
+    value(rows, kursy, dz, mecz=f'{home} - {away}', szacunek=bool(szac), polski='poland' in (kh, ka))
     if ostrz: print('\nOSTRZEŻENIA:', *ostrz, sep='\n - ')
     print('\nUwaga: model nie zna składów, kontuzji i motywacji z dnia meczu — sprawdź je osobno (korekta maks. ±6 pp).')
 
@@ -885,7 +886,21 @@ def werdykt_nogi(k, dz):
     return dz[k], None
 
 
-def value(rows, kursy, dz=None):
+NOGI_PLIK = None   # --nogi PLIK: nogi DOPUSZCZONE dopisywane do CSV dla kupon.py (faza 4)
+
+
+def _dopisz_noge(mecz, rynek, p, kurs, szacunek, polski):
+    """Wiersz dla kupon.py. marza i kryteria (A4.3) zostaja puste — uzupelnia przebieg; bez kryteriow kupon.py
+    daje poziom D, czyli PAPIEROWY (bezpieczny kierunek)."""
+    import csv
+    nowy = not os.path.exists(NOGI_PLIK)
+    with open(NOGI_PLIK, 'a', encoding='utf-8', newline='') as fh:
+        w = csv.writer(fh)
+        if nowy: w.writerow(['mecz', 'rynek', 'p', 'kurs', 'szacunek', 'polski', 'marza', 'kryteria'])
+        w.writerow([mecz, rynek, f'{p:.4f}', kurs, int(szacunek), int(polski), '', ''])
+
+
+def value(rows, kursy, dz=None, mecz=None, szacunek=False, polski=False):
     """29.09.2026: wczesniej wynik drugie_zrodlo() byl wyrzucany — bramka z Poprawki 48 istniala tylko jako tekst
     do przeczytania. Teraz: noga bez zgodnego drugiego zrodla ma wprost werdykt NIE NA KUPON, a EV i Kelly do
     kuponu licza sie z P po bramce (od Poprawki 58: P modelu, gdy zrodla zgodne)."""
@@ -904,6 +919,9 @@ def value(rows, kursy, dz=None):
             evk, kk = ev_kelly(pk, o)
             print(f'      → P do kuponu {pk:.1%}: EV={evk:+.1%}, ¼ Kelly={kk / 4:.1%}'
                   + ('  ✔ NOGA DOPUSZCZONA' if evk > 0 else '  ✘ NIE NA KUPON: EV ≤ 0 po bramce'))
+            if evk > 0 and NOGI_PLIK and mecz:
+                _dopisz_noge(mecz, k, pk, o, szacunek, polski)
+                print(f'      (zapisano do {NOGI_PLIK} — uzupelnij marza i kryteria A4.3 przed kupon.py)')
 
 
 # ---------------- reprezentacje ----------------
@@ -984,7 +1002,7 @@ def intl(home, away, neutral, kursy):
     if len(hh): print('\nH2H:', ' | '.join(f'{r.date} {r.home_team} {int(r.home_score)}:{int(r.away_score)} {r.away_team}' for r in hh.itertuples()))
     dz = drugie_zrodlo([(r.date, r.home_team, r.away_team, int(r.home_score), int(r.away_score)) for r in df.itertuples()
                         if pd.notna(r.home_score) and pd.notna(r.away_score)], h, a, rows)
-    value(rows, kursy, dz)
+    value(rows, kursy, dz, mecz=f'{home} - {away}', szacunek=bool(szac), polski='Poland' in (h, a))
 
 
 # 29.09.2026 (faza 3b): aliasy z pliku danych aliasy.csv (modul=typuj) — na koncu, zeby wpisy w kodzie wygrywaly
@@ -994,6 +1012,8 @@ _aliasy_z_pliku('typuj', norm, ALIASES)
 if __name__ == '__main__':
     args = [x for x in sys.argv[1:]]
     kursy = {}
+    if '--nogi' in args:
+        i = args.index('--nogi'); NOGI_PLIK = args[i + 1]; del args[i:i + 2]
     while '--kurs' in args:
         i = args.index('--kurs'); k, v = args[i + 1].split('='); kursy[k] = float(v.replace(',', '.')); del args[i:i + 2]
     live = None

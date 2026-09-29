@@ -60,3 +60,14 @@ def test_rynki_zawyzone_przy_p70(k, p, dopuszczona):
     pk, powod = typuj.werdykt_nogi(k, {k: p})
     assert (pk is not None) == dopuszczona
     if not dopuszczona: assert 'ZAWYZONY' in powod
+
+
+def test_nogi_dopuszczone_trafiaja_do_pliku(tmp_path, monkeypatch):
+    import pandas as pd
+    f = tmp_path / 'nogi.csv'
+    monkeypatch.setattr(typuj, 'NOGI_PLIK', str(f))
+    typuj.value([('1X', 0.85, 0.85), ('O1.5', 0.80, 0.80)], {'1X': 1.40, 'O1.5': 1.10},
+                {'1X': 0.85, 'O1.5': 0.80}, mecz='A - B', szacunek=False, polski=True)
+    d = pd.read_csv(f)
+    assert list(d.rynek) == ['1X']                      # O1.5 @1.10: EV <= 0 — nie trafia
+    assert d.polski.iloc[0] == 1 and d.kryteria.isna().all()
