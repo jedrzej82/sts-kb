@@ -4,12 +4,14 @@
   python3 typuj.py "Poland" "Netherlands" --intl [--neutral]
   python3 typuj.py A B --kurs 1X=1.35 --kurs O1.5=1.28   # kursy TYLKO po wyborze: EV po podatku 12%
   python3 typuj.py A B --kurs 1X=1.35 --nogi nogi.csv    # nogi DOPUSZCZONE dopisywane do nogi.csv (dla kupon.py)
+  python3 typuj.py A B --para 1X+O1.5=1.62 [--nogi nogi.csv]  # para z jednego meczu (Bet Builder, Poprawka 59):
+                                                         # laczne P z siatki; kurs = kurs BUILDERA z aplikacji
   python3 typuj.py A B --live 60 1:0 [--czerwona-gosp] [--czerwona-gosc]   # na żywo: minuta i wynik
 Wynik: prawdopodobieństwa (skalibrowane backtestem), statystyki formy/H2H/rożnych/kartek, ostrzeżenia."""
 import os, sys, re, sqlite3, pickle, difflib, unicodedata, datetime as dt
 import functools
 import numpy as np, pandas as pd
-from model import fit_dc, dc_lambdas, fit_elo_glm, elo_lambdas, markets, blend, load_calibration, calibrate, live_markets
+from model import fit_dc, dc_lambdas, fit_elo_glm, elo_lambdas, markets, blend, load_calibration, calibrate, live_markets, p_pary
 import json
 # v5n (20.09.2026): zespół DC + Elo + pi-ratings (wagi z ensemble.py) i korekta per rynek (korekta_rynkow.py)
 
@@ -805,6 +807,8 @@ def club(home, away, kursy, live=None):
     _mm = m[(m.HomeTeam.isin([h, a]) | m.AwayTeam.isin([h, a])) & m.FTHome.notna() & m.FTAway.notna()].sort_values('MatchDate')
     dz = drugie_zrodlo([(r.MatchDate, r.HomeTeam, r.AwayTeam, int(r.FTHome), int(r.FTAway)) for r in _mm.itertuples()], h, a, rows)
     value(rows, kursy, dz, mecz=f'{home} - {away}', szacunek=bool(szac), polski='poland' in (kh, ka))
+    for a_, b_, k_ in PARY:
+        para(rows, lam, rho, a_, b_, k_, dz, mecz=f'{home} - {away}', szacunek=bool(szac), polski='poland' in (kh, ka))
     if ostrz: print('\nOSTRZEŻENIA:', *ostrz, sep='\n - ')
     print('\nUwaga: model nie zna składów, kontuzji i motywacji z dnia meczu — sprawdź je osobno (korekta maks. ±6 pp).')
 
@@ -924,6 +928,47 @@ def value(rows, kursy, dz=None, mecz=None, szacunek=False, polski=False):
                 print(f'      (zapisano do {NOGI_PLIK} — uzupelnij marza i kryteria A4.3 przed kupon.py)')
 
 
+PARY = []   # --para A+B[=kurs Buildera]
+
+
+def para(rows, lam, rho, a, b, kurs, dz, mecz=None, szacunek=False, polski=False):
+    """29.09.2026 (Poprawka 59, A5 pkt 1 i 5): para z jednego meczu na zwyklym AKO jest w STS niedozwolona
+    (liczy sie tylko wyzszy kurs, reszta po 1,0), wiec za pieniadze tylko przez Bet Builder, ktorego kurs NIE jest
+    iloczynem kursow. Laczne P z siatki wynikow, skorygowane w dol tak jak nogi (korekta rynkow i bramka 48/58);
+    kazda noga musi sama przejsc werdykt_nogi. EV wylacznie z kursu Buildera."""
+    d = {k: (p, pc) for k, p, pc in rows}
+    print(f'\nPARA {a} + {b} (jeden mecz — tylko Bet Builder; zwykly AKO niedozwolony, Poprawka 59):')
+    if a == b or a not in d or b not in d:
+        print('  → NIE NA KUPON: nieznany rynek albo ten sam rynek dwa razy'); return
+    pj = p_pary(lam[0], lam[1], rho, a, b)
+    if pj is None:
+        print('  → NIE NA KUPON: rynek spoza siatki wyniku koncowego (DNB, HT, pierwszy gol) — brak lacznego P'); return
+    (pa, pca), (pb, pcb) = d[a], d[b]
+    naiw = pca * pcb
+    powody = []
+    ka, ra = werdykt_nogi(a, dz); kb, rb = werdykt_nogi(b, dz)
+    if ra: powody.append(f'{a}: {ra}')
+    if rb: powody.append(f'{b}: {rb}')
+    ka, kb = ka if ka is not None else pca, kb if kb is not None else pcb
+    pk = min(pj * min(1.0, ka / pa if pa else 0) * min(1.0, kb / pb if pb else 0), ka, kb)
+    if pk < 1e-6: powody.append('laczne P = 0 (rynki wykluczaja sie)')
+    print(f'  P1 {a} {ka:.1%} | P2 {b} {kb:.1%} | iloczyn naiwny {naiw:.1%} | P z siatki {pj:.1%} (model) '
+          f'→ P do kuponu {pk:.1%} ({(pk - naiw) * 100:+.1f} pp vs iloczyn)')
+    if pk >= 1e-6: print(f'  kurs sprawiedliwy po podatku {1 / pk / TAX:.2f}')
+    if kurs is None:
+        powody.append('brak kursu Buildera (--para A+B=KURS z aplikacji)')
+    else:
+        ev, kelly = ev_kelly(pk, kurs)
+        print(f'  kurs Buildera {kurs:.2f}: EV={ev:+.1%}, ¼ Kelly={kelly / 4:.1%}')
+        if ev <= 0: powody.append('EV ≤ 0 z kursu Buildera')
+    if powody:
+        print('  → NIE NA KUPON: ' + '; '.join(powody)); return
+    print('  ✔ PARA DOPUSZCZONA (jedna noga kuponu; maks. 2 nogi z meczu — A5 pkt 4)')
+    if NOGI_PLIK and mecz:
+        _dopisz_noge(mecz, f'{a}+{b}', pk, kurs, szacunek, polski)
+        print(f'  (zapisano do {NOGI_PLIK} jako jedna noga — uzupelnij marza i kryteria A4.3 przed kupon.py)')
+
+
 # ---------------- reprezentacje ----------------
 K_T = [('FIFA World Cup qualification', 40), ('FIFA World Cup', 60), ('UEFA Euro qualification', 40), ('UEFA Euro', 50),
        ('Nations League', 40), ('Copa América', 50), ('African Cup of Nations', 50), ('AFC Asian Cup', 50),
@@ -1003,6 +1048,8 @@ def intl(home, away, neutral, kursy):
     dz = drugie_zrodlo([(r.date, r.home_team, r.away_team, int(r.home_score), int(r.away_score)) for r in df.itertuples()
                         if pd.notna(r.home_score) and pd.notna(r.away_score)], h, a, rows)
     value(rows, kursy, dz, mecz=f'{home} - {away}', szacunek=bool(szac), polski='Poland' in (h, a))
+    for a_, b_, k_ in PARY:
+        para(rows, (lh, la), -0.05, a_, b_, k_, dz, mecz=f'{home} - {away}', szacunek=bool(szac), polski='Poland' in (h, a))
 
 
 # 29.09.2026 (faza 3b): aliasy z pliku danych aliasy.csv (modul=typuj) — na koncu, zeby wpisy w kodzie wygrywaly
@@ -1014,6 +1061,10 @@ if __name__ == '__main__':
     kursy = {}
     if '--nogi' in args:
         i = args.index('--nogi'); NOGI_PLIK = args[i + 1]; del args[i:i + 2]
+    while '--para' in args:
+        i = args.index('--para'); x = args[i + 1]; del args[i:i + 2]
+        ab, _, k = x.partition('='); a_, _, b_ = ab.partition('+')
+        PARY.append((a_, b_, float(k.replace(',', '.')) if k else None))
     while '--kurs' in args:
         i = args.index('--kurs'); k, v = args[i + 1].split('='); kursy[k] = float(v.replace(',', '.')); del args[i:i + 2]
     live = None

@@ -71,3 +71,39 @@ def test_nogi_dopuszczone_trafiaja_do_pliku(tmp_path, monkeypatch):
     d = pd.read_csv(f)
     assert list(d.rynek) == ['1X']                      # O1.5 @1.10: EV <= 0 — nie trafia
     assert d.polski.iloc[0] == 1 and d.kryteria.isna().all()
+
+
+def test_para_z_siatki_nie_iloczyn():
+    # Poprawka 59 / A5 pkt 1: "1" + "U2.5" sa ujemnie skorelowane — laczne P z siatki < iloczyn
+    from model import p_pary, markets
+    mk = markets(1.6, 0.9)
+    pj = p_pary(1.6, 0.9, -0.05, '1', 'U2.5')
+    assert pj < mk['1'] * mk['U2.5'] - 0.03
+    assert p_pary(1.6, 0.9, -0.05, 'O2.5', 'U2.5') == 0.0
+    assert p_pary(1.6, 0.9, -0.05, '1', 'gosp_O0.5') == pytest.approx(mk['1'])   # "1" zawiera gola gospodarza
+    assert p_pary(1.6, 0.9, -0.05, 'DNB_1', 'O1.5') is None and p_pary(1.6, 0.9, -0.05, 'HT_1', 'O1.5') is None
+
+
+def _rows(lam=(1.8, 0.8)):
+    from model import markets
+    mk = markets(*lam)
+    return [(k, mk[k], mk[k]) for k in typuj.KEY_MARKETS]
+
+
+@pytest.mark.parametrize('kurs, dopuszczona', [(None, False), (1.05, False), (3.0, True)])
+def test_para_wymaga_kursu_buildera_i_ev(kurs, dopuszczona, capsys, tmp_path, monkeypatch):
+    rows = _rows(); d = {k: pc for k, p, pc in rows}
+    f = tmp_path / 'nogi.csv'; monkeypatch.setattr(typuj, 'NOGI_PLIK', str(f))
+    typuj.para(rows, (1.8, 0.8), -0.05, '1X', 'O1.5', kurs, {'1X': d['1X'], 'O1.5': d['O1.5']}, mecz='A - B')
+    out = capsys.readouterr().out
+    assert ('PARA DOPUSZCZONA' in out) == dopuszczona and f.exists() == dopuszczona
+    if dopuszczona:
+        import pandas as pd
+        r = pd.read_csv(f).iloc[0]
+        assert r.rynek == '1X+O1.5' and r.p <= min(d['1X'], d['O1.5'])
+
+
+def test_para_odpada_gdy_noga_odpada(capsys):
+    rows = _rows(); d = {k: pc for k, p, pc in rows}
+    typuj.para(rows, (1.8, 0.8), -0.05, '1X', 'O1.5', 9.0, {'1X': None, 'O1.5': d['O1.5']})   # 1X rozbiezne
+    assert 'NIE NA KUPON' in capsys.readouterr().out

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Model statystyczny (bez kursów): Dixon-Coles z zanikiem czasowym per liga + Elo->Poisson globalnie, blend.
 Z macierzy wyników liczy rynki: 1X2, podwójna szansa, O/U, BTTS, pierwszy gol, gole drużyn, HT."""
+import re
 import numpy as np, pandas as pd
 from scipy.optimize import minimize
 from scipy.stats import poisson
@@ -118,6 +119,27 @@ def markets(lh, la, rho=-0.05, ht_ratio=0.44):
     top = sorted(((M[a, b], f'{a}:{b}') for a in range(6) for b in range(6)), reverse=True)[:5]
     out['wyniki'] = ', '.join(f'{s} {p:.0%}' for p, s in top)
     return out
+
+
+# 29.09.2026 (Poprawka 59, A5 pkt 1): pary z jednego meczu (Bet Builder) — laczne P z siatki wynikow, nie iloczyn.
+# Tylko rynki pelnego meczu wyznaczone przez wynik koncowy (DNB jest warunkowy, HT to inna siatka -> brak).
+def maska_rynku(k, i, j):
+    tot = i + j
+    proste = {'1': i > j, 'X': i == j, '2': i < j, '1X': i >= j, 'X2': i <= j, '12': i != j,
+              'BTTS_tak': (i > 0) & (j > 0), 'BTTS_nie': (i == 0) | (j == 0)}
+    if k in proste: return proste[k]
+    m = re.fullmatch(r'(gosp_|gość_)?([OU])(\d+\.5)', k)
+    if not m: return None
+    x = i if m.group(1) == 'gosp_' else j if m.group(1) == 'gość_' else tot
+    if m.group(1) and m.group(2) == 'U': return None
+    return x > float(m.group(3)) if m.group(2) == 'O' else x < float(m.group(3))
+
+
+def p_pary(lh, la, rho, a, b):
+    """Laczne P dwoch rynkow jednego meczu z siatki Dixona-Colesa albo None (rynek spoza siatki)."""
+    M = score_matrix(lh, la, rho); i, j = np.indices(M.shape)
+    ma, mb = maska_rynku(a, i, j), maska_rynku(b, i, j)
+    return None if ma is None or mb is None else float(M[ma & mb].sum())
 
 
 def blend(l_dc, l_elo, w_dc=0.6):
