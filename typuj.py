@@ -441,6 +441,15 @@ def resolve(name, pool):
         print(f'  UWAGA: "{name}" pasuje do {len(_kol[k])} roznych wpisow w bazie '
               f'({", ".join(sorted(_kol[k]))}) — sprawdz, ktory to.')
     if k in by: return by[k]
+    # 29.09.2026 (rozliczenie 27.09): druzyna kobiet — STS pisze "Bay FC [K]", baza "Bay FC W" / "Bay FC (W)".
+    # Szukamy nazwy BEZ znacznika tylko wsrod druzyn kobiet z puli (znacznik tego samego rodzaju), dokladnie.
+    if 'kobiety' in _znaczniki(name):
+        _bez = lambda s: ' '.join(x for x in re.split(r'\s+', str(s).strip()) if not _znaczniki(x.strip('[](){}<>.,;:')))
+        kob = {}
+        for p in sorted(pool):
+            if _znaczniki(p) == _znaczniki(name): kob.setdefault(norm(_bez(p)), set()).add(p)
+        kb_ = norm(_bez(name))
+        if kb_ and len(kob.get(kb_, ())) == 1: return next(iter(kob[kb_]))
     if k in ALIASES_KLUBY and ALIASES_KLUBY[k] in pool: return ALIASES_KLUBY[k]
     if k in _WARIANTY and _WARIANTY[k] in pool: return _WARIANTY[k]   # nazwa zrodlowa sklejonego klubu (build_kb)
     c = [p for p in by.values() if _zaw_nazwy(name, p)]

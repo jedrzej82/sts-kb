@@ -131,3 +131,13 @@ def test_aliasy_csv_ma_naglowek():
     import csv
     from nazwy import ALIASY_CSV
     assert csv.DictReader(open(ALIASY_CSV, encoding='utf-8')).fieldnames == ['modul', 'nazwa', 'cel', 'uzasadnienie', 'data']
+
+
+def test_druzyna_kobiet_rozny_zapis_znacznika():
+    # rozliczenie 27.09: STS "Bay FC [K]", baza "Bay FC W"; rezerwy kobiet "Barcelona B W" to inna druzyna
+    import typuj
+    pula = {'Bay FC', 'Bay FC W', 'Barcelona', 'Barcelona B', 'Barcelona W', 'Barcelona B W'}
+    assert typuj.resolve('Bay FC [K]', pula) == 'Bay FC W'
+    assert typuj.resolve('Barcelona [K]', pula) == 'Barcelona W'
+    assert typuj.resolve('Barcelona B [K]', pula) == 'Barcelona B W'
+    assert typuj.resolve('Bay FC', pula) == 'Bay FC'
