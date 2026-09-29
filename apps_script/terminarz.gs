@@ -8,6 +8,8 @@
  *  2. U góry wybierz funkcję „terminarzUstaw” → „Uruchom” → zezwól na dostęp. Tworzy osobny wyzwalacz co godzinę
  *     i od razu zapisuje pierwszy plik. Wszystkie nazwy mają przedrostek „terminarz”, żeby nie kolidować z resztą kodu.
  *  Wyłączenie: uruchom „terminarzUsun”.
+ *  Diagnoza pokrycia: uruchom „terminarzDiagnoza” — zapisuje terminarz_diagnoza.txt (liczby meczów przy różnych
+ *  parametrach zapytania) do tego samego folderu. Nic nie zmienia w terminarzu.
  *
  * PLIK: terminarz_365.csv.gz (nadpisywany) — kolumny: data,godzina_utc,sport,kraj,turniej,runda,gosp,gosc,status
  *   status 365scores: 2 = przed meczem, 3 = trwa, 4 = koniec. Czas UTC.
@@ -72,6 +74,45 @@ function terminarzPracuj() {
   while (stare.hasNext()) doKosza.push(stare.next());
   folder.createFile(Utilities.gzip(Utilities.newBlob(tresc, 'text/csv', 'terminarz_365.csv')).setName('terminarz_365.csv.gz'));
   doKosza.forEach(function (f) { f.setTrashed(true); });   // stary plik dopiero PO zapisie nowego
+}
+
+function terminarzDiagnoza() {
+  var d = Utilities.formatDate(new Date(), 'UTC', 'dd/MM/yyyy'), baza = 'https://webws.365scores.com/web/games/';
+  var warianty = {
+    'obecny': 'allscores/?appTypeId=5&langId=1&timezoneName=UTC&userCountryId=1&showOdds=false&onlyMajorGames=false&withTop=false',
+    'bez_kraju': 'allscores/?appTypeId=5&langId=1&timezoneName=UTC&showOdds=false&onlyMajorGames=false&withTop=false',
+    'kraj_PL': 'allscores/?appTypeId=5&langId=1&timezoneName=UTC&userCountryId=35&showOdds=false&onlyMajorGames=false&withTop=false',
+    'top': 'allscores/?appTypeId=5&langId=1&timezoneName=UTC&userCountryId=1&showOdds=true&onlyMajorGames=false&withTop=true',
+    'games': '?appTypeId=5&langId=1&timezoneName=UTC&userCountryId=1',
+    'tydzien_temu': 'allscores/?appTypeId=5&langId=1&timezoneName=UTC&userCountryId=1&showOdds=false&onlyMajorGames=false&withTop=false'
+  };
+  var d7 = Utilities.formatDate(new Date(Date.now() - 7 * 86400000), 'UTC', 'dd/MM/yyyy');
+  var out = ['terminarzDiagnoza ' + new Date().toISOString() + ' dzien ' + d];
+  [1, 4, 5, 2].forEach(function (sport) {
+    Object.keys(warianty).forEach(function (w) {
+      var dd = w === 'tydzien_temu' ? d7 : d;
+      var url = baza + warianty[w] + '&sports=' + sport + '&startDate=' + dd + '&endDate=' + dd, r = terminarzPobierz([url])[0];
+      var linia = 'sport ' + sport + ' | ' + w + ' | HTTP ' + r.getResponseCode();
+      try {
+        var j = JSON.parse(r.getContentText()), n = (j.games || []).length, strony = 1, kom = {};
+        (j.competitions || []).forEach(function (c) { kom[c.id] = c.name; });
+        var ile = {}; (j.games || []).forEach(function (g) { var k = kom[g.competitionId] || g.competitionDisplayName; ile[k] = (ile[k] || 0) + 1; });
+        var x = j;
+        while (strony < 30 && x.paging && x.paging.nextPage) {
+          var r2 = terminarzPobierz(['https://webws.365scores.com' + x.paging.nextPage])[0];
+          if (r2.getResponseCode() !== 200) break;
+          x = JSON.parse(r2.getContentText()); n += (x.games || []).length; strony++;
+        }
+        linia += ' | mecze ' + n + ' | strony ' + strony + ' | rozgrywek ' + (j.competitions || []).length +
+          ' | klucze ' + Object.keys(j).join(',') + ' | paging ' + JSON.stringify(j.paging || null).substr(0, 200);
+        if (w === 'obecny') linia += '\n    ' + Object.keys(ile).map(function (k) { return k + ':' + ile[k]; }).join('; ').substr(0, 1500);
+      } catch (e) { linia += ' | blad ' + e; }
+      out.push(linia);
+    });
+  });
+  var folder = DriveApp.getFolderById(TERMINARZ_FOLDER_ID), stare = folder.getFilesByName('terminarz_diagnoza.txt');
+  while (stare.hasNext()) stare.next().setTrashed(true);
+  folder.createFile('terminarz_diagnoza.txt', out.join('\n'), 'text/plain');
 }
 
 function terminarzPobierz(urls) {
