@@ -626,8 +626,13 @@ def resolve(name, pool):
         else:   # "Chievo Verona" zawiera i "Chievo", i "Verona" — pierwszy czlon to niemal zawsze wlasciwy klub
             pref = [p for p in c if k_.startswith(norm(p)) or norm(p).startswith(k_)]
             if len(pref) == 1: wyn = pref[0]
-            elif pref: wyn = max(pref, key=lambda p: len(norm(p)))
-            else: wyn = min(c, key=lambda p: abs(len(norm(p)) - len(k_)))
+            else:
+                # 29.09.2026: wczesniej wybor NAJDLUZSZEGO / najblizszego dlugoscia kandydata — zgadywanie.
+                # Dart „Price” -> „Sam Price” (w puli Gerwyn, Lewis, Kane...), snooker „Higgins” -> „Alex
+                # Higgins” (zm. 2010), „Wilson” -> „Erik Wilson”. Kilku kandydatow = noga MNIEJ.
+                print(f'  ODRZUCONO: "{name}" pasuje do {len(c)} wpisow ({", ".join(sorted(c)[:5])}) — '
+                      f'nie zgadujemy, noga MNIEJ.')
+                return None
         return _skrot_albo_nic(name, wyn, by.values())
     # prog 0.7 byl za luzny i milczacy; 0.80 jak w typuj.py, z ostrzezeniem dla czlowieka
     # rozmyte tylko dla dluzszych nazw i z wysokim progiem (0,87 zamiast 0,80:
