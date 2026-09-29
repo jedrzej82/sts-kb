@@ -136,8 +136,65 @@ def raport(d):
               f'{"odsiewa przeszacowane nogi" if o.traf.mean() < o.p_model.mean() - 0.02 else "NIE odsiewa istotnie gorszych nog"})')
 
 
+def sporty_wiersze(od='2026-01-01'):
+    """To samo dla sporty.py: P faworyta z Elo (calibrate, bez modelu marzy koszykowki), forma = log5 z odsetka
+    zwyciestw w 10 ostatnich meczach (jak sporty.drugie_zrodlo). Tylko mecze z >= 6 meczami obu druzyn."""
+    import sporty
+    d = sporty.load()
+    out = []
+    for sport in sorted(d.sport.unique()):
+        pre = []
+        try:
+            hfa = sporty.elo(d, sport, pre)[2]
+        except Exception as e:
+            print(f'  {sport}: pominiety ({type(e).__name__})'); continue
+        t = d[d.sport == sport].assign(ra=[x[0] for x in pre], rb=[x[1] for x in pre])
+        t = t[(t.data >= od) & (t.pg != t.pa)]
+        if len(t) < 200: continue
+        x = d[d.sport == sport].sort_values('data')
+        hist = {}
+        for g, a_, pg, pa, dd in zip(x.gosp, x.gosc, x.pg, x.pa, x.data):
+            hist.setdefault(g, ([], []))[0].append(dd); hist[g][1].append(int(pg > pa))
+            hist.setdefault(a_, ([], []))[0].append(dd); hist[a_][1].append(int(pa > pg))
+        def forma(tm, dd):
+            h = hist.get(tm)
+            if not h: return 0, 0
+            i = bisect_left(h[0], dd); w = h[1][max(0, i - DZ):i]
+            return sum(w), len(w)
+        for r in t.itertuples():
+            e = 1 / (1 + 10 ** ((r.rb - r.ra - hfa) / 400))
+            ec = sporty.calibrate(sport, e)[0]
+            (wh, nh), (wg, ng) = forma(r.gosp, r.data), forma(r.gosc, r.data)
+            if min(nh, ng) < MIN_M: continue
+            rh, rg = (wh + 1) / (nh + 2), (wg + 1) / (ng + 2)
+            pf_h = rh * (1 - rg) / (rh * (1 - rg) + rg * (1 - rh))
+            fav_h = ec >= 0.5
+            pm = ec if fav_h else 1 - ec
+            pf = pf_h if fav_h else 1 - pf_h
+            if pm < 0.70: continue
+            zg = (pf >= 0.5) and abs(pm - pf) <= PROG
+            out.append((sport, pm, pf, int((r.pg > r.pa) == fav_h), zg))
+    d = pd.DataFrame(out, columns=['sport', 'p_model', 'p_forma', 'traf', 'zgodne'])
+    d['brak_formy'] = False
+    d['p_min'] = np.where(d.zgodne, np.minimum(d.p_model, d.p_forma), np.nan)
+    return d
+
+
+DZ = OKNO
+
 if __name__ == '__main__':
     a = sys.argv[1:]
+    if '--sporty' in a:
+        d = sporty_wiersze(a[a.index('--sporty') + 1] if len(a) > a.index('--sporty') + 1 else '2026-01-01')
+        d.to_csv(os.path.join(HERE, 'bt_drugie_zrodlo_sporty.csv'), index=False)
+        raport(d)
+        for sp, g in d.groupby('sport'):
+            z = g[g.zgodne]
+            if len(z) >= 100:
+                print(f'  {sp:<16} n={len(g):5d} zgodne {g.zgodne.mean():.0%} | przepuszcz.: P {z.p_model.mean():.1%} '
+                      f'min {z.p_min.mean():.1%} traf {z.traf.mean():.1%} | odrzuc.: P {g[~g.zgodne].p_model.mean():.1%} '
+                      f'traf {g[~g.zgodne].traf.mean():.1%}')
+        sys.exit(0)
     s = a[0] if a else '2026-01-01'
     e = a[1] if len(a) > 1 else str(pd.Timestamp.today().date())
     d = wiersze(s, e)
