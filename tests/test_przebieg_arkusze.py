@@ -25,3 +25,18 @@ def test_opcjonalne_do_30h_bez_uwagi_brak_nie_blokuje(tmp_path, monkeypatch, cap
 def test_brak_wymaganego_to_blad(tmp_path, monkeypatch):
     monkeypatch.setattr(przebieg, 'HERE', str(tmp_path))
     assert len(przebieg.kontrola_arkuszy()) == len(przebieg.ARKUSZE)
+
+
+def test_arkusz_opcjonalny_sport_w_terminarzu(tmp_path, monkeypatch, capsys):
+    import terminarz
+    t = pd.DataFrame({'data': [str(przebieg.DZIS)] * 3 + ['2020-01-01'], 'sport': ['hockey', 'hockey', 'football', 'hockey'],
+                      'gosp': list('abcd'), 'gosc': list('efgh')})
+    monkeypatch.setattr(terminarz, 'wczytaj', lambda plik=None: t)
+    assert przebieg.mecze_w_terminarzu('hockey') == 2 and przebieg.mecze_w_terminarzu('handball') == 0
+    monkeypatch.setattr(przebieg, 'HERE', str(tmp_path))
+    monkeypatch.setattr(przebieg, 'DO_POBRANIA', [])
+    for a in przebieg.ARKUSZE:
+        pd.DataFrame({'data_aktualizacji': [przebieg.teraz_pl().strftime('%Y-%m-%d %H:%M')]}).to_csv(tmp_path / f'{a}.csv', index=False)
+    przebieg.kontrola_arkuszy()
+    out = capsys.readouterr().out
+    assert 'JEST DZIS W TERMINARZU (2 meczow)' in out and przebieg.DO_POBRANIA == ['statystyki_hokej']
