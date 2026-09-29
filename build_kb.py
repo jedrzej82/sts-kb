@@ -39,7 +39,12 @@ def fetch(refresh):
 
 
 def norm(s):
-    s = unicodedata.normalize('NFKD', str(s)).encode('ascii', 'ignore').decode().lower()
+    # 29.09.2026: litery l/o/ss przez nazwy.LITERY (jak w pozostalych modulach). Sprawdzone pelna przebudowa:
+    # baza identyczna (uzupelnij_ligi zamienial je juz przez ZNAKI). Lat (\d{4}) celowo NIE zachowujemy —
+    # proba z 29.09 odkleila "FC Basel 1893" od "Basel" i "TSG 1899 Hoffenheim II" od "Hoffenheim II"
+    # (5 zdublowanych meczow), a zadnego blednego sklejenia w danych nie naprawila.
+    from nazwy import LITERY
+    s = unicodedata.normalize('NFKD', str(s).translate(LITERY)).encode('ascii', 'ignore').decode().lower()
     s = re.sub(r"\b(fc|cf|afc|ac|sc|ssc|as|us|ud|cd|rc|rcd|sd|ca|sv|vfl|vfb|tsg|fk|sk|bk|if|club|calcio|balompie|de|futbol|football|1\.|\d{4})\b", ' ', s)
     return re.sub(r'[^a-z]', '', s)
 

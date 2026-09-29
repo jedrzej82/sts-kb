@@ -71,10 +71,15 @@ z EV > 0 po bramce, glownie pojedyncze (K3), gdzie przewaga ma szanse przetrwac 
   4 znane sprawdzone w `rejestr_konflikty_znane.csv`; test CI blokuje NOWE sprzecznosci
 - [x] oba testy znanych defektow (xfail) zamienione na zwykle testy
 
-**3b (nastepne):**
+**3b (29.09):**
 - rejestr jako plik danych (`encje.csv` + `aliasy.csv` z ID) i przeniesienie tabel z kodu do danych
 - dopasowanie oferty po terminarzu (liga + data +-1 + obie druzyny) z plikow 365scores/Flashscore z meczami zaplanowanymi
-- `build_kb.norm`: lata w nazwach i l/o — tylko z porownaniem sklejen przed/po na pelnej przebudowie
+- [x] terminarz 365scores (Apps Script `terminarz()` -> `terminarz_365.csv.gz`, `terminarz.py`, kontrola kraju w typuj.py)
+  — **wymaga wklejenia nowej wersji apps_script/wyniki_sts.gs w projekcie Apps Script uzytkownika**
+- [x] aliasy jako dane: `aliasy.csv` wczytywane przez typuj/sporty/sezon (kod wygrywa), objete rejestrem i testem
+- [x] `build_kb.norm`: l/o/ss przez nazwy.LITERY (baza identyczna); zachowanie lat ODRZUCONE po przebudowie —
+  odklejalo Basel/Hoffenheim II, niczego nie naprawialo (hipoteza z audytu nie potwierdzona danymi)
+- [ ] przeniesienie istniejacych tabel z kodu do aliasy.csv (stopniowo, z testem rownowaznosci)
 
 ### Faza 4 — model i przewaga (do 15.11)
 - CLV: kurs w chwili typu i kurs zamkniecia dla kazdej nogi (takze papierowej).
