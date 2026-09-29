@@ -36,3 +36,20 @@ Odrzucone: srednie P_model 80,4%, trafnosc 80,8% — nie sa przeszacowane.
 - Tylko pilka; sporty z sporty.py (log5) nie byly testowane.
 - korekta_rynkow_v5n.csv byla dopasowana na okresie czesciowo pokrywajacym sie z testem (in-sample).
 - Brak kursow: nie wiadomo, czy nogi odrzucone mialy EV > 0; CLV (Poprawka 56.3) to odpowie na zywo.
+
+## Inne sporty (sporty.py) — `python3 bt_drugie_zrodlo.py --sporty 2026-01-01`
+
+P faworyta z Elo (sporty.calibrate, bez modelu marzy koszykowki), forma = log5 z 10 meczow (jak sporty.drugie_zrodlo).
+3 119 nog z P >= 70% (dart, e-sport LoL, koszykowka, rugby, snooker; hokej/reczna/siatkowka bez dosc danych w okresie).
+
+| | srednie P | trafnosc | Brier | log loss |
+|---|---|---|---|---|
+| przepuszczone, P_model | 76,7% | 78,7% | 0,1653 | 0,5104 |
+| przepuszczone, min(P) | 74,6% | 78,7% | 0,1680 | 0,5176 |
+| odrzucone | 76,1% | **79,2%** | | |
+
+Ten sam wzor co w pilce, mocniej: min(P) zaniza, a bramka nie odsiewa gorszych nog (odrzucone trafiaja czesciej).
+
+## Decyzja (29.09.2026, Poprawka 58)
+Zgodnosc drugiego zrodla zostaje obowiazkowa (wymog uzytkownika). P do kuponu = P modelu w typuj.py i sporty.py.
+Bez zmian (nie testowane): sezon.py (arkusz statystyk) i tenis — tam nadal mniejsze z dwoch.
