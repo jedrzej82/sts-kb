@@ -48,9 +48,7 @@ def f(x, d=None):
 # "hearts otland", "Sporting Achaia" -> "sporting haia". Do tego ł/ø/ß byly kasowane ("Slask Wroclaw"
 # z polskimi znakami -> "slask wrocaw"). Teraz formy prawne odpadaja tylko jako CALE czlony, a litery
 # nierozkladalne przez NFKD dostaja te sama tabele co typuj.py i sporty.py.
-_LITERY = str.maketrans({'ł': 'l', 'Ł': 'L', 'đ': 'd', 'Đ': 'D', 'ø': 'o', 'Ø': 'O', 'ß': 'ss',
-                         'æ': 'ae', 'Æ': 'AE', 'œ': 'oe', 'Œ': 'OE', 'þ': 'th', 'Þ': 'TH',
-                         'ð': 'd', 'Ð': 'D', 'ı': 'i', 'ŋ': 'n', 'ħ': 'h', 'ŧ': 't'})
+from nazwy import LITERY as _LITERY   # 29.09.2026: jedna tabela dla wszystkich modulow (nazwy.py)
 _FORMY_NORM = frozenset(('fc', 'cf', 'sc', 'ac', 'afc', 'cp', 'sad'))
 
 

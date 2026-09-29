@@ -80,9 +80,7 @@ K = 24
 # 21.09.2026: przez to norm("Wisla Plock" z polskimi znakami) dawalo "wisapock" zamiast
 # "wislaplock" i klub w ogole nie pasowal do bazy; ratowalo to tylko dopasowanie rozmyte,
 # czyli przypadek. Dotyczy wszystkich nazw z l z kreska, d z kreska, o z kreska itd.
-_LITERY = str.maketrans({'ł':'l','Ł':'L','đ':'d','Đ':'D','ø':'o','Ø':'O','ß':'ss',
-                         'æ':'ae','Æ':'AE','œ':'oe','Œ':'OE','þ':'th','Þ':'TH',
-                         'ð':'d','Ð':'D','ı':'i','ŋ':'n','ħ':'h','ŧ':'t'})
+from nazwy import LITERY as _LITERY   # 29.09.2026: jedna tabela dla wszystkich modulow (nazwy.py)
 
 def norm(s): return re.sub(r'[^a-z0-9]', '', unicodedata.normalize('NFKD', str(s).translate(_LITERY)).encode('ascii', 'ignore').decode().lower())
 
@@ -145,31 +143,9 @@ def _tok_seed(s):
 # dopasowanie tylko wtedy, gdy kandydat ma ich WIECEJ niz zrodlo. Samo "czy kandydat zawiera znacznik"
 # nie wystarczalo: "Boca Juniors" i "Young Boys" to pierwsze zespoly, a zawieraja "juniors" i "young",
 # przez co ochrona sie dla nich wylaczala i "Boca Juniors" lapalo sie na "Boca Juniors Sub-20".
-_ZNACZNIK = re.compile(r'^(b|ii|iii|2|3|c|k|u-?1[6-9]|u-?2[0-3]|sub-?2[0-3]|jun|juniors?|res|reserves?|'
-                       r'young|youth|yth|academy|akademia|w|women|kobiet[ay]?|damen|femenino|femenil|'
-                       r'feminin[oa]?|fem)\.?$', re.I)
 
 
-def _znaczniki(s):
-    # 22.09.2026: STS oznacza druzyny kobiece sufiksem "[K]", a czasem "(W)". Bez zdjecia
-    # nawiasow token "[K]" nie pasowal do wzorca i "Club Leon [K]" dopasowywalo sie
-    # do meskiego "Club Leon" — zmierzone na 5 meczach w przebiegu 21:00 dnia 21.09,
-    # bez zadnego ostrzezenia. Model liczyl mecze meskie dla zdarzen kobiecych.
-    # 23.09.2026 (wyd. 24, recenzja): liczyl tylko ILE jest znacznikow, nie JAKIE — "Barcelona (K)"
-    # (kobiety) trafiala na "Barcelona B" (rezerwy), a "Real Madryt [K]" na "Real Madrid C", bo po obu
-    # stronach byl jeden znacznik. Teraz porownujemy RODZAJE: kobiety / rezerwy B / zespol C /
-    # kategoria wiekowa (z rocznikiem) / mlodziez ogolnie.
-    out = []
-    for t in re.split(r'[\s]+', str(s).strip()):
-        t = t.strip('[](){}<>.,;:')
-        if not _ZNACZNIK.match(t): continue
-        t = t.lower().rstrip('.')
-        if re.match(r'^(k|w|women|kobiet[ay]?|damen|femenino|femenil|feminin[oa]?|fem)$', t): out.append('kobiety')
-        elif re.match(r'^(b|ii|2|res|reserves?)$', t): out.append('rezerwy')
-        elif re.match(r'^(c|iii|3)$', t): out.append('zespol_c')
-        elif re.match(r'^(u|sub)-?\d+$', t): out.append('u' + re.sub(r'\D', '', t))
-        else: out.append('mlodziez')
-    return tuple(sorted(out))
+from nazwy import znaczniki as _znaczniki   # historia zmian (22.09 [K]/(W), 23.09 rodzaje): nazwy.py
 
 
 def _rezerwa_a_nie_pierwsza(zrodlo, kandydat):

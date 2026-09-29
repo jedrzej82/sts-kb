@@ -61,12 +61,20 @@ z EV > 0 po bramce, glownie pojedyncze (K3), gdzie przewaga ma szanse przetrwac 
 - Przeliczyc `ensemble.py` i `korekta_rynkow.py` na poprawionej bazie; `przebieg.py` ostrzega, gdy
   kalibracja starsza niz 7 dni.
 
-### Faza 3 — tozsamosc druzyn (2 tygodnie)
-- Rejestr encji: `entity(id, sport, rodzaj, kraj, nazwa, rok_zal, plec, poziom)` + `alias(entity_id, zrodlo, nazwa, liga)`.
-  Migracja ~20 tabel do danych; jedna funkcja `normalize()`.
-- Dopasowanie oferty **po meczu**: liga + data ±1 dzien + obie druzyny naraz; akceptacja tylko przy
-  jednoznacznym trafieniu. Usuwa klase bledow Independiente Yumbo / CD Inca / Athletic Club.
-- Zdjecie `xfail` z dwoch testow znanych defektow.
+### Faza 3 — tozsamosc druzyn
+**3a (29.09, zrobione):**
+- [x] `nazwy.py` — jedna tabela liter i jedne znaczniki druzyn (kobiety/rezerwy/mlodziez) zamiast kopii w typuj/sporty/sezon/tenis;
+  nowe znaczniki `talang`, `jong`, `primavera` (Hammarby Talang, Jong Ajax, Juventus Primavera nie trafiaja juz do pierwszej druzyny)
+- [x] dopasowanie LACZNE w typuj.py: nazwa, ktora zgubila czlon rozrozniajacy, przechodzi tylko gdy oba kluby meczu
+  graly w jednej lidze w 2 latach (Temperley–Quilmes przechodzi, Temperley–River Plate: NIEPEWNE DOPASOWANIE)
+- [x] `rejestr.py` — 982 wpisy z 10 tabel w jednej liscie; sprzecznosci (ta sama nazwa -> rozne kluby) wypisane,
+  4 znane sprawdzone w `rejestr_konflikty_znane.csv`; test CI blokuje NOWE sprzecznosci
+- [x] oba testy znanych defektow (xfail) zamienione na zwykle testy
+
+**3b (nastepne):**
+- rejestr jako plik danych (`encje.csv` + `aliasy.csv` z ID) i przeniesienie tabel z kodu do danych
+- dopasowanie oferty po terminarzu (liga + data +-1 + obie druzyny) z plikow 365scores/Flashscore z meczami zaplanowanymi
+- `build_kb.norm`: lata w nazwach i l/o — tylko z porownaniem sklejen przed/po na pelnej przebudowie
 
 ### Faza 4 — model i przewaga (do 15.11)
 - CLV: kurs w chwili typu i kurs zamkniecia dla kazdej nogi (takze papierowej).

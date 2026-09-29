@@ -27,9 +27,7 @@ def db():
 # 21.09.2026: przez to norm("Wisla Plock" z polskimi znakami) dawalo "wisapock" zamiast
 # "wislaplock" i klub w ogole nie pasowal do bazy; ratowalo to tylko dopasowanie rozmyte,
 # czyli przypadek. Dotyczy wszystkich nazw z l z kreska, d z kreska, o z kreska itd.
-_LITERY = str.maketrans({'ł':'l','Ł':'L','đ':'d','Đ':'D','ø':'o','Ø':'O','ß':'ss',
-                         'æ':'ae','Æ':'AE','œ':'oe','Œ':'OE','þ':'th','Þ':'TH',
-                         'ð':'d','Ð':'D','ı':'i','ŋ':'n','ħ':'h','ŧ':'t'})
+from nazwy import LITERY as _LITERY   # 29.09.2026: jedna tabela dla wszystkich modulow (nazwy.py)
 
 def norm(s):
     s = unicodedata.normalize('NFKD', str(s).translate(_LITERY)).encode('ascii', 'ignore').decode().lower()
@@ -51,31 +49,9 @@ ALIASES = {'cdrecoleta': 'Recoleta FC', 'vinotintofc': 'Vinotinto del Ecuador FC
 # dopasowanie tylko wtedy, gdy kandydat ma ich WIECEJ niz zrodlo. Samo "czy kandydat zawiera znacznik"
 # nie wystarczalo: "Boca Juniors" i "Young Boys" to pierwsze zespoly, a zawieraja "juniors" i "young",
 # przez co ochrona sie dla nich wylaczala i "Boca Juniors" lapalo sie na "Boca Juniors Sub-20".
-_ZNACZNIK = re.compile(r'^(b|ii|iii|2|3|c|k|u-?1[6-9]|u-?2[0-3]|sub-?2[0-3]|jun|juniors?|res|reserves?|'
-                       r'young|youth|yth|academy|akademia|w|women|kobiet[ay]?|damen|femenino|femenil|'
-                       r'feminin[oa]?|fem)\.?$', re.I)
 
 
-def _znaczniki(s):
-    # 22.09.2026: STS oznacza druzyny kobiece sufiksem "[K]", a czasem "(W)". Bez zdjecia
-    # nawiasow token "[K]" nie pasowal do wzorca i "Club Leon [K]" dopasowywalo sie
-    # do meskiego "Club Leon" — zmierzone na 5 meczach w przebiegu 21:00 dnia 21.09,
-    # bez zadnego ostrzezenia. Model liczyl mecze meskie dla zdarzen kobiecych.
-    # 23.09.2026 (wyd. 24, recenzja): liczyl tylko ILE jest znacznikow, nie JAKIE — "Barcelona (K)"
-    # (kobiety) trafiala na "Barcelona B" (rezerwy), a "Real Madryt [K]" na "Real Madrid C", bo po obu
-    # stronach byl jeden znacznik. Teraz porownujemy RODZAJE: kobiety / rezerwy B / zespol C /
-    # kategoria wiekowa (z rocznikiem) / mlodziez ogolnie.
-    out = []
-    for t in re.split(r'[\s]+', str(s).strip()):
-        t = t.strip('[](){}<>.,;:')
-        if not _ZNACZNIK.match(t): continue
-        t = t.lower().rstrip('.')
-        if re.match(r'^(k|w|women|kobiet[ay]?|damen|femenino|femenil|feminin[oa]?|fem)$', t): out.append('kobiety')
-        elif re.match(r'^(b|ii|2|res|reserves?)$', t): out.append('rezerwy')
-        elif re.match(r'^(c|iii|3)$', t): out.append('zespol_c')
-        elif re.match(r'^(u|sub)-?\d+$', t): out.append('u' + re.sub(r'\D', '', t))
-        else: out.append('mlodziez')
-    return tuple(sorted(out))
+from nazwy import znaczniki as _znaczniki   # historia zmian (22.09 [K]/(W), 23.09 rodzaje): nazwy.py
 
 
 # 23.09.2026, USTERKA U5: Asociacion Deportivo Cali jest w bazie jako 'AD Cali'.
@@ -306,6 +282,9 @@ _OGOLNE = frozenset('fc cf sc ac as ss sv fk nk sk bk hk hc mhk vk kk rk ok ks c
                     'hockey sport sports de del la el the da do'.split())
 
 
+_SKROTY = {}   # nazwa z oferty -> klub, dopasowane przez przypadek (c) ponizej; sprawdza club()
+
+
 def _skrot_albo_nic(name, wyn, pula):
     """22.09.2026, USTERKA U1 z przebiegu 21:00: "Independiente Yumbo" (Kolumbia, II liga) zostalo
     policzone jako "Independiente" (Argentyna, Avellaneda) — oczekiwane gole 2,05 : 0,84 z sily
@@ -332,6 +311,7 @@ def _skrot_albo_nic(name, wyn, pula):
         return None
     print(f'  UWAGA: "{name}" dopasowane do KROTSZEJ nazwy "{wyn}" — pominieto czlon '
           f'rozrozniajacy. Rdzen jest w bazie jednoznaczny, ale sprawdz, czy to ten sam klub.')
+    _SKROTY[name] = wyn
     return wyn
 
 
@@ -648,6 +628,16 @@ def club(home, away, kursy, live=None):
                  f'W meczu ligi krajowej obie druzyny sa z jednego kraju — jedna z nazw zostala '
                  f'dopasowana do INNEGO klubu. Analiza przerwana, noga MNIEJ. '
                  f'Puchary kontynentalne (Libertadores, Liga Mistrzow...) i sparingi: dodaj --kontynentalny.')
+    # 29.09.2026 (faza 3, dopasowanie LACZNE): gdy nazwa zgubila czlon rozrozniajacy (przypadek (c)
+    # w _skrot_albo_nic: "Independiente Yumbo" -> "Independiente"), sam napis nie rozstrzyga — para z oferty
+    # tak: dwa kluby jednego meczu ligowego graja w jednej lidze. Kontrola kraju (wyzej) nie lapie dwoch lig
+    # tego samego kraju ani pucharu. Brak wspolnej ligi w 2 latach = noga MNIEJ (bezpieczny kierunek bledu).
+    from nazwy import wspolna_liga
+    skroty = [(n, t) for n, t in ((home, h), (away, a)) if _SKROTY.get(n) == t]
+    if skroty and not wspolna_liga(m, h, a):
+        sys.exit('NIEPEWNE DOPASOWANIE: ' + '; '.join(f'"{n}" -> {t} (zgubiony czlon rozrozniajacy)' for n, t in skroty)
+                 + f', a {h} i {a} nie graly w jednej lidze w ostatnich 2 latach — to prawdopodobnie INNY klub. '
+                 f'Analiza przerwana, noga MNIEJ. Jesli to ten sam klub, dopisz pare do ALIASES (typuj.py).')
     # 22.09.2026, USTERKA U3: KROK 2b wymaga ostrzezenia dla ligi bez meczow z ostatnich 60 dni,
     # a skrypt go nie wypisywal. Liga PAR konczyla sie w bazie 2025-07-31, Sol de America mial ostatni
     # mecz 2024-06-06 (838 dni), a model podawal dla tego meczu rynki z dokladnoscia do dziesiatych
