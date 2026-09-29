@@ -114,6 +114,12 @@ def kontrola_arkuszy():
                 print(f'  {a}.csv: BRAK, a ten sport JEST DZIS W TERMINARZU ({n} meczow) — POBIERZ arkusz „{a}” '
                       f'z Dysku jako CSV do kb/ przed typowaniem (Poprawka 63.2)')
                 DO_POBRANIA.append(a)
+            elif n is None:
+                # 29.09.2026 (Raport 18:00, usterka 6): bez terminarza „brak meczow” bylo nieodroznialne od „nie wiem” —
+                # MLB bylo w ofercie, a arkusza baseball nie pobrano. Nie wiemy = pobierz.
+                print(f'  {a}.csv: BRAK, a terminarza nie ma (nie da sie sprawdzic, czy sport jest dzis) — POBIERZ '
+                      f'arkusz „{a}” z Dysku jako CSV do kb/, jesli ten sport jest w ofercie (Poprawka 63.2)')
+                DO_POBRANIA.append(a)
             else:
                 print(f'  {a}.csv: brak — arkusz „{a}” jest na Dysku (baza-wiedzy, odswiezany raz na dobe); '
                       f'pobierz jako CSV, gdy ten sport jest w ofercie')

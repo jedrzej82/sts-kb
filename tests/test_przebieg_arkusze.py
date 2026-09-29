@@ -10,6 +10,9 @@ def _arkusz(d, nazwa, godzin):
 
 
 def test_opcjonalne_do_30h_bez_uwagi_brak_nie_blokuje(tmp_path, monkeypatch, capsys):
+    import terminarz
+    t = pd.DataFrame({'data': ['2020-01-01'], 'sport': ['baseball'], 'gosp': ['a'], 'gosc': ['b']})   # terminarz jest, dzis bez baseballu
+    monkeypatch.setattr(terminarz, 'wczytaj', lambda plik=None: t)
     monkeypatch.setattr(przebieg, 'HERE', str(tmp_path))
     for a in przebieg.ARKUSZE: _arkusz(tmp_path, a, 1)
     _arkusz(tmp_path, 'statystyki_hokej', 15)       # wieczorny zapis, w poludnie ok. 15 h — aktualny
@@ -40,3 +43,18 @@ def test_arkusz_opcjonalny_sport_w_terminarzu(tmp_path, monkeypatch, capsys):
     przebieg.kontrola_arkuszy()
     out = capsys.readouterr().out
     assert 'JEST DZIS W TERMINARZU (2 meczow)' in out and przebieg.DO_POBRANIA == ['statystyki_hokej']
+
+
+def test_arkusz_opcjonalny_bez_terminarza_do_pobrania(tmp_path, monkeypatch, capsys):
+    # Raport 29.09 18:00, usterka 6: terminarza nie pobrano, MLB w ofercie, arkusza baseball nie pobrano
+    import terminarz
+    monkeypatch.setattr(terminarz, 'wczytaj', lambda plik=None: None)
+    assert przebieg.mecze_w_terminarzu('baseball') is None
+    monkeypatch.setattr(przebieg, 'HERE', str(tmp_path))
+    monkeypatch.setattr(przebieg, 'DO_POBRANIA', [])
+    for a in przebieg.ARKUSZE + ('statystyki_hokej',):
+        pd.DataFrame({'data_aktualizacji': [przebieg.teraz_pl().strftime('%Y-%m-%d %H:%M')]}).to_csv(tmp_path / f'{a}.csv', index=False)
+    przebieg.kontrola_arkuszy()
+    out = capsys.readouterr().out
+    assert 'terminarza nie ma' in out and 'statystyki_baseball' in przebieg.DO_POBRANIA
+    assert 'statystyki_hokej' not in przebieg.DO_POBRANIA           # jest na miejscu

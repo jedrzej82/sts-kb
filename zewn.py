@@ -532,6 +532,15 @@ _MIEDZYNAR = {'europe', 'world', 'international', 'asia', 'africa', 'south ameri
               'americas', 'oceania', 'australia & oceania'}
 
 
+def _klucz_alias(s): return re.sub(r'[^a-z0-9]', '', _n(s))
+
+
+@functools.lru_cache(maxsize=1)
+def _aliasy_sporty():
+    from nazwy import aliasy_z_pliku
+    d = {}; aliasy_z_pliku('sporty', _klucz_alias, d); return d
+
+
 def _bez_kraju(n):
     """Flashscore w pucharach dopisuje kraj: „Seoul Knights (Kor)”, „Penarol (Uru)” (znacznik kobiet (W) zostaje)."""
     return re.sub(r'\s*\([A-Z][a-z]{2}\)$', '', str(n))
@@ -584,6 +593,9 @@ def _fsx_bez_dubli(s, fsx=None):
         # gdy obie druzyny graly w ligach krajowych, musza to byc te same kraje (puchary europejskie nic nie mowia)
         kr = kraje.get(('fs', sp, t), set()) - _MIEDZYNAR
         tb = _bez_kraju(t)
+        # 29.09.2026: aliasy z aliasy.csv (modul sporty) — „St. Raphael” -> „Saint Raphaël” byl w bazie dwoma klubami
+        cel = _aliasy_sporty().get(_klucz_alias(t))
+        if cel and cel in nazwy.get(sp, ()): mapa[(sp, t)] = cel; continue
         kand = [n for n in nazwy.get(sp, ()) if pasuje(tb, n)
                 and not (kr and (k365 := kraje.get(('365', sp, n), set()) - _MIEDZYNAR) and not kr & k365)]
         if len(kand) > 1:   # „China W”: „China (W)”, nie „China Univ. (W)” — wygrywa JEDYNA nazwa o tych samych czlonach
