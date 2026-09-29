@@ -197,9 +197,9 @@ function terminarzCsv(a) {
 // Wyzwalacz: codziennie ok. 06:00 (ustaw raz: wynikiFsUstaw).
 var WYNIKI_FS_SPORTY = {3: 'basketball', 7: 'handball', 12: 'volleyball'};
 
-function wynikiFsDruzynowe() {
+function wynikiFsDruzynowe(dni) {
   var ids = Object.keys(WYNIKI_FS_SPORTY), nowe = {}, log = ['wynikiFsDruzynowe ' + new Date().toISOString()];
-  [-1, -2].forEach(function (dzien) {
+  (Array.isArray(dni) ? dni : [-1, -2]).forEach(function (dzien) {
     var odp = null;
     for (var h = 0; h < TERMINARZ_FS_HOSTY.length && !odp; h++) {
       var host = TERMINARZ_FS_HOSTY[h];
@@ -259,4 +259,9 @@ function wynikiFsUstaw() {
   ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'wynikiFsDruzynowe') ScriptApp.deleteTrigger(t); });
   ScriptApp.newTrigger('wynikiFsDruzynowe').timeBased().everyDays(1).atHour(6).create();
   wynikiFsDruzynowe();
+}
+
+// Jednorazowo: zaległe 7 dni (Flashscore trzyma wyniki tygodnia wstecz) — więcej meczów do Elo na start.
+function wynikiFsTydzien() {
+  wynikiFsDruzynowe([-1, -2, -3, -4, -5, -6, -7]);
 }
