@@ -42,3 +42,12 @@ def test_dopisz_typ_scala_kolumny_ze_starym_logiem(tmp_path):
     assert list(d.gosp) == ['A', 'C', 'E']
     assert d.kurs_typu.iloc[1] == 1.35 and d.pieniadze.iloc[1] == 1
     assert pd.isna(d.kurs_typu.iloc[0]) and pd.isna(d.kurs_typu.iloc[2])
+
+
+def test_archiwum_arkuszy(tmp_path, monkeypatch):
+    import tarfile, przebieg
+    (tmp_path / 'statystyki_druzyn.csv').write_text('a,b\n1,2\n')
+    monkeypatch.setattr(przebieg, 'HERE', str(tmp_path))
+    assert przebieg.archiwum_arkuszy() == 0
+    f = next(tmp_path.glob('arkusze_*.tar.gz'))
+    assert tarfile.open(f).getnames() == ['statystyki_druzyn.csv']

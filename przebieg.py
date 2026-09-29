@@ -2,6 +2,7 @@
 """Caly przebieg budowy bazy JEDNYM poleceniem, w jedynej poprawnej kolejnosci, z twarda kontrola danych.
   python3 przebieg.py            — kontrola plikow zewn/ → build_kb → uzupelnij_ligi → build_kb → hist_import → swiezosc
   python3 przebieg.py --kontrola — tylko kontrola plikow zewn/ (sekundy), bez budowy
+  python3 przebieg.py --archiwum-arkuszy — spakuj statystyki_*.csv do arkusze_RRRR-MM-DD.tar.gz (historia arkuszy)
   Pliki zwrocone przez Dysk W TRESCI (base64): zapisz tekst jako zewn/NAZWA.csv.gz.b64 — przebieg sam je zdekoduje.
 
 Ostatnia linia wyniku to WERDYKT:
@@ -186,7 +187,24 @@ def kontrola_kalibracji():
              f'python3 ensemble.py && python3 korekta_rynkow.py (wpisz do USTERKI)'))
 
 
+def archiwum_arkuszy():
+    """29.09.2026 (faza 4): arkusze statystyki_*.csv sa nadpisywane co godzine, wiec nie ma ich historii — a bez
+    niej nie da sie sprawdzic backtestem regul z sezon.py i tenisa (docs/BACKTEST_P48.md). Pakuje biezace arkusze
+    do arkusze_RRRR-MM-DD.tar.gz; pierwszy przebieg dnia zapisuje ten plik na Dysku (Poprawka 57.7)."""
+    import tarfile
+    pliki = sorted(glob.glob(os.path.join(HERE, 'statystyki_*.csv')))
+    if not pliki:
+        print('BRAK arkuszy statystyki_*.csv — nic do spakowania'); return 1
+    cel = os.path.join(HERE, f'arkusze_{DZIS}.tar.gz')
+    with tarfile.open(cel, 'w:gz') as t:
+        for f in pliki: t.add(f, arcname=os.path.basename(f))
+    print(f'spakowano {len(pliki)} arkuszy -> {os.path.basename(cel)} ({os.path.getsize(cel) // 1024} KB)')
+    return 0
+
+
 def main():
+    if '--archiwum-arkuszy' in sys.argv:
+        return archiwum_arkuszy()
     print(f'PRZEBIEG {teraz_pl():%Y-%m-%d %H:%M} (czas polski)\n1) Pliki zewn/:')
     bledy = kontrola_zewn()
     print('   Arkusze statystyk (drugie zrodlo):')
