@@ -88,7 +88,9 @@ var TERMINARZ_FS_SPORTY = {1: 'football', 2: 'tennis', 3: 'basketball', 4: 'hock
 var TERMINARZ_FS_HOSTY = ['https://global.flashscore.ninja/2/x/feed/', 'https://d.flashscore.com/x/feed/'];
 
 function terminarzFs() {
-  var ids = Object.keys(TERMINARZ_FS_SPORTY), wiersze = [], byly = {}, log = ['terminarzFs ' + new Date().toISOString()];
+  var ids = [];   // wszystkie 1..45: numery spoza mapy trafiają do pliku jako „fsNN” (log pokazuje ich rozgrywki)
+  for (var q = 1; q <= 45; q++) ids.push(String(q));
+  var wiersze = [], byly = {}, log = ['terminarzFs ' + new Date().toISOString()];
   [0, 1].forEach(function (dzien) {   // 0 = dziś, 1 = jutro (strefa 0 = UTC)
     var odp = null, host = '';
     for (var h = 0; h < TERMINARZ_FS_HOSTY.length && !odp; h++) {
@@ -102,7 +104,7 @@ function terminarzFs() {
     }
     if (!odp) return;
     odp.forEach(function (r, i) {
-      var sport = TERMINARZ_FS_SPORTY[ids[i]], n = 0, kraj = '', turniej = '';
+      var sport = TERMINARZ_FS_SPORTY[ids[i]] || ('fs' + ids[i]), n = 0, kraj = '', turniej = '', pierwsza = '';
       if (r.getResponseCode() !== 200) { log.push('dzien ' + dzien + ' ' + sport + ': HTTP ' + r.getResponseCode()); return; }
       r.getContentText().split('~').forEach(function (rek) {
         var f = {};
@@ -110,6 +112,7 @@ function terminarzFs() {
         if (f.ZA !== undefined) {   // nagłówek rozgrywek: „KRAJ: Liga”
           var c = f.ZA.indexOf(': ');
           kraj = c > 0 ? f.ZA.substr(0, c) : (f.ZY || ''); turniej = c > 0 ? f.ZA.substr(c + 2) : f.ZA;
+          if (!pierwsza) pierwsza = f.ZA;
         } else if (f.AA !== undefined && f.AD && !byly[f.AA]) {
           byly[f.AA] = 1;
           var t = new Date(Number(f.AD) * 1000), st = f.AB === '3' ? 4 : f.AB === '2' ? 3 : 2;
@@ -118,7 +121,9 @@ function terminarzFs() {
           n++;
         }
       });
-      log.push('dzien ' + dzien + ' ' + sport + ': ' + n + ' meczów');
+      var tekst = r.getContentText();
+      if (n || TERMINARZ_FS_SPORTY[ids[i]]) log.push('dzien ' + dzien + ' ' + sport + ' (id ' + ids[i] + '): ' + n + ' meczów' +
+        (pierwsza ? ' | np. ' + pierwsza : '') + (!n && tekst ? ' | odpowiedź: ' + tekst.substr(0, 80).replace(/[^ -~]/g, '?') : ''));
     });
   });
   var folder = DriveApp.getFolderById(TERMINARZ_FOLDER_ID);
