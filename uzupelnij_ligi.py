@@ -10,7 +10,7 @@ Wynik: ligi_extra.csv (format tabeli matches) — build_kb.py dokleja go jak del
 import os, re, sys, glob, json, subprocess, sqlite3, numpy as np, pandas as pd
 HERE = os.path.dirname(os.path.abspath(__file__)); RAW = os.path.join(HERE, 'raw'); WFR = os.path.join(RAW, 'wfr')
 sys.path.insert(0, HERE)
-from build_kb import norm, map_names
+from build_kb import norm
 
 REL = 'https://github.com/JaseZiv/worldfootballR_data/releases/download/match_results/{}_match_results.rds'
 # kod FBref -> {nazwa rozgrywek: Division w kb}
@@ -552,7 +552,7 @@ def main():
             for _h, _a, _d in zip(_df.HomeTeam, _df.AwayTeam, _df.MatchDate):
                 _d = pd.Timestamp(_d).normalize()
                 zajete.add((div, norm(_h), _d)); zajete.add((div, norm(_a), _d))
-        przydzial, rozszerzono, odrzucone_przyszlosc = [], False, 0
+        przydzial, odrzucone_przyszlosc = [], 0
         for i, r in enumerate(rest):
             kh, ka = norm(r.HomeTeam), norm(r.AwayTeam)
             wybrany = None
@@ -573,9 +573,6 @@ def main():
                 continue
             zajete.add((div, kh, wybrany)); zajete.add((div, ka, wybrany))
             przydzial.append((r, wybrany))
-        if rozszerzono:
-            print(f'  wiki {div} {s}: okno sezonu za krotkie dla {len(rest)} meczow — '
-                  f'rozszerzam do {dni[-1].date()}, zeby zaden klub nie gral 2x jednego dnia.')
         for r, d in przydzial:
             add.append(dict(Division=div, MatchDate=d, HomeTeam=r.HomeTeam, AwayTeam=r.AwayTeam, FTHome=r.FTHome,
                             FTAway=r.FTAway, src='wiki'))

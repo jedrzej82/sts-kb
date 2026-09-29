@@ -788,8 +788,8 @@ def club(home, away, kursy, live=None):
     if len(hh):
         print('\nH2H (ost. 8):', ' | '.join(f"{r.MatchDate.date()} {r.HomeTeam} {int(r.FTHome)}:{int(r.FTAway)} {r.AwayTeam}" for r in hh.itertuples()))
     _mm = m[(m.HomeTeam.isin([h, a]) | m.AwayTeam.isin([h, a])) & m.FTHome.notna() & m.FTAway.notna()].sort_values('MatchDate')
-    drugie_zrodlo([(r.MatchDate, r.HomeTeam, r.AwayTeam, int(r.FTHome), int(r.FTAway)) for r in _mm.itertuples()], h, a, rows)
-    value(rows, kursy)
+    dz = drugie_zrodlo([(r.MatchDate, r.HomeTeam, r.AwayTeam, int(r.FTHome), int(r.FTAway)) for r in _mm.itertuples()], h, a, rows)
+    value(rows, kursy, dz)
     if ostrz: print('\nOSTRZEŻENIA:', *ostrz, sep='\n - ')
     print('\nUwaga: model nie zna składów, kontuzji i motywacji z dnia meczu — sprawdź je osobno (korekta maks. ±6 pp).')
 
@@ -841,16 +841,41 @@ def drugie_zrodlo(w, h, a, rows, n=10):
     return wynik
 
 
-def value(rows, kursy):
+def ev_kelly(p, o):
+    """EV po podatku 12% i pelny Kelly (0, gdy kurs po podatku nie przekracza 1)."""
+    ev = p * o * TAX - 1
+    return ev, (max(0.0, ev / (o * TAX - 1)) if o * TAX > 1 else 0.0)
+
+
+def werdykt_nogi(k, dz):
+    """P do kuponu wg Poprawki 48 i powod, gdy noga odpada.
+    dz = wynik drugie_zrodlo(): {} (brak drugiego zrodla), {rynek: P | None}."""
+    if dz is None: return None, 'drugie zrodlo nie liczone'
+    if not dz: return None, 'BRAK DRUGIEGO ZRODLA'
+    if k not in dz: return None, 'rynek bez drugiego zrodla'
+    if dz[k] is None: return None, 'ROZBIEZNE zrodla'
+    return dz[k], None
+
+
+def value(rows, kursy, dz=None):
+    """29.09.2026: wczesniej EV liczone bylo z P modelu, a wynik drugie_zrodlo() byl wyrzucany — bramka
+    z Poprawki 48 istniala tylko jako tekst do przeczytania. Teraz: EV i Kelly do kuponu liczone z P po
+    bramce (mniejsze z dwoch), a noga bez zgodnego drugiego zrodla ma wprost werdykt NIE NA KUPON."""
     if not kursy: return
     d = {k: pc for k, p, pc in rows}
     print('\nWARTOŚĆ (kurs użyty dopiero po wyliczeniu P; podatek 12%):')
     for k, o in kursy.items():
         if k not in d: print(f'  {k}: brak rynku'); continue
-        p = d[k]; ev = p * o * TAX - 1
-        kelly = max(0.0, (p * o * TAX - 1) / (o * TAX - 1)) if o * TAX > 1 else 0
+        p = d[k]; ev, kelly = ev_kelly(p, o)
         print(f'  {k} @ {o}: P={p:.1%}, kurs sprawiedliwy={1 / p / TAX:.2f}, EV={ev:+.1%}, ¼ Kelly={kelly / 4:.1%} bankrollu'
               + ('  ✔ wartość' if ev > 0 else '  ✘ brak wartości'))
+        pk, powod = werdykt_nogi(k, dz)
+        if powod:
+            print(f'      → NIE NA KUPON: {powod} (Poprawka 48)')
+        else:
+            evk, kk = ev_kelly(pk, o)
+            print(f'      → P do kuponu {pk:.1%}: EV={evk:+.1%}, ¼ Kelly={kk / 4:.1%}'
+                  + ('  ✔ NOGA DOPUSZCZONA' if evk > 0 else '  ✘ NIE NA KUPON: EV ≤ 0 po bramce'))
 
 
 # ---------------- reprezentacje ----------------
@@ -929,9 +954,9 @@ def intl(home, away, neutral, kursy):
         print(f'\n{t} ost. 6:', ' | '.join(f'{r.date} {r.home_team} {int(r.home_score)}:{int(r.away_score)} {r.away_team} ({r.tournament})' for r in t10.itertuples()))
     hh = df[((df.home_team == h) & (df.away_team == a)) | ((df.home_team == a) & (df.away_team == h))].tail(6)
     if len(hh): print('\nH2H:', ' | '.join(f'{r.date} {r.home_team} {int(r.home_score)}:{int(r.away_score)} {r.away_team}' for r in hh.itertuples()))
-    drugie_zrodlo([(r.date, r.home_team, r.away_team, int(r.home_score), int(r.away_score)) for r in df.itertuples()
-                   if pd.notna(r.home_score) and pd.notna(r.away_score)], h, a, rows)
-    value(rows, kursy)
+    dz = drugie_zrodlo([(r.date, r.home_team, r.away_team, int(r.home_score), int(r.away_score)) for r in df.itertuples()
+                        if pd.notna(r.home_score) and pd.notna(r.away_score)], h, a, rows)
+    value(rows, kursy, dz)
 
 
 if __name__ == '__main__':

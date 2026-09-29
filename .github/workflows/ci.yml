@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  testy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pandas numpy scipy pyflakes pytest
+      - name: pyflakes (bledy, nie styl)
+        run: |
+          python -m pyflakes *.py | grep -E "undefined name|imported but unused|redefinition of unused" && exit 1 || true
+      - name: kompilacja
+        run: python -m py_compile *.py
+      - name: testy
+        run: python -m pytest -q tests

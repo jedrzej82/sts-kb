@@ -4,7 +4,7 @@ dopisywane dziennie do tenis_delta.csv (także Challenger/ITF — baza rośnie z
   python3 tenis.py "Zawodnik A" "Zawodnik B" [--hard|--clay|--grass] [--bo5]
   python3 tenis.py --backtest            — kalibracja na 2024–2025
   python3 tenis.py --wynik RRRR-MM-DD "Zwycięzca" "Przegrany" NAWIERZCHNIA POZIOM   — dopisanie wyniku (np. ITF, WTA)"""
-import os, sys, glob, subprocess, difflib, re, unicodedata, pickle, numpy as np, pandas as pd
+import os, sys, subprocess, difflib, re, unicodedata, pickle, numpy as np, pandas as pd
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 HIST = os.path.join(HERE, 'tenis_hist.csv')  # ATP+WTA 1968–dziś (hist_import.py)
