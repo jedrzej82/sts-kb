@@ -112,6 +112,17 @@ def kontrola_zewn():
                   else '  (UWAGA: stary — przy e-sporcie w ofercie pobierz z Dysku; nie blokuje przebiegu)'))
         except Exception as e:
             print(f'  UWAGA: zewn/{os.path.basename(f)} nieczytelny ({e}) — e-sport bez swiezych danych')
+    # 29.09.2026 (faza 3b): terminarz 365scores (Apps Script, co godzine) — opcjonalny; bez niego typuj.py
+    # po prostu nie robi kontroli kraju meczu z terminarza. Tylko informacja, nie blad.
+    f = os.path.join(ZD, 'terminarz_365.csv.gz')
+    if os.path.exists(f):
+        try:
+            d = pd.read_csv(f, usecols=['data'], dtype=str).data.max()
+            print(f'  zewn/terminarz_365.csv.gz: mecze do {d}')
+        except Exception as e:
+            print(f'  UWAGA: zewn/terminarz_365.csv.gz nieczytelny ({e}) — kontrola terminarza w typuj.py pominieta')
+    else:
+        print('  zewn/terminarz_365.csv.gz: brak (opcjonalny — pobierz z Dysku, jesli Apps Script go zapisuje)')
     arch = glob.glob(os.path.join(ZD, 'wyniki_365_pilka_archiwum_*.csv.gz'))
     if not arch:
         bledy.append('brak zewn/wyniki_365_pilka_archiwum_*.csv.gz (sezon 2025/26) — pobierz z Dysku; '

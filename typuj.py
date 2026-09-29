@@ -349,6 +349,11 @@ _KRAJ_KANON = {'turk': 'turkey', 'turkiye': 'turkey', 'turkey': 'turkey', 'saudi
                'usa': 'usa', 'unitedstates': 'usa', 'unitedstatesofamerica': 'usa'}
 
 
+# nazwy "krajow" 365scores, ktore nie sa krajem (rozgrywki miedzynarodowe) — tu terminarz nie rozstrzyga
+_KRAJE_OGOLNE = frozenset({'world', 'international', 'intl', 'europe', 'asia', 'africa', 'oceania', 'southamerica',
+                           'northcentralamerica', 'northandcentralamerica', 'concacaf', 'intercontinental', 'americas'})
+
+
 def _ten_sam_kraj(a, b):
     return _KRAJ_KANON.get(a, a) == _KRAJ_KANON.get(b, b)
 
@@ -628,6 +633,25 @@ def club(home, away, kursy, live=None):
                  f'W meczu ligi krajowej obie druzyny sa z jednego kraju — jedna z nazw zostala '
                  f'dopasowana do INNEGO klubu. Analiza przerwana, noga MNIEJ. '
                  f'Puchary kontynentalne (Libertadores, Liga Mistrzow...) i sparingi: dodaj --kontynentalny.')
+    # 29.09.2026 (faza 3b, TERMINARZ): mecz z oferty szukany w terminarzu 365scores po OBU druzynach naraz
+    # (zewn/terminarz_365.csv.gz, Apps Script). Terminarz podaje kraj rozgrywek — klub dopasowany do ligi
+    # z innego kraju to pomylony klub. Brak pliku / meczu / kraj ogolny (World, Europe…) = bez kontroli.
+    if '--kontynentalny' not in sys.argv:
+        try:
+            import terminarz as _tm
+            mt = _tm.znajdz(home, away)
+        except Exception as e:
+            mt = None
+            print(f'  UWAGA: kontrola terminarza pominieta ({type(e).__name__}: {e})')
+        if mt:
+            kt = norm(mt['kraj'])
+            print(f'  TERMINARZ: {mt["gosp"]} – {mt["gosc"]} | {mt["kraj"]} | {mt["turniej"]}')
+            if kt and kt not in _KRAJE_OGOLNE:
+                zle = [(n, t, k) for n, t, k in ((home, h, kh), (away, a, ka)) if k and not _ten_sam_kraj(k, kt)]
+                if zle:
+                    sys.exit('NIEZGODNE Z TERMINARZEM: ' + '; '.join(f'"{n}" -> {t} (liga z kraju {k})' for n, t, k in zle)
+                             + f', a mecz w terminarzu 365scores jest w kraju {mt["kraj"]} ({mt["turniej"]}). '
+                             f'Nazwa trafila w INNY klub. Analiza przerwana, noga MNIEJ.')
     # 29.09.2026 (faza 3, dopasowanie LACZNE): gdy nazwa zgubila czlon rozrozniajacy (przypadek (c)
     # w _skrot_albo_nic: "Independiente Yumbo" -> "Independiente"), sam napis nie rozstrzyga — para z oferty
     # tak: dwa kluby jednego meczu ligowego graja w jednej lidze. Kontrola kraju (wyzej) nie lapie dwoch lig
