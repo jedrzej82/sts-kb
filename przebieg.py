@@ -169,6 +169,17 @@ def kontrola_zewn():
             print(f'  UWAGA: zewn/{os.path.basename(f)} nieczytelny ({e}) — tenis stolowy Ligi Pro bez danych')
     else:
         print(f'  zewn/{os.path.basename(f)}: brak (opcjonalny — Liga Pro, Apps Script „ligapro”)')
+    # 29.09.2026: koszykowka / reczna / siatkowka z Flashscore (Apps Script wynikiFsDruzynowe) — opcjonalne
+    f = os.path.join(ZD, f'wyniki_fsx_inne_{DZIS.strftime("%Y-%m")}.csv.gz')
+    if os.path.exists(f):
+        try:
+            t = pd.read_csv(f, usecols=['data', 'sport'], dtype=str)
+            print(f'  zewn/{os.path.basename(f)}: {len(t)} meczow (' + ', '.join(f'{k} {v}' for k, v in t.sport.value_counts().items())
+                  + f'), ostatni {t.data.max()}')
+        except Exception as e:
+            print(f'  UWAGA: zewn/{os.path.basename(f)} nieczytelny ({e}) — koszykowka/reczna/siatkowka tylko z 365')
+    else:
+        print(f'  zewn/{os.path.basename(f)}: brak (opcjonalny — Flashscore koszykowka/reczna/siatkowka, Apps Script „wynikiFsDruzynowe”)')
     # od 29.09 takze terminarz_fs.csv.gz (Flashscore) — wiecej sportow i nizszych lig niz 365scores
     for nazwa in ('terminarz_fs.csv.gz', 'terminarz_365.csv.gz'):
         f = os.path.join(ZD, nazwa)

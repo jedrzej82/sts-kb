@@ -18,7 +18,7 @@
 var GH_OWNER = 'jedrzej82';
 var GH_REPO  = 'sts-kb';
 var GH_DIR   = 'zewn';
-var GH_RODZINY = ['wyniki_365_pilka_', 'wyniki_365_inne_', 'wyniki_fs_inne_', 'wyniki_lol_inne_'];
+var GH_RODZINY = ['wyniki_365_pilka_', 'wyniki_365_inne_', 'wyniki_fs_inne_', 'wyniki_fsx_inne_', 'wyniki_lol_inne_'];
 
 function ustawPushGitHub() {
   ScriptApp.getProjectTriggers().forEach(function (t) {
