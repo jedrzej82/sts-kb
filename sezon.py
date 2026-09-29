@@ -22,7 +22,7 @@ Zasady łączenia (heurystyka startowa — do kalibracji na rozliczeniach):
   ROZBIEŻNOŚĆ, gdy |P_model − P_sezon| > 10 pp — typ nie idzie do K1/K2 (reguła użytkownika).
 Wszystkie wyniki są orientacyjne; nie używają kursów.
 """
-import csv, math, os, sys, unicodedata, difflib
+import csv, math, os, sys, unicodedata
 
 KATALOG = os.path.dirname(os.path.abspath(__file__))
 PLIKI = {
@@ -43,11 +43,22 @@ def f(x, d=None):
         return d
 
 
+# 29.09.2026: norm() usuwal formy prawne przez replace() na PODCIAGACH, wiec ucinal poczatek kazdego
+# slowa zaczynajacego sie od sc/ac/cf/cp/sad: "FC Schalke 04" -> "halke 04", "Hearts Scotland" ->
+# "hearts otland", "Sporting Achaia" -> "sporting haia". Do tego ł/ø/ß byly kasowane ("Slask Wroclaw"
+# z polskimi znakami -> "slask wrocaw"). Teraz formy prawne odpadaja tylko jako CALE czlony, a litery
+# nierozkladalne przez NFKD dostaja te sama tabele co typuj.py i sporty.py.
+_LITERY = str.maketrans({'ł': 'l', 'Ł': 'L', 'đ': 'd', 'Đ': 'D', 'ø': 'o', 'Ø': 'O', 'ß': 'ss',
+                         'æ': 'ae', 'Æ': 'AE', 'œ': 'oe', 'Œ': 'OE', 'þ': 'th', 'Þ': 'TH',
+                         'ð': 'd', 'Ð': 'D', 'ı': 'i', 'ŋ': 'n', 'ħ': 'h', 'ŧ': 't'})
+_FORMY_NORM = frozenset(('fc', 'cf', 'sc', 'ac', 'afc', 'cp', 'sad'))
+
+
 def norm(s):
-    s = unicodedata.normalize('NFKD', str(s)).encode('ascii', 'ignore').decode().lower()
-    for zb in (' fc', 'fc ', ' cf', ' sc', ' ac', ' afc', ' cp', ' sad', '.', '-', "'"):
-        s = s.replace(zb, ' ')
-    return ' '.join(s.split())
+    s = unicodedata.normalize('NFKD', str(s).translate(_LITERY)).encode('ascii', 'ignore').decode().lower()
+    for zn in ('.', '-', "'"):
+        s = s.replace(zn, ' ')
+    return ' '.join(t for t in s.split() if t not in _FORMY_NORM)
 
 
 def wczytaj(sport, plik=None):
@@ -130,10 +141,14 @@ def _alias(nazwa):
     k_ = ''.join(ch for ch in norm(nazwa) if ch.isalnum())
     try:
         import sporty
-        v = _ALIASY_PILKA.get(k_) or getattr(sporty, '_ALIASY_RECZNE', {}).get(k_)
-        return [v] if v else []
-    except Exception:
-        return []
+        reczne = getattr(sporty, '_ALIASY_RECZNE', {})
+    except Exception as e:
+        # 29.09.2026: wczesniej blad importu po cichu wylaczal WSZYSTKIE aliasy z sporty.py.
+        print(f'  OSTRZEZENIE: aliasy z sporty.py niedostepne ({type(e).__name__}: {e}) — tylko _ALIASY_PILKA.',
+              file=sys.stderr)
+        reczne = {}
+    v = _ALIASY_PILKA.get(k_) or reczne.get(k_)
+    return [v] if v else []
 
 
 def znajdz(wiersze, nazwa, liga=None, sport=None):

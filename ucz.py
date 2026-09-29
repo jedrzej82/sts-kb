@@ -5,7 +5,7 @@
   python3 ucz.py rozlicz                                              -> rozlicza typy wynikami z bazy, liczy własną trafność
 Po rozliczeniu powstaje korekta_wlasna.csv: dla każdego rynku i przedziału P miesza kalibrację z backtestu
 z NASZĄ rzeczywistą trafnością (waga n/(n+100)), więc model poprawia się z każdym rozliczonym typem."""
-import os, sys, sqlite3, datetime as dt, numpy as np, pandas as pd
+import os, sys, sqlite3, pandas as pd
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 LOG, DELTA, KOR = (os.path.join(HERE, f) for f in ('typy_log.csv', 'delta.csv', 'korekta_wlasna.csv'))

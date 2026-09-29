@@ -11,6 +11,10 @@ elo = pd.read_sql('select club, elo, date from clubelo', con).sort_values('date'
 today = pd.Timestamp(dt.date.today())
 act = m[m.MatchDate >= today - pd.Timedelta(days=300)]
 rows, lrows = [], []
+# ostatnia liga kazdej druzyny — liczona raz (wczesniej w petli przez sztuczke z dir())
+last_div = pd.concat([m[['MatchDate', 'HomeTeam', 'Division']].rename(columns={'HomeTeam': 't'}),
+                      m[['MatchDate', 'AwayTeam', 'Division']].rename(columns={'AwayTeam': 't'})]
+                     ).sort_values('MatchDate').groupby('t').Division.last()
 for div, g in act.groupby('Division'):
     mdl = fit_dc(m[m.Division == div], today)
     lg = m[(m.Division == div) & (m.MatchDate >= today - pd.Timedelta(days=730))]
@@ -19,7 +23,6 @@ for div, g in act.groupby('Division'):
                       remis=round((lg.FTHome == lg.FTAway).mean(), 3), O15=round((t > 1.5).mean(), 3), O25=round((t > 2.5).mean(), 3),
                       U35=round((t < 3.5).mean(), 3), BTTS=round(((lg.FTHome > 0) & (lg.FTAway > 0)).mean(), 3),
                       dc_home=round(float(mdl['home']), 3) if mdl else None, dc_rho=round(float(mdl['rho']), 3) if mdl else None))
-    last_div = pd.concat([m[['MatchDate','HomeTeam','Division']].rename(columns={'HomeTeam':'t'}), m[['MatchDate','AwayTeam','Division']].rename(columns={'AwayTeam':'t'})]).sort_values('MatchDate').groupby('t').Division.last() if 'last_div' not in dir() else last_div
     for team in sorted(set(g.HomeTeam) | set(g.AwayTeam)):
         if last_div.get(team) != div: continue
         tm = m[(m.HomeTeam == team) | (m.AwayTeam == team)].sort_values('MatchDate').tail(20)

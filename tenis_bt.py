@@ -1,4 +1,4 @@
-import re, numpy as np, pandas as pd, itertools, sys
+import re, numpy as np, pandas as pd, itertools
 from tenis import load
 d = load()
 def games(s):
