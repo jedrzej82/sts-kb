@@ -131,3 +131,28 @@ def test_samo_nazwisko_kilku_osob_nie_zgadujemy():
     assert sporty.resolve('Price', pula) is None and sporty.resolve('Higgins', pula) is None
     assert sporty.resolve('Price G.', pula) == 'Gerwyn Price' and sporty.resolve('Higgins J.', pula) == 'John Higgins'
     assert sporty.resolve('Littler', pula) == 'Luke Littler'                  # jeden kandydat -> dalej dziala
+
+
+def test_nazwa_sportu_skroty():
+    """29.09.2026 (Raport 15:00): „typuj reczna …” -> BRAK W BAZIE dla calej pilki recznej."""
+    assert sporty.nazwa_sportu('reczna') == 'piłka ręczna' and sporty.nazwa_sportu('handball') == 'piłka ręczna'
+    assert sporty.nazwa_sportu('stolowy') == 'tenis stołowy' and sporty.nazwa_sportu('darts') == 'dart'
+    assert sporty.nazwa_sportu('xyz') == 'xyz'
+
+
+def test_aliasy_raport_1500():
+    pula = {'Salon Vilpas', 'KTP-Basket', 'Joensuun Kataja', 'Kladno', 'Ilves', 'Jukurit', 'HC CSOB Pardubice'}
+    assert sporty.resolve('Salon Vilpas Vikings', pula) == 'Salon Vilpas'
+    assert sporty.resolve('Kataja Basket Joensuu', pula) == 'Joensuun Kataja'
+    assert sporty.resolve('Rytiri Kladno', pula) == 'Kladno' and sporty.resolve('Mikkelin Jukurit', pula) == 'Jukurit'
+    assert sporty.resolve('Dynamo Pardubice', pula) == 'HC CSOB Pardubice'
+
+
+def test_biezacy_sezon_kolejki():
+    rows = [('2026-09-%02d' % (1 + r), 'hokej', 'Finland | Liiga', f'T{2 * i}', f'T{2 * i + 1}', 3, 2, 0) for r in range(4) for i in range(5)]
+    rows += [('2026-09-20', 'hokej', 'Canada | OHL', f'O{i}', f'P{i}', 1, 0, 0) for i in range(21)]
+    rows += [('2026-04-01', 'hokej', 'Finland | Liiga', 'T0', 'T1', 1, 0, 0)]          # poprzedni sezon — nie liczy sie
+    d = pd.DataFrame(rows, columns=['data', 'sport', 'liga', 'gosp', 'gosc', 'pg', 'pa', 'dogrywka'])
+    b = sporty.biezacy_sezon(d, min_meczow=20)
+    assert b.loc[('hokej', 'Finland | Liiga'), 'kolejki'] == 4 and b.loc[('hokej', 'Finland | Liiga'), 'szacunek'] == 'nie'
+    assert b.loc[('hokej', 'Canada | OHL'), 'szacunek'].startswith('TAK')
