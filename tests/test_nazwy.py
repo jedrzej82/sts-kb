@@ -141,3 +141,11 @@ def test_druzyna_kobiet_rozny_zapis_znacznika():
     assert typuj.resolve('Barcelona [K]', pula) == 'Barcelona W'
     assert typuj.resolve('Barcelona B [K]', pula) == 'Barcelona B W'
     assert typuj.resolve('Bay FC', pula) == 'Bay FC'
+
+
+def test_typuj_kilka_klubow_nie_zgadujemy():
+    """29.09.2026: „Dinamo” -> „Dinamo Samarkand”, „Mexico” -> „New Mexico” — zgadywanie po dlugosci nazwy."""
+    import typuj
+    pula = {'Dinamo Samarkand', 'Dinamo Tbilisi', 'Dinamo Zagreb', 'Chievo Verona', 'Verona'}
+    assert typuj.resolve('Dinamo', pula) is None
+    assert typuj.resolve('Chievo', pula) == 'Chievo Verona'      # jednoznaczny kandydat dalej dziala
