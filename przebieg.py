@@ -115,7 +115,7 @@ def kontrola_zewn():
             print(f'  UWAGA: zewn/{os.path.basename(f)} nieczytelny ({e}) — e-sport bez swiezych danych')
     # 29.09.2026 (faza 3b): terminarz 365scores (Apps Script, co godzine) — opcjonalny; bez niego typuj.py
     # po prostu nie robi kontroli kraju meczu z terminarza. Tylko informacja, nie blad.
-    # od 29.09 takze terminarz_fs.csv.gz (Flashscore) — 365scores od ok. 20.09 zwraca ~1/4 meczow pilki
+    # od 29.09 takze terminarz_fs.csv.gz (Flashscore) — wiecej sportow i nizszych lig niz 365scores
     for nazwa in ('terminarz_fs.csv.gz', 'terminarz_365.csv.gz'):
         f = os.path.join(ZD, nazwa)
         if os.path.exists(f):

@@ -71,3 +71,9 @@ def test_kraje_flashscore():
     znane = typuj._kraje_znane()
     assert typuj._kanon_kraju(n('PARAGUAY')) in znane and typuj._kanon_kraju(n('ITF MEN - SINGLES')) not in znane
     assert n('AUSTRALIA & OCEANIA') in typuj._KRAJE_OGOLNE
+
+
+def test_znacznik_rezerw_w_roznym_zapisie():
+    # Flashscore pisze rezerwy jako "Platense 2", STS jako "Platense II" — znacznik nie jest czlonem nazwy
+    assert terminarz.pasuje('Platense II', 'Platense 2') and terminarz.pasuje('Hacken (K)', 'Hacken W')
+    assert not terminarz.pasuje('Platense', 'Platense 2')

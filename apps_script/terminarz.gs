@@ -8,7 +8,7 @@
  *  2. U góry wybierz funkcję „terminarzUstaw” → „Uruchom” → zezwól na dostęp. Tworzy osobny wyzwalacz co godzinę
  *     i od razu zapisuje pierwszy plik. Wszystkie nazwy mają przedrostek „terminarz”, żeby nie kolidować z resztą kodu.
  *  Wyłączenie: uruchom „terminarzUsun”.
- *  FLASHSCORE (od 29.09): 365scores od ok. 20.09 zwraca ~1/4 meczów piłki, więc terminarzPracuj zapisuje też
+ *  FLASHSCORE (od 29.09): 365scores nie ma futsalu, darta, snookera, tenisa stołowego i wielu niższych lig, więc terminarzPracuj zapisuje też
  *  terminarz_fs.csv.gz z Flashscore (te same kolumny) i terminarz_fs_log.txt (liczba meczów per sport, kody HTTP).
  *  typuj.py szuka najpierw we Flashscore, potem w 365scores.
  *  Diagnoza pokrycia: uruchom „terminarzDiagnoza” — zapisuje terminarz_diagnoza.txt (liczby meczów przy różnych

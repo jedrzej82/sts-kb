@@ -30,7 +30,7 @@ def _czlony(s):
     t = re.findall(r'[a-z0-9]+', unicodedata.normalize('NFKD', str(s).translate(LITERY)).encode('ascii', 'ignore').decode().lower())
     out = set()
     for x in t:
-        if x in _FORMY: continue
+        if x in _FORMY or znaczniki(x): continue   # znaczniki (II/2/B, W/K, U20) porownuje pasuje() osobno
         out.add(x)
         out.update(_MIASTA_PL.get(x, ()))   # "monachium" pasuje tez do "munich"
     return out
@@ -55,7 +55,7 @@ def _czytaj(plik):
 
 
 def wczytaj(plik=None):
-    """Oba terminarze (kolumna zrodlo: fs, 365) albo None. 365scores od ok. 20.09 zwraca ~1/4 meczow pilki."""
+    """Oba terminarze (kolumna zrodlo: fs, 365) albo None. Flashscore ma wiecej sportow i nizszych lig."""
     if plik: return _czytaj(plik)
     czesci = [t.assign(zrodlo=z) for z, p in (('fs', PLIK_FS), ('365', PLIK)) for t in [_czytaj(p)] if t is not None]
     return pd.concat(czesci, ignore_index=True) if czesci else None
