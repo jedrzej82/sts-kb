@@ -78,3 +78,18 @@ def test_k5_omija_polski_klub_gdy_jest_inna_kombinacja(capsys):
     kupon.main([f, '--depozyt', '100'])
     k5 = capsys.readouterr().out.split('K5:')[1]
     assert 'Legia' not in k5 and 'PAPIEROWY' not in k5
+
+
+# 29.09.2026 — przeglad kupon.py: budzet 300 zl i K5 8 zl dziennie liczone lacznie
+def test_budzet_300_z_kuponami_tego_przebiegu(tmp_path, capsys):
+    rows = [dict(mecz=f'M{i}', rynek='1', p=p, kurs=k) for i, (p, k) in enumerate([(0.9, 1.3), (0.9, 1.3), (0.88, 1.4), (0.87, 1.45), (0.62, 2.0), (0.6, 2.1)])]
+    f = tmp_path / 'nogi.csv'; _d(rows).to_csv(f, index=False)
+    kupon.main([str(f), '--depozyt', '200', '--wydane-lacznie', '296'])
+    stawki = [int(x.split('stawka ')[1].split(' zl')[0]) for x in capsys.readouterr().out.splitlines() if 'DO GRY' in x]
+    assert sum(stawki) <= 4
+
+
+def test_k5_limit_8_zl_z_wczesniejszymi():
+    o = dict(ev=0.1, polski=0, szacunki=0, marza_max=1.05, poziom='A', p=0.55, kurs=2.25)
+    assert kupon.za_pieniadze(o, 'K5', _a(depozyt=2000.0, k5_dzis=5), 5, 1) == (3, None)
+    assert kupon.za_pieniadze(o, 'K5', _a(depozyt=2000.0, k5_dzis=8), 5, 1)[0] == 0

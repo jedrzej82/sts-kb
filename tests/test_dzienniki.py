@@ -123,3 +123,47 @@ def test_tenis_para_rozstrzyga_kandydatow():
     st, wyn, uw = dzienniki.rozlicz_noge(dict(sport='tenis', zdarzenie='Hurkacz - Shapovalov', rynek='Zwyciezca Hurkacz', data=D), W)
     assert st == 'TRAFIONY' and wyn.startswith('Hubert Hurkacz') and 'jedyna pasujaca para' in uw
     assert dzienniki._kandydaci_tenis('Linette M.', set(t.w) | set(t.l)) == set()
+
+
+# 29.09.2026 — przeglad dzienniki.py (bledy potwierdzone przykladem)
+def _W_inne(rows):
+    return dict(pilka=pd.DataFrame(columns=['d', 'h', 'a', 'g', 'ga', 'hg', 'ha']), tenis=pd.DataFrame(columns=['d', 'w', 'l', 'score']),
+                inne=pd.DataFrame(rows, columns=['d', 'sport', 'h', 'a', 'pg', 'pa', 'ot']))
+
+
+def test_remis_to_nie_wygrana_goscia():
+    T = pd.Timestamp
+    w = _W_inne([(T('2026-09-28'), 'futsal', 'Alpha Team', 'Beta Club', 3, 3, 0)])
+    for ry in ('1', '2'):
+        assert dzienniki.rozlicz_noge(dict(sport='futsal', zdarzenie='Alpha Team - Beta Club', rynek=ry, data='2026-09-28'), w)[0] == 'PRZEGRANY'
+    w = _W_inne([(T('2026-09-28'), 'hokej na trawie', 'Alpha Team', 'Beta Club', 2, 2, 0)])   # sport bez DRAW_PRIOR
+    assert dzienniki.rozlicz_noge(dict(sport='hokej na trawie', zdarzenie='Alpha Team - Beta Club', rynek='2', data='2026-09-28'), w)[0] == 'BRAK WYNIKU'
+
+
+def test_ta_sama_para_dwa_dni_z_rzedu():
+    T = pd.Timestamp
+    w = _W_inne([(T('2026-09-28'), 'baseball', 'New York Yankees', 'Boston Red Sox', 5, 2, 0),
+                 (T('2026-09-29'), 'baseball', 'New York Yankees', 'Boston Red Sox', 1, 4, 0)])
+    z = dict(sport='baseball', zdarzenie='New York Yankees - Boston Red Sox', rynek='1')
+    assert dzienniki.rozlicz_noge(dict(z, data='2026-09-28'), w)[:2] == ('TRAFIONY', '5:2')
+    assert dzienniki.rozlicz_noge(dict(z, data='2026-09-29'), w)[:2] == ('PRZEGRANY', '1:4')
+    w2 = _W_inne([(T('2026-09-27'), 'baseball', 'New York Yankees', 'Boston Red Sox', 5, 2, 0),
+                  (T('2026-09-29'), 'baseball', 'New York Yankees', 'Boston Red Sox', 1, 4, 0)])
+    assert dzienniki.rozlicz_noge(dict(z, data='2026-09-28'), w2)[0] == 'BRAK WYNIKU'    # 27 i 29 w oknie — nie zgadujemy
+
+
+def _ako_pilka(kurs_razem, uw, status='ZAGRANY'):
+    base = dict(data='2026-09-28', godzina_uruchomienia='12:00', tag='K1', nr_kuponu='1', sport='pilka', P='80', status=status, kurs_zamkniecia='')
+    return pd.DataFrame([dict(base, noga_nr='1', zdarzenie='Legia Warszawa - Lech Poznan', rynek='1', kurs='1.60', uwaga=''),
+                         dict(base, noga_nr='RAZEM', zdarzenie='', rynek='', kurs=kurs_razem, uwaga=uw)])
+
+
+def test_kurs_i_stawka_kuponu():
+    T = pd.Timestamp
+    W = dict(pilka=pd.DataFrame([(T('2026-09-28'), 'Legia Warszawa', 'Lech Poznan', 2, 0, None, None)], columns=['d', 'h', 'a', 'g', 'ga', 'hg', 'ha']),
+             tenis=pd.DataFrame(columns=['d', 'w', 'l', 'score']), inne=pd.DataFrame(columns=['d', 'sport', 'h', 'a', 'pg', 'pa', 'ot']))
+    for k, u in (('1.60', 'stawka 5 zl'), ('', 'stawka 5 zl'), ('1.60', 'stawka: 5 zł')):
+        _, b = dzienniki.rozlicz_dzien('2026-09-28', _ako_pilka(k, u), W)
+        assert (b['postawione'], b['wyplacone'], b['pien'], b['pap_liczba']) == (5.0, 7.04, 1, 0)
+    r, b = dzienniki.rozlicz_dzien('2026-09-28', _ako_pilka('1.60', 'bez kwoty'), W)
+    assert b['postawione'] == 0 and b['pap_liczba'] == 0 and 'bez stawki' in r.iloc[1].TRAFIONY_PRZEGRANY
