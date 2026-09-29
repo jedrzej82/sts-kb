@@ -545,17 +545,26 @@ def _fsx_bez_dubli(s, fsx=None):
     baza = s[~jest & s.sport.isin(FSX_SPORTY)]
     dni = {}
     for r in baza.itertuples():
-        dni.setdefault((r.sport, str(r.data)[:10]), []).append((r.gosp, r.gosc))
+        dni.setdefault((r.sport, str(r.data)[:10]), []).append((r.gosp, r.gosc, str(r.wg), str(r.wa)))
     dubel = pd.Series(False, index=s.index)
+    pary = {}   # (sport, nazwa FS) -> {nazwa 365} z potwierdzonych dubli
     for i, r in s[jest].iterrows():
-        for g, a in dni.get((r.sport, str(r.data)[:10]), ()):
-            if (pasuje(r.gosp, g) and pasuje(r.gosc, a)) or (pasuje(r.gosp, a) and pasuje(r.gosc, g)):
-                dubel[i] = True; break
+        for g, a, wg, wa in dni.get((r.sport, str(r.data)[:10]), ()):
+            proste = (pasuje(r.gosp, g), pasuje(r.gosc, a)); odwr = (pasuje(r.gosp, a), pasuje(r.gosc, g))
+            # druzyna gra najwyzej raz dziennie: ten sam dzien + ten sam wynik + jedna pasujaca druzyna = ten sam mecz
+            # (29.09: „Hamburg”/„HSV Handball”, „Kobe”/„Nishinomiya”, „Ulm”/„Ratiopharm Ulm” — 33 takie przypadki)
+            if all(proste) or (any(proste) and (str(r.wg), str(r.wa)) == (wg, wa)):
+                dubel[i] = True; pary.setdefault((r.sport, r.gosp), set()).add(g); pary.setdefault((r.sport, r.gosc), set()).add(a); break
+            if all(odwr) or (any(odwr) and (str(r.wg), str(r.wa)) == (wa, wg)):
+                dubel[i] = True; pary.setdefault((r.sport, r.gosp), set()).add(a); pary.setdefault((r.sport, r.gosc), set()).add(g); break
     zostaje = jest & ~dubel
     nazwy = {sp: sorted(set(g.gosp) | set(g.gosc)) for sp, g in baza.groupby('sport')}
     mapa, zle = {}, 0
     for sp, t in set(zip(s.sport[zostaje], s.gosp[zostaje])) | set(zip(s.sport[zostaje], s.gosc[zostaje])):
         if t in nazwy.get(sp, ()): continue
+        z_dubli = pary.get((sp, t), set())
+        if len(z_dubli) == 1: mapa[(sp, t)] = next(iter(z_dubli)); continue   # ten sam klub potwierdzony meczem
+        if len(z_dubli) > 1: zle += 1; continue
         kand = [n for n in nazwy.get(sp, ()) if pasuje(t, n)]
         if len(kand) == 1: mapa[(sp, t)] = kand[0]
         elif len(kand) > 1: zle += 1
@@ -581,7 +590,7 @@ def inne():
     rows = []
     s = s.assign(sport=s.sport.map(lambda x: ALIAS_SPORT.get(x, x)))
     kt = s.kraj + ' ' + s.turniej
-    s = s[~kt.str.contains(r'friendl|\bu-?1\d\b|\bu-?2[0-3]\b|youth|junior|juvenil|\bu\d\d\b', case=False)]
+    s = s[~kt.str.contains(r'friendl|\bu-?1\d\b|\bu-?2[0-3]\b|youth|junior|juvenil|\bu\d\d\b|3x3', case=False)]   # 3x3 to inna dyscyplina
     kob = (s.kraj + ' ' + s.turniej).str.contains(r'women|\(w\)|female|femen|feminin|damen|frauen|ladies|wnba|wta', case=False)
     dop = lambda n: n if re.search(r'(?:\(W\)|\(K\)|\bW|\bWomen)$', str(n).strip()) else f'{n} (W)'
     s = s.assign(gosp=np.where(kob, s.gosp.map(dop), s.gosp), gosc=np.where(kob, s.gosc.map(dop), s.gosc))
