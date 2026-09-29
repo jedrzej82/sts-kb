@@ -50,3 +50,10 @@ def test_gracz_w_odwrotnej_kolejnosci(oferta, oczekiwane):
     # Liga Pro (29.09.2026): scores24 "Imie Nazwisko" albo "Nazwisko Imie", STS "Nazwisko Imie" / "Nazwisko I."
     pula = ['Jakub Stolfa', 'Trefny Jan', 'Jan Novak', 'Jiri Novak', 'Lukas Jindrak']
     assert sporty.resolve(oferta, pula) == oczekiwane
+
+
+def test_liga_pro_zawsze_nie_na_kupon():
+    # Poprawka 60: backtest 29.09 — Elo w Lidze Pro bez przewagi
+    p, powody = sporty.werdykt_meczu(True, 0.75, 30, {'CZECH REPUBLIC | Liga Pro'})
+    assert p is None and any('Liga Pro' in x for x in powody)
+    assert sporty.werdykt_meczu(True, 0.75, 30, {'POLAND | Superliga'}) == (0.75, [])

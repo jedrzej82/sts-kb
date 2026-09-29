@@ -725,10 +725,17 @@ def drugie_zrodlo(d, sport, h, g, p_h):
     return pm
 
 
-def werdykt_meczu(skala_ok, p_dz, n):
+# 29.09.2026 (Poprawka 60): ligi, w ktorych backtest nie znalazl przewagi modelu — WERDYKT zawsze NIE NA KUPON.
+# Liga Pro (CZ), walk-forward Elo na 4912 meczach 04-29.09 (2156 ocenionych, obaj gracze >= 15 meczow):
+# Brier 0,257 przy 0,250 dla rzutu moneta; faworyci P 70-80% wygrali 38% (n=65), P 60-70% — 54% (n=556).
+LIGI_BEZ_PRZEWAGI = {'Liga Pro': 'Liga Pro — backtest 29.09: model bez przewagi (Brier 0,257 > 0,25)'}
+
+
+def werdykt_meczu(skala_ok, p_dz, n, ligi=()):
     """29.09.2026: jedna linia WERDYKT zamiast bramek rozrzuconych po wyjsciu (wspolna skala, drugie
-    zrodlo z Poprawek 48/51, dane rywala z Poprawki 15). Zwraca (P do kuponu | None, lista powodow)."""
-    powody = []
+    zrodlo z Poprawek 48/51, dane rywala z Poprawki 15). Zwraca (P do kuponu | None, lista powodow).
+    ligi — ligi obu druzyn/graczy (Poprawka 60: LIGI_BEZ_PRZEWAGI)."""
+    powody = [p for k, p in LIGI_BEZ_PRZEWAGI.items() if any(k in str(l) for l in ligi)]
     if not skala_ok: powody.append('rozne ligi bez wspolnej skali')
     if p_dz is None: powody.append('brak zgodnego drugiego zrodla')
     if n < 5: powody.append(f'brak danych rywala ({n} mecz(e))')
@@ -871,7 +878,7 @@ def main(a):
             print(f'  Wysokie EV na SLABSZEJ druzynie jest tu artefaktem, nie przewaga — nie graj go.')
             print(f'  P faworyta traktuj jako DOLNA granice. Mecze wyrownane sa wiarygodniejsze.')
         fav = h if ec >= 0.5 else g
-        p_k, powody = werdykt_meczu(ok_, p_dz, n)
+        p_k, powody = werdykt_meczu(ok_, p_dz, n, _ligi_druzyny(d[d.sport == sport], h, 1) | _ligi_druzyny(d[d.sport == sport], g, 1))
         if powody:
             print(f'\nWERDYKT: NIE NA KUPON — {"; ".join(powody)}')
         else:
