@@ -92,3 +92,42 @@ function ligaproDiagnoza3() {
   while (stare.hasNext()) stare.next().setTrashed(true);
   folder.createFile('ligapro_diagnoza.txt', out.join('\n'), 'text/plain');
 }
+
+/** Diagnoza 4: bieżąca liga (czech-liga-pro-1) — mecze z __REACT_QUERY_STATE__ i adres API rapi z kodu strony. */
+function ligaproDiagnoza4() {
+  var h = {'User-Agent': TERMINARZ_UA['User-Agent'], 'Accept': 'text/html,*/*', 'Accept-Language': 'en-US,en;q=0.9'};
+  var out = ['ligaproDiagnoza4 ' + new Date().toISOString()];
+  ['czech-liga-pro-1', 'czech-liga-pro'].forEach(function (slug) {
+    var r = UrlFetchApp.fetch('https://scores24.live/en/table-tennis/l-' + slug, {muteHttpExceptions: true, headers: h});
+    var t = r.getContentText() || '';
+    out.push('STRONA ' + slug + ' | HTTP ' + r.getResponseCode() + ' | ' + t.length);
+    var m = t.match(/window\.__REACT_QUERY_STATE__\s*=\s*JSON\.parse\(("(?:[^"\\]|\\.)*")\)/);
+    if (!m) { out.push('   brak __REACT_QUERY_STATE__'); return; }
+    try {
+      var st = JSON.parse(JSON.parse(m[1]));
+      (st.queries || []).forEach(function (q) {
+        var k = (q.queryKey || [])[0] || {}, d = ((q.state || {}).data || {}).data;
+        if (k._id !== 'leaguesMatches') return;
+        var e = (d && d.edges) || [];
+        out.push('   ' + JSON.stringify(k.query) + ' -> ' + e.length + ' meczow');
+        e.slice(0, 3).forEach(function (x) { out.push('      ' + JSON.stringify(x.node).substr(0, 700)); });
+      });
+    } catch (err) { out.push('   JSON blad ' + err); }
+    if (slug === 'czech-liga-pro-1') {   // adres API: szukamy „leaguesMatches” w skryptach strony
+      var src = (t.match(/<script[^>]+src="([^"]+\.js)"/g) || []).map(function (s) { return s.match(/src="([^"]+)"/)[1]; });
+      out.push('   skrypty: ' + src.length);
+      for (var i = 0; i < src.length && i < 25; i++) {
+        var u = src[i].indexOf('http') === 0 ? src[i] : 'https://scores24.live' + src[i];
+        var js = UrlFetchApp.fetch(u, {muteHttpExceptions: true, headers: h}).getContentText() || '';
+        var p = js.indexOf('leaguesMatches');
+        while (p >= 0 && out.length < 60) {
+          out.push('   JS ' + u.split('/').pop() + ' @' + p + ': ' + js.substr(Math.max(0, p - 300), 700).replace(/\s+/g, ' '));
+          p = js.indexOf('leaguesMatches', p + 1);
+        }
+      }
+    }
+  });
+  var folder = DriveApp.getFolderById(TERMINARZ_FOLDER_ID), stare = folder.getFilesByName('ligapro_diagnoza.txt');
+  while (stare.hasNext()) stare.next().setTrashed(true);
+  folder.createFile('ligapro_diagnoza.txt', out.join('\n'), 'text/plain');
+}
