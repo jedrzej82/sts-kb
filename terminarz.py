@@ -10,6 +10,7 @@ dopasowanie do klubu z innego kraju. Brak pliku albo brak meczu w terminarzu nic
 Dopasowanie strony: te same czlony nazwy po odrzuceniu form prawnych (FC, CF, SK…), z polskimi nazwami
 miast przetlumaczonymi, albo czlony jednej nazwy zawarte w drugiej (min. jeden czlon >= 4 znaki).
 Znaczniki (kobiety, rezerwy, mlodziez) musza byc identyczne. Wynik tylko przy JEDNYM pasujacym meczu."""
+import functools
 import os
 import re
 import sys
@@ -26,8 +27,15 @@ _FORMY = frozenset('fc cf sc ac afc cfc fk nk sk bk hk hc kk rk ok ks sv ss ec f
 
 
 def _czlony(s):
+    """Czlony nazwy (frozenset). 30.09.2026: wynik zapamietywany — funkcja czysta, a zewn._fsx_bez_dubli wolal ja
+    1,9 mln razy dla tych samych nazw (45 s z 314 s hist_import)."""
+    return _czlony_z(str(s))
+
+
+@functools.lru_cache(maxsize=None)
+def _czlony_z(s):
     from sezon import _MIASTA_PL
-    t = re.findall(r'[a-z0-9]+', unicodedata.normalize('NFKD', str(s).translate(LITERY)).encode('ascii', 'ignore').decode().lower())
+    t = re.findall(r'[a-z0-9]+', unicodedata.normalize('NFKD', s.translate(LITERY)).encode('ascii', 'ignore').decode().lower())
     out = set()
     for x in t:
         if x in _FORMY or znaczniki(x): continue   # znaczniki (II/2/B, W/K, U20) porownuje pasuje() osobno
@@ -38,7 +46,7 @@ def _czlony(s):
     # sa nazwa klubu, nie znacznikiem.
     if not out:
         out = {x for x in t if x not in _FORMY}
-    return out
+    return frozenset(out)
 
 
 def pasuje(oferta, zrodlo):

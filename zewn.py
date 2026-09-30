@@ -94,7 +94,11 @@ def _scal_nazwy_rozgrywek(d):
     #   i wspolne mecze to co najmniej POLOWA meczow mniejszej z nazw (przemianowanie, nie baraz).
     licz = d['_wez'].value_counts()
     wspolne = {}
-    for _, g in d.groupby(mecz, sort=False)['_wez']:
+    # 30.09.2026 (czas przebiegu): tylko mecze zapisane pod co najmniej dwiema nazwami rozgrywek — reszta grup
+    # (prawie wszystkie) nic nie wnosi, a iteracja po nich kosztowala ok. 45 s hist_import. Wynik identyczny.
+    u = d[mecz + ['_wez']].drop_duplicates()
+    u = u[u.duplicated(mecz, keep=False)]
+    for _, g in u.groupby(mecz, sort=False)['_wez']:
         u = sorted(set(g))
         for i_, a_ in enumerate(u):
             for b_ in u[i_ + 1:]:
@@ -122,12 +126,13 @@ def _scal_nazwy_rozgrywek(d):
         return d.drop(columns='_wez')
 
     licz = d['_wez'].value_counts()
+    grupy = {}
+    for w in set(wezly):   # jedno przejscie zamiast szukania grupy osobno dla kazdej nazwy (kwadratowe)
+        grupy.setdefault(znajdz(w), []).append(w)
     kanon = {}
-    for w in set(wezly):
-        k = znajdz(w)
-        grupa = [x for x in set(wezly) if znajdz(x) == k]
+    for grupa in grupy.values():
         naj = max(grupa, key=lambda x: (licz.get(x, 0), x[2]))
-        kanon[w] = naj
+        for w in grupa: kanon[w] = naj
     zmienione = {w: n for w, n in kanon.items() if w != n}
     for w, n in sorted(zmienione.items()):
         print(f'  zewn: te same rozgrywki pod dwiema nazwami — "{w[1]} | {w[2]}" -> "{n[1]} | {n[2]}" '

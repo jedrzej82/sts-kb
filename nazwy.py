@@ -7,6 +7,7 @@ bylo wnosic w kilku plikach, a kopie zaczynaly sie rozjezdzac).
   znaczniki(s) — RODZAJE znacznikow w nazwie; porownanie jest symetryczne: rozne znaczniki = rozne druzyny
   wspolna_liga(m, a, b) — czy dwa kluby graly w jednej lidze (dopasowanie LACZNE pary z oferty)
 """
+import functools
 import os
 import re
 
@@ -26,9 +27,16 @@ ZNACZNIK = re.compile(r'^(b|ii|iii|2|3|c|k|u-?1[6-9]|u-?2[0-3]|sub-?2[0-3]|jun|j
 def znaczniki(s):
     """Rodzaje znacznikow w nazwie (posortowana krotka): kobiety / rezerwy / zespol_c / uNN / mlodziez.
     22.09.2026: STS pisze "[K]" i "(W)" — nawiasy zdejmujemy. 23.09.2026: porownujemy RODZAJE, nie liczbe
-    ("Barcelona (K)" to nie "Barcelona B", choc obie maja po jednym znaczniku)."""
+    ("Barcelona (K)" to nie "Barcelona B", choc obie maja po jednym znaczniku).
+    30.09.2026: wynik zapamietywany (funkcja czysta, krotka niezmienna) — hist_import wolal ja 7,3 mln razy
+    dla tych samych nazw (76 s z 314 s przebiegu)."""
+    return _znaczniki(str(s))
+
+
+@functools.lru_cache(maxsize=None)
+def _znaczniki(s):
     out = []
-    for t0 in re.split(r'[\s]+', str(s).strip()):
+    for t0 in re.split(r'[\s]+', s.strip()):
         t0 = t0.strip('[](){}<>.,;:')
         # 30.09.2026 (przeglad): „Zenit-2”, „CSKA-2 Moscow” — znacznik po lacznika nie byl widziany i pierwsza druzyna
         # („Zenit”) trafiala w rezerwy. Ostatni czlon po '-' sprawdzamy osobno (bez rozbijania „U-19”, „Sub-21”).
