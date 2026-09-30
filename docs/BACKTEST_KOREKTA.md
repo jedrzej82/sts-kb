@@ -88,3 +88,14 @@ Platt (a·logit P + b) i sama skala uczone przed cięciem, log loss po cięciu (
 Wyuczone a > 1 (model raczej *niedoszacowany*), zyski ≤ 0,0003, a na wrześniu 2026 korekta wyraźnie szkodzi.
 Początek sezonu nie jest systematycznie zawyżony: wrzesień 2025 P 0,600 vs trafność 0,646 (n = 364).
 Obniżanie P w hokeju nie ma oparcia w danych; wrócić po ≥ 30 rozliczonych własnych nogach hokejowych.
+
+## Koszykówka i piłka ręczna — ta sama metoda (30.09.2026)
+
+**Decyzja: bez korekty (nie podnosimy P).** Na całym sezonie oba sporty wyglądają na mocno *niedoszacowane*
+(kosz: P 0,645 vs trafność 0,738 w przedziale 0,6–0,7; ręczna: 0,652 vs 0,772), Platt uczy a ≈ 2.
+Przyczyna to krótka historia w bazie: ligi spoza NBA/NHL są w niej dopiero od lipca 2025, więc jesienią 2025 oceny
+drużyn były ściągnięte do średniej. Z każdym miesiącem średnie P rośnie (kosz: 0,592 w 10.2025 → 0,659 w 09.2026),
+a trafność stoi (~0,68). We wrześniu 2026 koszykówka jest skalibrowana (P 0,659 vs 0,662, n = 619), a korekta
+uczona na wcześniejszych danych psuje wynik: log loss 0,61740 → 0,65169 (Platt) / 0,65146 (skala).
+Ręczna we wrześniu 2026: P 0,713 vs 0,776, ale n = 143 — za mało, by luzować limity (CZĘŚĆ A).
+Wrócić w styczniu 2027 (sezon z pełną roczną historią) albo po ≥ 30 rozliczonych własnych nogach.
