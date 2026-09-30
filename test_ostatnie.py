@@ -70,8 +70,7 @@ def tenis():
     d = T.load(); test = d[(d.date >= OD - pd.Timedelta(days=7)) & (d.date <= DO)]
     st, _ = T.run_elo(d[d.date < test.date.min()])
     for r in test.itertuples():
-        p = T.p_win(st, r.winner_name, r.loser_name, r.surface, str(r.best_of) == '5')
-        pc = T.calibrate(max(p, 1 - p)); pw = pc if p >= 0.5 else 1 - pc   # P, że wygra faktyczny zwycięzca
+        p, pw = T.p_skalibr(st, r.winner_name, r.loser_name, r.surface, str(r.best_of) == '5')   # P, że wygra faktyczny zwycięzca
         mecz = f'{r.winner_name} – {r.loser_name} ({r.tourney_name} {r.round})'
         wyniki.append(('tenis', r.date.date(), mecz, f'wygrał {r.winner_name} {r.score}', f'wygra {r.winner_name}', pw, True))
         wyniki.append(('tenis', r.date.date(), mecz, f'wygrał {r.winner_name} {r.score}', f'wygra {r.loser_name}', 1 - pw, False))

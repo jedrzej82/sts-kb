@@ -241,10 +241,22 @@ def p_win(st, a, b, s, bo5=False):
     sa, sb = st['Rs'].get((a, s), ra), st['Rs'].get((b, s), rb)
     ea, eb = 0.5 * ra + 0.5 * sa, 0.5 * rb + 0.5 * sb
     p = 1 / (1 + 10 ** ((eb - ea) / 400))
-    if bo5:  # mecz do 3 wygranych setów wzmacnia faworyta
-        ps = p ** 0.55 / (p ** 0.55 + (1 - p) ** 0.55)
-        p = ps ** 3 * (1 + 3 * (1 - ps) + 6 * (1 - ps) ** 2)
-    return p
+    return na_bo5(p) if bo5 else p
+
+
+def na_bo5(p):
+    """P meczu do 2 wygranych setow -> do 3 (dluzszy mecz wzmacnia faworyta). Symetryczne: na_bo5(1-p) = 1-na_bo5(p)."""
+    ps = p ** 0.55 / (p ** 0.55 + (1 - p) ** 0.55)
+    return ps ** 3 * (1 + 3 * (1 - ps) + 6 * (1 - ps) ** 2)
+
+
+def p_skalibr(st, a, b, s, bo5=False):
+    """(P_model, P_skalibr) wygranej `a`. 30.09.2026 (przeglad): krzywa z --backtest jest dopasowana do ZWYKLEGO P Elo
+    (skala meczu do 2 setow) — kalibrujemy je, a dopiero POTEM przeliczamy na bo5. Dotad p_win(bo5) szlo do calibrate()
+    i plaska gora krzywej zjadala wzmocnienie faworyta (Sinner–Mensik: bo3 i bo5 po 86,6%)."""
+    p = p_win(st, a, b, s)
+    pc = calibrate(max(p, 1 - p)); pc = pc if p >= 0.5 else 1 - pc
+    return (na_bo5(p), na_bo5(pc)) if bo5 else (p, pc)
 
 
 # Litery, ktorych NFKD NIE rozklada — encode('ascii','ignore') po prostu je KASUJE.
@@ -340,12 +352,17 @@ def _resolve1(name, players):
         elif len(parts) >= 3: c = []   # trzy czlony w ofercie, zaden kandydat nie ma wszystkich -> None
     if len(c) == 1: return c[0]
     if c and len(parts) == 1:
-        # kilku zawodnikow o tym nazwisku, a w ofercie samo nazwisko — wybor po liczbie meczow
-        # jest ZGADYWANIEM, wiec musi byc widoczny dla czlowieka
-        w = max(c, key=lambda p: NCOUNT.get(p, 0))
+        # 30.09.2026 (przeglad): dotad wybor najczesciej grajacego — ZGADYWANIE („Wang” -> Qiang Wang przy 6 kandydatach,
+        # „Li” -> Ann Li). Jak przy „Ruud C.”: rozstrzyga tylko jedyny AKTYWNY (mecz w ostatnich 2 latach), inaczej nic.
+        if OSTATNI:
+            gr = pd.Timestamp.today() - pd.Timedelta(days=730)
+            akt = [p for p in c if OSTATNI.get(p) is not None and pd.Timestamp(OSTATNI[p]) >= gr]
+            if len(akt) == 1:
+                print(f'  UWAGA: "{name}" to samo nazwisko, w bazie {len(c)} zawodnikow, aktywny tylko "{akt[0]}" — wybrano go.')
+                return akt[0]
         print(f'  UWAGA: "{name}" to samo nazwisko, w bazie {len(c)} zawodnikow '
-              f'({", ".join(sorted(c)[:4])}) — wybrano najczesciej grajacego: "{w}". Sprawdz, czy to ten.')
-        return w
+              f'({", ".join(sorted(c)[:4])}) — nie dopasowano. Podaj pelne imie i nazwisko.')
+        return NIEJEDNOZNACZNE
     if c and len(parts) > 1:
         ini = norm(parts[0])[:1]
         c2 = [p for p in c if ini and norm(p)[:1] == ini]
@@ -363,7 +380,12 @@ def _resolve1(name, players):
             print(f'  UWAGA: "{name}" pasuje do {len(c2)} zawodnikow ({", ".join(sorted(c2)[:4])}) — '
                   f'nie dopasowano. Podaj pelne imie i nazwisko.')
             return NIEJEDNOZNACZNE
-    m = difflib.get_close_matches(k_, list(by), n=1, cutoff=0.8)
+    m = difflib.get_close_matches(k_, list(by), n=2, cutoff=0.8)
+    if len(m) > 1 and len(parts) == 1:
+        # 30.09.2026: samo nazwisko, rozmycie pasuje do kilku wpisow — wybor pierwszego to zgadywanie
+        print(f'  UWAGA: "{name}" rozmyto pasuje do kilku zawodnikow ({", ".join(by[x] for x in m)}) — NIE dopasowano.')
+        return NIEJEDNOZNACZNE
+    m = m[:1]
     if m:
         kand = by[m[0]]
         # 22.09.2026: nie dopasowuj do wpisu SKROCONEGO, jesli skrot pasuje do kilku pelnych nazwisk.
@@ -512,7 +534,7 @@ def main():
     A, B = resolve(names[0], pl), resolve(names[1], pl)
     print(f'Dopasowano: {A} | {B} (nawierzchnia {surf})')
     if not A or not B: sys.exit('Brak zawodnika w bazie (ATP+WTA 1968–dziś, główne turnieje + tenis_delta). Dla ITF/WTA: szacunek ręczny i dopisuj wyniki --wynik.')
-    p = p_win(st, A, B, surf, '--bo5' in a); pc = calibrate(max(p, 1 - p)); fav = A if p >= 0.5 else B
+    p, pcA = p_skalibr(st, A, B, surf, '--bo5' in a); pc = max(pcA, 1 - pcA); fav = A if p >= 0.5 else B
     for x in (A, B):
         print(f'  {x}: Elo {st["R"].get(x, 1500):.0f}, {surf} {st["Rs"].get((x, surf), st["R"].get(x, 1500)):.0f}, meczów {st["N"].get(x, 0)}, ostatni w bazie {st["last"].get(x).date()}')
     _nmin = min(st['N'].get(A, 0), st['N'].get(B, 0))
