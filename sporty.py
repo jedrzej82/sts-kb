@@ -381,7 +381,10 @@ _OGOLNE = frozenset('fc cf sc ac as ss sv fk nk sk bk hk hc mhk vk kk rk ok ks c
                     'hockey sport sports de del la el the da do '
                     # Poprawka 43 (24.09.2026): dopiski STS bez znaczenia rozrozniajacego
                     # ("Lancashire County", "Colomiers Rugby", "Storhamar Ishockey", "Narvik IK", "IF Bjorkloven")
-                    'county rugby ishockey ik if'.split())
+                    'county rugby ishockey ik if '
+                    # 30.09.2026 (Raport 12:00, usterka 1): skroty formy prawnej/sekcji z oferty STS bez znaczenia rozrozniajacego
+                    # ("BC Lietkabelis", "Besiktas JK", "BM Logrono La Rioja", "Tatabanya KC", "CB Canarias")
+                    'bc kc bm cb jk'.split())
 
 
 # Poprawka 54 (24.09.2026): STS podaje druzyny NCAA z przydomkiem („Coastal Carolina Chanticleers”,
