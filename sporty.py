@@ -487,6 +487,7 @@ def kraj_z_terminarza(d, sport, nazwy, wyniki, mt=None):
                         'oceania'):
         return wyniki
     x = d[d.sport == sport]
+    x = x[x.data >= x.data.max() - pd.Timedelta(days=730)]   # jak typuj._w_kraju: zapis bez meczu od 2 lat nie jest kandydatem
     kraj = x.liga.astype(str).str.split('|').str[0].map(_kraj_klucz)
     x = x[(kraj == kt).values]
     pula = set(x.gosp) | set(x.gosc)
