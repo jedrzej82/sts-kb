@@ -300,11 +300,18 @@ def _skrot_albo_nic(name, wyn, pula):
           z ostrzezeniem. Tego przypadku NIE DA SIE odroznic od "Independiente Yumbo" po samym
           napisie (w bazie jest jedno Independiente), dlatego typuj.py sprawdza dodatkowo KRAJ ligi."""
     tn, tk = _tokeny(name), _tokeny(wyn)
-    if len(tn) <= len(tk): return wyn
+    # 30.09.2026 (przeglad): nazwa z oferty KROTSZA niz w bazie ("Crystal" (SVK) -> "Crystal Palace",
+    # "Nelson" (ENG) -> "Nelson Suburbs" (NZ)) i roznica w samych czlonach ogolnych ("BK Olympic" (SWE) ->
+    # "Olympic" (AUS)) wracaly bez zadnej kontroli. Teraz ida do _SKROTY -> typuj sprawdza wspolna lige pary.
+    if len(tn) <= len(tk):
+        _SKROTY[name] = wyn
+        return wyn
     if tn[:len(tk)] == tk: odp = tn[len(tk):]
     elif tn[-len(tk):] == tk: odp = tn[:-len(tk)]
     else: odp = tuple(t for t in tn if t not in tk)
-    if odp and all(t in _OGOLNE for t in odp): return wyn
+    if odp and all(t in _OGOLNE for t in odp):
+        _SKROTY[name] = wyn
+        return wyn
     inne = sorted(p for p in pula if p != wyn and len(_tokeny(p)) > len(tk)
                   and (_tokeny(p)[:len(tk)] == tk or _tokeny(p)[-len(tk):] == tk))
     if inne:
@@ -617,6 +624,13 @@ def _z_meczami(t, m):
 from nazwy import EGZONIMY  # 29.09.2026: lista wspolna z sporty.py (nazwy.py)
 
 
+def skladniki_zespolu(wagi, ldc, lel, lpi):
+    """Skladniki zespolu v5n: (waga, lambdy) modeli z waga > 0; gdy zaden taki nie jest dostepny — to, co jest,
+    z waga 1. Liczba skladnikow to liczba modeli, z ktorych NAPRAWDE policzono P (kontrola TYLKO JEDEN MODEL)."""
+    return [(x, l) for x, l in zip(wagi, (ldc, lel, lpi)) if l is not None and x > 0] or \
+           [(1.0, l) for l in (ldc, lel, lpi) if l is not None]
+
+
 def _przez_egzonim(name, pool):
     czl = str(name).split()
     nowe = [EGZONIMY.get(norm(c), c) for c in czl]
@@ -624,6 +638,9 @@ def _przez_egzonim(name, pool):
     alt = ' '.join(nowe)
     r = resolve(alt, pool)
     if r: print(f'  UWAGA: "{name}" dopasowane po zamianie polskiej nazwy miasta -> "{alt}" -> {r}.')
+    # 30.09.2026 (przeglad): resolve() zapisal skrot pod nazwa PO zamianie — club() szuka nazwy z oferty,
+    # wiec „Atletico Turyn” -> Torino omijalo kontrole wspolnej ligi, a „Atletico Torino” ja przechodzilo
+    if r and _SKROTY.get(alt) == r: _SKROTY[name] = r
     return r
 
 
@@ -731,7 +748,7 @@ def club(home, away, kursy, live=None):
         mdl = cached(f'dc_{dh}_{today.date()}', lambda: fit_dc(m[m.Division == dh], today))
         ldc = dc_lambdas(mdl, h, a); rho = mdl['rho'] if mdl else rho
         if mdl and min(mdl['cnt'].get(h, 0), mdl['cnt'].get(a, 0)) < 10:
-            ldc = None; ostrz.append('Beniaminek / mało meczów w tej lidze (<10) — tylko model Elo.')
+            ldc = None; ostrz.append('Beniaminek / mało meczów w tej lidze (<10) — model DC pominięty.')
     else:
         ostrz.append(f'Różne ligi ({dh} vs {da}) — tylko model Elo.')
     glm = cached(f'glm_{today.date()}', lambda: fit_elo_glm(m))
@@ -758,7 +775,11 @@ def club(home, away, kursy, live=None):
             mm, R, N = prepare(m.dropna(subset=['FTHome', 'FTAway']))
             return R, N, fit_pi_glm(mm[mm.MatchDate >= today - pd.Timedelta(days=365 * 4)])
         R, N, pg = cached(f'pi_{today.date()}', _pi)
-        if min(N.get(h, 0), N.get(a, 0)) >= 10:
+        if dh != da and lel is not None:
+            # 30.09.2026 (przeglad): przy wagach Elo = 0 (ensemble_wagi.json) mecz dwoch lig liczyl sie z SAMEGO pi,
+            # choc oceny pi z roznych lig sa nieporownywalne (patrz ROZNE LIGI BEZ ELO wyzej) — a wynik mial gwiazdki.
+            ostrz.append('pi-ratings pominięte — różne ligi, oceny pi nieporównywalne.')
+        elif min(N.get(h, 0), N.get(a, 0)) >= 10:
             lpi = pi_lambdas(pg, gd_hat_for(R, h, a), dh if dh == da else None)
         else: ostrz.append('pi-ratings: <10 meczów jednej z drużyn — pominięte.')
     except Exception as e:
@@ -771,13 +792,16 @@ def club(home, away, kursy, live=None):
             if nm_ == 'ldc': ldc = None
             elif nm_ == 'lel': lel = None
             else: lpi = None
-    if sum(x is not None for x in (ldc, lel, lpi)) <= 1:
-        ostrz.append('TYLKO JEDEN MODEL — traktuj P jak „szacunek” (max 1 noga na kupon, nie do K1).')
     wp = os.path.join(HERE, 'ensemble_wagi.json')
     if os.path.exists(wp):
         wd, we, wpi = json.load(open(wp))['wagi_dc_elo_pi']
-        parts = [(x, l) for x, l in ((wd, ldc), (we, lel), (wpi, lpi)) if l is not None and x > 0] or \
-                [(1.0, l) for l in (ldc, lel, lpi) if l is not None]
+        parts = skladniki_zespolu((wd, we, wpi), ldc, lel, lpi)
+        n_modeli = len(parts)          # 30.09.2026: liczy sie to, co WESZLO do zespolu (Elo ma wage 0)
+    else:
+        n_modeli = sum(x is not None for x in (ldc, lel, lpi))
+    if n_modeli <= 1:
+        ostrz.append('TYLKO JEDEN MODEL — traktuj P jak „szacunek” (max 1 noga na kupon, nie do K1).')
+    if os.path.exists(wp):
         lam = tuple(float(np.exp(sum(x * np.log(l[k]) for x, l in parts) / sum(x for x, _ in parts))) for k in (0, 1)) if parts else None
         zrodla = '+'.join(n for n, (x, l) in zip(('DC', 'Elo', 'pi'), ((wd, ldc), (we, lel), (wpi, lpi))) if l is not None and (x > 0 or len(parts) and parts[0][0] == 1.0))
         print(f'Model v5n: zespół {zrodla} (wagi DC/Elo/pi = {wd}/{we}/{wpi})')
