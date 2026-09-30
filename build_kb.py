@@ -208,6 +208,56 @@ def _zawiera(x, y):
     return bool(tx) and bool(ty) and (tx <= ty or ty <= tx)
 
 
+# 30.09.2026 (proba generalna): zbior martj42 (intl) konczy sie 2026-08-26 — wrzesniowe okno reprezentacji (eliminacje,
+# Liga Narodow) nie wchodzilo do Elo reprezentacji (Argentyna: ostatni mecz 19.07), a swiezosc mowila „ok” (prog 45 dni).
+# Mecze seniorskich reprezentacji z plikow zewn/ (365, Flashscore) PO ostatniej dacie martj42 dopisujemy, gdy OBIE nazwy
+# sa w tabeli intl (wprost albo przez INTL_NAZWY — tylko roznice pisowni). Nieznana nazwa = mecz pominiety (nie zgadujemy).
+INTL_NAZWY = {'Czechia': 'Czech Republic', 'Bosnia & Herzegovina': 'Bosnia and Herzegovina', 'D.R. Congo': 'DR Congo',
+              'Congo DR': 'DR Congo', 'Ireland': 'Republic of Ireland', 'Guinea Bissau': 'Guinea-Bissau', 'Curacao': 'Curaçao',
+              'Antigua & Barbuda': 'Antigua and Barbuda', 'Sao Tome and Principe': 'São Tomé and Príncipe',
+              'Sao Tome': 'São Tomé and Príncipe', 'Central Africa': 'Central African Republic', 'Republic of the Congo': 'Congo',
+              'Maldives Islands': 'Maldives', 'Saint Vincent And The Grenadines': 'Saint Vincent and the Grenadines',
+              'USA': 'United States', 'Turkiye': 'Turkey', 'Türkiye': 'Turkey', 'Korea Republic': 'South Korea',
+              "Cote d'Ivoire": 'Ivory Coast', "Côte d'Ivoire": 'Ivory Coast', 'Cape Verde Islands': 'Cape Verde',
+              'China PR': 'China', 'Chinese Taipei': 'Taiwan', 'Kyrgyz Republic': 'Kyrgyzstan', 'St. Kitts and Nevis': 'Saint Kitts and Nevis'}
+
+
+def uzupelnij_intl(intl, zd):
+    import swiezosc as _sw
+    from nazwy import znaczniki
+    if not os.path.isdir(zd) or not len(intl): return intl
+    ost = str(intl.date.max())[:10]
+    znane = set(intl[intl.date >= '2018-01-01'].home_team) | set(intl[intl.date >= '2018-01-01'].away_team)
+    cz = []
+    for p in sorted(os.listdir(zd)):
+        if not (p.startswith('wyniki_') and '_pilka_' in p) or 'archiwum' in p: continue
+        try: z = pd.read_csv(os.path.join(zd, p), dtype=str, keep_default_na=False)
+        except Exception: continue
+        if not {'data', 'kraj', 'turniej', 'gosp', 'gosc', 'wg', 'wa'} <= set(z.columns): continue
+        t = z.turniej.str.lower()
+        cz.append(z[(z.data.str[:10] > ost) & z.kraj.str.strip().str.lower().isin(_sw._KRAJE_REPR)
+                    & t.str.contains(_sw._TURNIEJ_REPR) & ~t.str.contains(_sw._TURNIEJ_NIE)])
+    if not cz: return intl
+    z = pd.concat(cz, ignore_index=True)
+    naz = lambda n: INTL_NAZWY.get(str(n).strip(), str(n).strip())
+    z = z.assign(h=z.gosp.map(naz), a=z.gosc.map(naz), hs=pd.to_numeric(z.wg, errors='coerce'), as_=pd.to_numeric(z.wa, errors='coerce'))
+    ok = z.h.isin(znane) & z.a.isin(znane) & z.hs.notna() & z.as_.notna() & (z.h != z.a) \
+        & ~z.gosp.map(lambda n: bool(znaczniki(n))) & ~z.gosc.map(lambda n: bool(znaczniki(n)))
+    pominiete = sorted(set(z.loc[~ok & z.hs.notna(), 'gosp']) | set(z.loc[~ok & z.hs.notna(), 'gosc']))
+    z = z[ok].assign(date=z.data.str[:10]).sort_values('date')
+    # ten sam mecz z 365 i Flashscore (czasem z data o dzien inna) — jeden wiersz
+    wz, bylo = [], {}
+    for r in z.itertuples():
+        k = (r.h, r.a); d = pd.Timestamp(r.date)
+        if k in bylo and abs((d - bylo[k]).days) <= 1: continue
+        bylo[k] = d; wz.append(dict(date=r.date, home_team=r.h, away_team=r.a, home_score=int(r.hs), away_score=int(r.as_),
+                                    tournament=r.turniej, city='', country='', neutral=False))
+    if wz:
+        print(f'  BUILD_KB: intl — dopisano {len(wz)} meczow reprezentacji z zewn/ po {ost} (martj42 konczy sie na tej dacie); '
+              f'pominieto nazwy spoza tabeli intl: {len(pominiete)} (np. {", ".join(pominiete[:6])})')
+    return pd.concat([intl, pd.DataFrame(wz)], ignore_index=True) if wz else intl
+
+
 from collections import namedtuple
 _Wiersz = namedtuple('_Wiersz', ['Division', 'HomeTeam', 'AwayTeam'])
 
@@ -810,6 +860,7 @@ def main():
     allm = allm.drop(columns=['src_zrodlo', '_oH', '_oA'], errors='ignore')
     allm = allm.sort_values(['MatchDate', 'Division']).reset_index(drop=True)
     intl = pd.read_csv(os.path.join(RAW, 'intl_results.csv')).dropna(subset=['home_score', 'away_score'])
+    intl = uzupelnij_intl(intl, os.path.join(HERE, 'zewn'))
     elo = pd.read_csv(os.path.join(RAW, 'EloRatings.csv'))
     db = sqlite3.connect(os.path.join(HERE, 'kb.sqlite'))
     allm.to_sql('matches', db, if_exists='replace', index=False)
