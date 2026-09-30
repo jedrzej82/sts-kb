@@ -66,14 +66,31 @@ def wczytaj(plik=None):
     return pd.concat(czesci, ignore_index=True) if czesci else None
 
 
-def znajdz(gosp, gosc, t=None, data=None, sport='football'):
-    """Zwraca dict(kraj, turniej, gosp, gosc, data, godzina_utc) jednego meczu albo None (brak / kilka)."""
+def _wspolny(oferta, zrodlo):
+    """Luzniej niz pasuje(): te same znaczniki i co najmniej jeden wspolny czlon >= 4 litery
+    („CD Platense Zacatecoluca” / „Platense Municipal”). Tylko dla drugiej druzyny, gdy pierwsza pasuje scisle."""
+    if znaczniki(oferta) != znaczniki(zrodlo): return False
+    # surowe czlony (bez form prawnych): „CD Junior Barranquilla” / „Junior FC” — „junior” to tu nazwa klubu,
+    # a znacznik mlodziezy i tak musi byc po obu stronach taki sam (warunek wyzej)
+    sur = lambda s: {x for x in re.findall(r'[a-z0-9]+', unicodedata.normalize('NFKD', str(s).translate(LITERY))
+                                          .encode('ascii', 'ignore').decode().lower()) if x not in _FORMY}
+    return bool({x for x in (_czlony(oferta) | sur(oferta)) & (_czlony(zrodlo) | sur(zrodlo)) if len(x) >= 4})
+
+
+def znajdz(gosp, gosc, t=None, data=None, sport='football', luzno=False):
+    """Zwraca dict(kraj, turniej, gosp, gosc, data, godzina_utc) jednego meczu albo None (brak / kilka).
+    luzno=True (30.09.2026, tylko do ponownego dopasowania w kraju meczu w typuj.py): gdy scisle nic nie ma, wystarczy,
+    ze JEDNA druzyna pasuje scisle, a druga ma wspolny czlon >= 4 litery — i taki mecz jest jeden."""
     t = wczytaj() if t is None else t
     if t is None or not len(t): return None
     if 'zrodlo' in t and t.zrodlo.nunique() > 1:   # zrodla nazywaja ligi inaczej — kazde osobno, Flashscore pierwszy
         for z in ('fs', '365'):
             m = znajdz(gosp, gosc, t[t.zrodlo == z].drop(columns='zrodlo'), data, sport)
             if m: return m
+        if luzno:
+            for z in ('365', 'fs'):   # luzno: najpierw 365 — jego zapis nazw jest zwykle ten sam co w bazie
+                m = znajdz(gosp, gosc, t[t.zrodlo == z].drop(columns='zrodlo'), data, sport, luzno=True)
+                if m: return m
         return None
     x = t[t.sport == sport] if 'sport' in t else t
     if data:
@@ -81,6 +98,9 @@ def znajdz(gosp, gosc, t=None, data=None, sport='football'):
         dd = pd.to_datetime(x.data, errors='coerce')
         x = x[(dd - d0).abs() <= pd.Timedelta(days=1)]
     traf = x[[pasuje(gosp, g) and pasuje(gosc, a) for g, a in zip(x.gosp, x.gosc)]]
+    if traf.empty and luzno:
+        traf = x[[(pasuje(gosp, g) and _wspolny(gosc, a)) or (_wspolny(gosp, g) and pasuje(gosc, a))
+                  for g, a in zip(x.gosp, x.gosc)]]
     if traf.empty:   # oferta czasem odwraca strony (mecz na neutralnym / pomylka) — tylko informacyjnie
         return None
     if len(traf.drop_duplicates(['kraj', 'turniej', 'gosp', 'gosc'])) > 1:

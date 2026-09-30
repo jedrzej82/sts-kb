@@ -627,6 +627,51 @@ def _wariant_kraju(h, a, m, pool, jawne=(False, False)):
     return h, a
 
 
+def _kraj_z_terminarza(home, away, h, a, kh, ka, pool, m, mt=None):
+    """30.09.2026 (audyt oferty 01.10): „CD Junior Barranquilla” -> CD Junior (Nikaragua), „CD Platense Zacatecoluca” ->
+    CD Platense (Honduras). Kontrola krajow tylko odrzucala noge. Terminarz ZNA kraj meczu i zapis nazw 365/Flashscore —
+    druzyne z innego kraju szukamy ponownie WSROD KLUBOW KRAJU MECZU (zapis z terminarza, potem z oferty).
+    Zwraca (h, a) albo None (brak meczu, kraj ogolny, niejednoznacznie) — wtedy jak dotad noga MNIEJ."""
+    if mt is None:
+        try:
+            import terminarz as _tm
+            mt = _tm.znajdz(home, away) or _tm.znajdz(home, away, luzno=True)
+        except Exception:
+            return None
+    if not mt: return None
+    kt = norm(mt['kraj'])
+    if not kt or kt in _KRAJE_OGOLNE or _kanon_kraju(kt) not in _kraje_znane(): return None
+    nowe = [h, a]
+    for i, (n, t_, k, zt) in enumerate(((home, h, kh, mt['gosp']), (away, a, ka, mt['gosc']))):
+        if t_ is not None and (not k or _ten_sam_kraj(k, kt)): continue   # kraj nieznany nie przeczy terminarzowi
+        r_ = _w_kraju((zt, n), kt, pool, m)
+        if not r_: return None
+        if r_ != t_:
+            print(f'  UWAGA: "{n}" dopasowane w kraju meczu z terminarza ({mt["kraj"]}, {mt["turniej"]}: '
+                  f'{mt["gosp"]} – {mt["gosc"]}) -> {r_} (zamiast {t_}).')
+        nowe[i] = r_
+    if nowe[0] == nowe[1]: return None
+    print(f'Dopasowano (po terminarzu): "{home}" → {nowe[0]} | "{away}" → {nowe[1]}')
+    return tuple(nowe)
+
+
+def _w_kraju(nazwy, kraj, pool, m):
+    """Jedna nazwa z bazy dla pierwszej z `nazwy`, ktora rozwiazuje sie JEDNOZNACZNIE wsrod klubow, ktorych ostatnia
+    liga jest z kraju `kraj` (kraj z terminarza). None, gdy zadna nie daje wyniku albo wyniki sa rozne."""
+    ost = pd.concat([m[['MatchDate', 'HomeTeam', 'Division']].rename(columns={'HomeTeam': 't'}),
+                     m[['MatchDate', 'AwayTeam', 'Division']].rename(columns={'AwayTeam': 't'})])
+    ost = ost.sort_values('MatchDate').groupby('t').Division.last()
+    pula = {t for t in pool if t in ost.index and _ten_sam_kraj(_kraj_ligi(ost[t]) or '', kraj)}
+    if not pula: return None
+    import io, contextlib
+    wyn = set()
+    for n in nazwy:
+        with contextlib.redirect_stdout(io.StringIO()):
+            r = resolve(n, pula) or _przez_egzonim(n, pula)
+        if r: wyn.add(r)
+    return next(iter(wyn)) if len(wyn) == 1 else None
+
+
 def _z_meczami(t, m):
     """Nazwa bez meczow w bazie (sam wpis clubelo, np. "Nott'm Forest"), a obok ten sam zapis po kluczu
     Z meczami ("Nottm Forest") — bierzemy ten z meczami. Klucz = te same litery i cyfry, wiec to ten sam klub."""
@@ -711,6 +756,11 @@ def club(home, away, kursy, live=None):
         sys.exit(f'TA SAMA DRUZYNA PO OBU STRONACH: "{home}" i "{away}" wskazuja na "{h}" '
                  f'— analiza przerwana. Sprawdz nazwy w bazie przed dalsza praca.')
     print(f'Dopasowano: "{home}" → {h} | "{away}" → {a}')
+    if (not h or not a) and '--kontynentalny' not in sys.argv:
+        # 30.09.2026 (audyt oferty 01.10): „Cerro Porteno Asuncion” -> None, choc „Cerro Porteño” jest w bazie, a mecz
+        # w terminarzu (Paragwaj). Nieznana nazwa szukana wsrod klubow kraju meczu z terminarza (jak wyzej).
+        popr = _kraj_z_terminarza(home, away, h, a, None, None, pool, m)
+        if popr: h, a = popr
     if not h or not a: sys.exit('Nie znaleziono drużyny w bazie — podaj inną pisownię.')
     today = pd.Timestamp(dt.date.today())
     ostrz = []
@@ -722,6 +772,10 @@ def club(home, away, kursy, live=None):
     # niemozliwe — to znaczy, ze jedna z nazw trafila w cudzy klub. Po samym napisie nie da sie
     # tego wykryc ("Chievo Verona" -> "Chievo" ma ten sam ksztalt), po kraju ligi — tak.
     kh, ka = _kraj_ligi(dh), _kraj_ligi(da)
+    if kh and ka and not _ten_sam_kraj(kh, ka) and '--kontynentalny' not in sys.argv:
+        popr = _kraj_z_terminarza(home, away, h, a, kh, ka, pool, m)
+        if popr:
+            h, a = popr; dh, da = div_of(h), div_of(a); kh, ka = _kraj_ligi(dh), _kraj_ligi(da)
     if kh and ka and not _ten_sam_kraj(kh, ka) and '--kontynentalny' not in sys.argv:
         sys.exit(f'ROZNE KRAJE: "{home}" -> {h} ({dh}, {kh}) | "{away}" -> {a} ({da}, {ka}). '
                  f'W meczu ligi krajowej obie druzyny sa z jednego kraju — jedna z nazw zostala '
@@ -744,6 +798,11 @@ def club(home, away, kursy, live=None):
                 print(f'  (kraj terminarza „{mt["kraj"]}” spoza listy krajow lig — bez kontroli kraju)')
             elif kt and kt not in _KRAJE_OGOLNE:
                 zle = [(n, t, k) for n, t, k in ((home, h, kh), (away, a, ka)) if k and not _ten_sam_kraj(k, kt)]
+                if zle:
+                    popr = _kraj_z_terminarza(home, away, h, a, kh, ka, pool, m, mt)
+                    if popr:
+                        h, a = popr; dh, da = div_of(h), div_of(a); kh, ka = _kraj_ligi(dh), _kraj_ligi(da)
+                        zle = []
                 if zle:
                     sys.exit('NIEZGODNE Z TERMINARZEM: ' + '; '.join(f'"{n}" -> {t} (liga z kraju {k})' for n, t, k in zle)
                              + f', a mecz w terminarzu jest w kraju {mt["kraj"]} ({mt["turniej"]}). '
