@@ -87,3 +87,19 @@ def test_niejednoznaczny_rdzen_bez_kandydata():
     h = sporty.resolve('Slovan Lublana', pula, 'piłka ręczna')
     assert h is None and 'Slovan Lublana' not in sporty._KANDYDAT
     assert sporty.potwierdz_rywalem(d, 'piłka ręczna', ('Slovan Lublana', 'Celje'), (h, 'Celje')) == (None, 'Celje')
+
+
+def test_aliasy_audyt_oferty_0110():
+    assert sporty.resolve('PSG', {'Paris Handball', 'Nantes'}, 'piłka ręczna') == 'Paris Handball'
+    assert sporty.resolve('HSV Hamburg', {'HSV Handball', 'ThSV Eisenach'}, 'piłka ręczna') == 'HSV Handball'
+    assert sporty.resolve('Penarol Mar del Plata', {'Penarol', 'Ca Penarol'}, 'koszykówka') == 'Penarol'
+    assert sporty.resolve('Gimnasia Indalo', {'Gimnasia y Esgrima (CR)', 'Gimnasia Y Esgrima La Plata'}, 'koszykówka') == 'Gimnasia y Esgrima (CR)'
+
+
+def test_aliasy_pilka_audyt_0110():
+    import typuj
+    pula = {'Junior FC', 'CD Junior', 'Atletico Nacional', 'Cerro Porteño', 'CD Platense', 'Platense Municipal'}
+    assert typuj.resolve('CD Junior Barranquilla', pula) == 'Junior FC'
+    assert typuj.resolve('Atletico Nacional Medellin', pula) == 'Atletico Nacional'
+    assert typuj.resolve('Cerro Porteno Asuncion', pula) == 'Cerro Porteño'
+    assert typuj.resolve('CD Platense Zacatecoluca', pula) == 'Platense Municipal'
