@@ -52,3 +52,23 @@ def test_znajdz_luzno():
     assert terminarz.znajdz('Alianza FC San Salvador', 'CD Platense Zacatecoluca', t, luzno=True)['gosc'] == 'Platense Municipal'
     assert terminarz.znajdz('Atletico Nacional', 'CD Junior Barranquilla', t, luzno=True)['gosc'] == 'Junior FC'
     assert terminarz.znajdz('Deportivo Cali', 'Junior U19', t, luzno=True) is None                 # obie luzno / znaczniki
+
+
+def test_stary_zapis_klubu_nie_jest_kandydatem():
+    """Raport 30.09 21:00: „San Luis Quillota” -> „San Luis” (ostatni mecz 2018) zamiast „San Luis de Quillota”."""
+    r = [('2018-11-28', 'CHI', 'San Luis', 'Colo Colo'),
+         ('2026-09-15', 'Chile | First Division B', 'San Luis de Quillota', 'Cobreloa'),
+         ('2026-09-26', 'Chile | First Division B', 'Union San Felipe', 'Deportes Copiapo')]
+    m = pd.DataFrame(r, columns=['MatchDate', 'Division', 'HomeTeam', 'AwayTeam']).assign(MatchDate=lambda x: pd.to_datetime(x.MatchDate))
+    pool = set(m.HomeTeam) | set(m.AwayTeam)
+    assert typuj._w_kraju(['San Luis', 'San Luis Quillota'], 'chile', pool, m) == 'San Luis de Quillota'
+
+
+def test_sporty_stary_zapis_pominiety():
+    import sporty
+    d = pd.DataFrame([('2018-03-01', 'koszykówka', 'Chile | LNB', 'San Luis', 'X'),
+                      ('2026-09-20', 'koszykówka', 'Chile | LNB', 'San Luis de Quillota', 'Y')],
+                     columns=['data', 'sport', 'liga', 'gosp', 'gosc']).assign(data=lambda x: pd.to_datetime(x.data))
+    r = sporty.kraj_z_terminarza(d, 'koszykówka', ('San Luis Quillota', 'Y'), (None, 'Y'),
+                                 mt=dict(kraj='Chile', turniej='LNB', gosp='San Luis', gosc='Y'))
+    assert r == ('San Luis de Quillota', 'Y')

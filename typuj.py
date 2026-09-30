@@ -665,7 +665,11 @@ def _w_kraju(nazwy, kraj, pool, m):
     liga jest z kraju `kraj` (kraj z terminarza). None, gdy zadna nie daje wyniku albo wyniki sa rozne."""
     ost = pd.concat([m[['MatchDate', 'HomeTeam', 'Division']].rename(columns={'HomeTeam': 't'}),
                      m[['MatchDate', 'AwayTeam', 'Division']].rename(columns={'AwayTeam': 't'})])
-    ost = ost.sort_values('MatchDate').groupby('t').Division.last()
+    ost = ost.sort_values('MatchDate').groupby('t').agg(Division=('Division', 'last'), d=('MatchDate', 'max'))
+    # 30.09.2026 (Raport 21:00): „San Luis Quillota” trafialo w „San Luis” — ten sam klub, ale zapis z bazy konczy sie
+    # w 2018 (dzis „San Luis de Quillota”). Klub bez meczu od 2 lat nie jest kandydatem do meczu z dzisiejszej oferty.
+    od = pd.to_datetime(ost.d).max() - pd.Timedelta(days=730)
+    ost = ost[pd.to_datetime(ost.d) >= od].Division
     pula = {t for t in pool if t in ost.index and _ten_sam_kraj(_kraj_ligi(ost[t]) or '', kraj)}
     if not pula: return None
     import io, contextlib
