@@ -130,3 +130,12 @@ def test_sezon_formy_niemieckie_i_aliasy():
     assert sezon.znajdz(w, 'Atletico Nacional Medellin')[0]['druzyna'] == 'Atletico Nacional'
     assert sezon.znajdz(w, 'CD Junior Barranquilla')[0]['druzyna'] == 'Junior FC'
     assert sezon.znajdz(w, 'VfB Lubeck')[0] is None                   # inna druzyna — nie zgadujemy
+
+
+def test_sezon_tenis_drugie_imie_w_arkuszu():
+    import sezon
+    w = [{'druzyna': 'Joel Josef Schwaerzler', 'mecze': '5'}, {'druzyna': 'Yulia Starodubtsewa', 'mecze': '5'},
+         {'druzyna': 'Anna Maria Kowalska', 'mecze': '3'}, {'druzyna': 'Anna Beata Kowalska', 'mecze': '3'}]
+    assert sezon.znajdz(w, 'Schwaerzler Joel', sport='tenis')[0]['druzyna'] == 'Joel Josef Schwaerzler'
+    assert sezon.znajdz(w, 'Starodubtseva Yuliia', sport='tenis')[0]['druzyna'] == 'Yulia Starodubtsewa'
+    assert sezon.znajdz(w, 'Kowalska Anna', sport='tenis')[0] is None          # dwie rozne osoby — bez zgadywania

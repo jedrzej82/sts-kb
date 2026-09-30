@@ -228,6 +228,14 @@ def znajdz(wiersze, nazwa, liga=None, sport=None):
             if len({norm(w['druzyna']) for w in tr}) == 1:
                 print(f'  „{nazwa}” → „{tr[0]["druzyna"]}” (pominiete drugie imie)')
                 return tr[0], 0.85
+        # 30.09.2026 (audyt 01.10): odwrotnie — to ARKUSZ ma drugie imie, STS nie („Schwaerzler Joel” ->
+        # „Joel Josef Schwaerzler”). Pierwsze imie i nazwisko musza byc DOKLADNIE te dwa czlony z oferty.
+        if len(tq) == 2:
+            tr = [w for w in kand if len(norm(w['druzyna']).split()) == 3
+                  and sorted([norm(w['druzyna']).split()[0], norm(w['druzyna']).split()[-1]]) == sorted(tq)]
+            if len({norm(w['druzyna']) for w in tr}) == 1:
+                print(f'  „{nazwa}” → „{tr[0]["druzyna"]}” (drugie imie tylko w arkuszu)')
+                return tr[0], 0.85
     # (5) tenis: „Mensik J.” vs „Jakub Mensik” — nazwisko i WSZYSTKIE inicjaly imion
     if sport == 'tenis':
         tq = _tok_osoba(nazwa)
