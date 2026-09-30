@@ -497,6 +497,17 @@ def stan_bazy():
     return f'{int(os.path.getmtime(f))}_{os.path.getsize(f)}' if os.path.exists(f) else '0'
 
 
+def kalibruj_v5n(KR, k, p):
+    """Korekta per rynek z korekta_rynkow_v5n.csv (tylko w dol); rynki „ponizej” zawsze min. −4 pp (regula uzytkownika).
+    30.09.2026: wyjete z main(), zeby test_ostatnie.py oceniał ten sam model, ktory typuje."""
+    s = 0.0
+    for r in KR[KR.rynek == k].itertuples():
+        lo, hi = [float(x) for x in str(r.przedzial).strip('[)').split(',')]
+        if lo <= p < hi: s = float(r.przesuniecie)
+    if k.startswith('U') and p >= 0.5: s = min(s, -0.04)
+    return max(p + s, 0.0)
+
+
 def korekta_wlasna(pc, kor_rynku):
     """Korekta z wlasnych rozliczonych typow (korekta_wlasna.csv, wiersze jednego rynku).
     30.09.2026 (przeglad): przedzial wybierany po P PRZED korekta i tylko jeden — dotad korekta mogla przesunac P
@@ -793,7 +804,7 @@ def club(home, away, kursy, live=None):
         def _pi():
             mm, R, N = prepare(m.dropna(subset=['FTHome', 'FTAway']))
             return R, N, fit_pi_glm(mm[mm.MatchDate >= today - pd.Timedelta(days=365 * 4)])
-        R, N, pg = cached(f'pi_{today.date()}', _pi)
+        R, N, pg = cached(f'pi2_{today.date()}', _pi)   # pi2: 30.09.2026 srednie lig sciagane (pi.K_LIGA)
         if dh != da and lel is not None:
             # 30.09.2026 (przeglad): przy wagach Elo = 0 (ensemble_wagi.json) mecz dwoch lig liczyl sie z SAMEGO pi,
             # choc oceny pi z roznych lig sa nieporownywalne (patrz ROZNE LIGI BEZ ELO wyzej) — a wynik mial gwiazdki.
@@ -843,13 +854,7 @@ def club(home, away, kursy, live=None):
     kr_p = os.path.join(HERE, 'korekta_rynkow_v5n.csv')
     if os.path.exists(kr_p) and os.path.exists(os.path.join(HERE, 'ensemble_wagi.json')):
         KR = pd.read_csv(kr_p); cal = {}
-        def calibrate_v5n(k, p):   # korekta per rynek tylko w dół; rynki „poniżej” zawsze min. −4 pp (reguła użytkownika)
-            s = 0.0
-            for r in KR[KR.rynek == k].itertuples():
-                lo, hi = [float(x) for x in str(r.przedzial).strip('[)').split(',')]
-                if lo <= p < hi: s = float(r.przesuniecie)
-            if k.startswith('U') and p >= 0.5: s = min(s, -0.04)
-            return max(p + s, 0.0)
+        calibrate_v5n = lambda k, p: kalibruj_v5n(KR, k, p)
     else:
         calibrate_v5n = None
         cal = load_calibration(os.path.join(HERE, 'kalibracja_mapa.csv'))
