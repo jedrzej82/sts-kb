@@ -706,7 +706,35 @@ def inne():
                     ot = -1
             except ValueError: ot = -1
         rows.append((r.data, sp, liga, r.gosp, r.gosc, pg, pa, ot))
-    return pd.DataFrame(rows, columns=['data', 'sport', 'liga', 'gosp', 'gosc', 'pg', 'pa', 'dogrywka'])
+    return _przemianowane_dubli(pd.DataFrame(rows, columns=['data', 'sport', 'liga', 'gosp', 'gosc', 'pg', 'pa', 'dogrywka']))
+
+
+# 30.09.2026 (Raport 12:00): 365scores zmienia nazwe druzyny miedzy odczytami („Tauragės KK Tauragė” -> „Tauragė”,
+# „ADELAIDE 36ers” -> „Adelaide”, „Sydney Kings” -> „Sydney”), a klucz dubli w czytaj() zawiera nazwy — ten sam mecz
+# wchodzil DWA razy (17 meczow koszykowki od 07.2026). W koszykowce i recznej druzyna gra najwyzej raz dziennie,
+# a wynik punktowy jest praktycznie niepowtarzalny: ta sama druzyna + dzien + identyczny wynik = ten sam mecz.
+# Zostaje wiersz z nazwa rywala, ktora ma w danych wiecej meczow (inaczej klub mialby dwa Elo). Siatkowka (3:0)
+# i hokej (2:1) maja wyniki zbyt czeste, zeby tak rozstrzygac.
+PUNKTOWE = {'koszykówka', 'piłka ręczna'}
+
+
+def _przemianowane_dubli(d):
+    if not len(d): return d
+    m = d.sport.isin(PUNKTOWE) & (pd.to_numeric(d.pg, errors='coerce') + pd.to_numeric(d.pa, errors='coerce') >= 30)
+    if not m.any(): return d
+    ile = pd.concat([d.gosp, d.gosc]).value_counts()
+    dzien = d.data.astype(str).str[:10]
+    usun = set()
+    for (sp, dz, t, a, b), gr in pd.concat([
+            pd.DataFrame({'i': d.index, 'sp': d.sport, 'dz': dzien, 't': d.gosp, 'a': d.pg, 'b': d.pa, 'r': d.gosc}),
+            pd.DataFrame({'i': d.index, 'sp': d.sport, 'dz': dzien, 't': d.gosc, 'a': d.pa, 'b': d.pg, 'r': d.gosp})])[
+            lambda x: m[x.i].values].groupby(['sp', 'dz', 't', 'a', 'b']):
+        gr = gr[~gr.i.isin(usun)]
+        if len(gr) < 2 or gr.r.nunique() < 2: continue
+        zost = max(gr.itertuples(), key=lambda z: (ile.get(z.r, 0), z.i)).i
+        usun |= set(gr.i) - {zost}
+    if usun: print(f'  zewn: {len(usun)} dubli po zmianie nazwy druzyny w zrodle (ta sama druzyna, dzien i wynik) odrzuconych.')
+    return d.drop(index=sorted(usun)).reset_index(drop=True)
 
 
 # Challengery/WTA125 bez nawierzchni w API: turnieje ziemne (reszta = twarda; trawa tylko czerwiec–lipiec)
