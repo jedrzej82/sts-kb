@@ -8,7 +8,7 @@
   tenis_hist.csv   — ATP i WTA 1968–dziś (LuckyLoser91/TennisCourtLog, format Sackmanna, aktualizowane co tydzień)
 Kolumna dogrywka: 1 = dogrywka/karne/dodatkowe inningi, 0 = regulaminowy czas, -1 = nieznane.
   python3 hist_import.py          — pobiera/aktualizuje źródła i przebudowuje cache (ok. 2–3 min)"""
-import os, re, glob, subprocess, datetime as dt, pandas as pd
+import os, re, sys, glob, subprocess, unicodedata, datetime as dt, numpy as np, pandas as pd
 
 HERE = os.path.dirname(os.path.abspath(__file__)); RAW = os.path.join(HERE, 'raw'); REL = os.path.join(RAW, 'rel')
 REPOS = {'hoopR-data': ('sportsdataverse/hoopR-data', 'nba/schedules/csv/*'),
@@ -275,12 +275,32 @@ def _jeden_zapis(n):
     return re.sub(r"[’ʼ`´]", "'", html.unescape(n))
 
 
+_TURNIEJ_OGOLNE = {'open', 'atp', 'wta', 'itf', 'challenger', 'men', 'women', 'singles', 'doubles', 'qualification',
+                   'the', 'de', 'di', 'tennis', 'championships', 'international', 'internationaux', 'trophy', 'cup'}
+_DRUZYNOWE = ('davis', 'billie', 'bjk', 'fed cup', 'united cup', 'hopman', 'laver')
+
+
+def ten_sam_turniej(a, b):
+    """Czy dwie nazwy turnieju (365/Flashscore vs TennisCourtLog) to ten sam turniej: wspolny czlon znaczacy
+    („Jiujiang, China” ~ „Jiujiang”) albo oba to te same rozgrywki druzynowe (Davis Cup, BJK Cup)."""
+    na, nb = str(a).lower(), str(b).lower()
+    for x in _DRUZYNOWE:
+        if x in na and x in nb: return True
+    ta = {w for w in re.findall(r'[a-z]+', unicodedata.normalize('NFKD', na).encode('ascii', 'ignore').decode())
+          if len(w) >= 3 and w not in _TURNIEJ_OGOLNE}
+    tb = {w for w in re.findall(r'[a-z]+', unicodedata.normalize('NFKD', nb).encode('ascii', 'ignore').decode())
+          if len(w) >= 3 and w not in _TURNIEJ_OGOLNE}
+    return bool(ta & tb)
+
+
 def main():
     fetch()
     parts = [espn('nba', 'NBA'), espn('wnba', 'WNBA'), nhl(), nfl(), mlb(), esport()]
-    try:
-        import zewn; parts.append(zewn.inne())   # Sofascore przez Apps Script: siatkówka, ręczna, hokej EU, tenis stołowy, futsal…
-    except Exception as ex: print('UWAGA: zewn.inne nie wczytany:', ex)
+    # 30.09.2026 (przeglad): blad zewn.inne byl tylko „UWAGA” i kod 0 — sporty_hist bez siatkowki, recznej, hokeja EU
+    # i koszykowki poza NBA, a przebieg konczyl „PRZEBIEG OK”. To glowne zrodlo innych sportow: blad = stop.
+    import zewn
+    try: parts.append(zewn.inne())   # 365scores/Flashscore przez Apps Script: siatkówka, ręczna, hokej EU, tenis stołowy, futsal…
+    except Exception as ex: sys.exit(f'BLAD: zewn.inne nie wczytany ({type(ex).__name__}: {ex}) — sporty_hist bylby bez innych sportow')
     for fn in (kbo_npb, snooker, ufc, dart, rugby):
         try: parts.append(fn())
         except Exception as ex: print('UWAGA:', fn.__name__, 'nie wczytany:', ex)
@@ -304,15 +324,18 @@ def main():
             # turnieju: w danych glownych 'date' to START turnieju, wiec mecz z 365 wypada 0-16 dni pozniej.
             # Danych glownych nie ruszamy (recenzja: drop_duplicates na calosci kasowal np. final Sinner-Fritz
             # z ATP Finals 2024 jako "dubel" meczu grupowego tej samej pary).
-            tk = t[['zwyciezca', 'przegrany', 'date']].rename(columns={'date': 'd_t'})
+            # 30.09.2026 (przeglad): sama para + okno dat kasowala mecz z NASTEPNEGO turnieju (Basavareddy–Draxl
+            # w Sarasocie, gdy dane glowne maja ich mecz w Houston tydzien wczesniej). Teraz takze ten sam turniej.
+            tk = t[['zwyciezca', 'przegrany', 'date', 'tourney_name']].rename(columns={'date': 'd_t', 'tourney_name': 't_t'})
             zz = z.reset_index(drop=True).reset_index().merge(tk, on=['zwyciezca', 'przegrany'], how='inner')
             dz = (zz.date - zz.d_t).dt.days
-            dub = set(zz.loc[(dz >= -1) & (dz <= 16), 'index'])
+            ten_sam = [ten_sam_turniej(a, b) for a, b in zip(zz.tourney_name, zz.t_t)]
+            dub = set(zz.loc[(dz >= -1) & (dz <= 16) & np.array(ten_sam, dtype=bool), 'index'])
             if dub:
                 print(f'  tenis: pominieto {len(dub)} meczow z 365scores obecnych juz w danych glownych')
                 z = z.reset_index(drop=True).drop(index=list(dub))
             t = pd.concat([t, z], ignore_index=True).sort_values('date', kind='stable')
-    except Exception as ex: print('UWAGA: zewn.tenis nie wczytany:', ex)
+    except Exception as ex: sys.exit(f'BLAD: zewn.tenis nie wczytany ({type(ex).__name__}: {ex}) — tenis_hist bylby bez 365/Flashscore')
     t.to_csv(os.path.join(HERE, 'tenis_hist.csv'), index=False)
     print(t.groupby('tour').agg(mecze=('zwyciezca', 'size'), od=('date', 'min'), do=('date', 'max')).to_string())
 

@@ -491,8 +491,27 @@ def resolve(name, pool):
     return None
 
 
+def stan_bazy():
+    """Znacznik stanu kb.sqlite (czas modyfikacji + rozmiar) do kluczy cache."""
+    f = os.path.join(HERE, 'kb.sqlite')
+    return f'{int(os.path.getmtime(f))}_{os.path.getsize(f)}' if os.path.exists(f) else '0'
+
+
+def korekta_wlasna(pc, kor_rynku):
+    """Korekta z wlasnych rozliczonych typow (korekta_wlasna.csv, wiersze jednego rynku).
+    30.09.2026 (przeglad): przedzial wybierany po P PRZED korekta i tylko jeden — dotad korekta mogla przesunac P
+    do nastepnego przedzialu i dostac druga (0,72 -> 0,77 -> 0,89), czyli zawyzyc P."""
+    for r in kor_rynku.itertuples():
+        lo, hi = [float(x) for x in str(r.przedział).strip('[)').split(',')]
+        if lo <= pc < hi:
+            return (1 - r.waga) * pc + r.waga * r.trafność
+    return pc
+
+
 def cached(key, fn):
-    p = os.path.join(HERE, 'cache', f'{key}.pkl'); os.makedirs(os.path.dirname(p), exist_ok=True)
+    # 30.09.2026 (przeglad): klucz byl sama data — dopasowania DC/GLM/pi z pierwszego wywolania dnia zostawaly
+    # w cache/ i nie widzialy wynikow dopisanych pozniej (przebudowa bazy). Teraz klucz zawiera stan kb.sqlite.
+    p = os.path.join(HERE, 'cache', f'{key}_{stan_bazy()}.pkl'); os.makedirs(os.path.dirname(p), exist_ok=True)
     if os.path.exists(p): return pickle.load(open(p, 'rb'))
     v = fn(); pickle.dump(v, open(p, 'wb')); return v
 
@@ -842,9 +861,7 @@ def club(home, away, kursy, live=None):
     for k in KEY_MARKETS:
         p = mk[k]; pc = calibrate_v5n(k, p) if calibrate_v5n else calibrate(cal, k, p)
         if kor is not None:  # uczenie na własnych rozliczonych typach
-            for r in kor[kor.rynek == k].itertuples():
-                lo, hi = [float(x) for x in str(r.przedział).strip('[)').split(',')]
-                if lo <= pc < hi: pc = (1 - r.waga) * pc + r.waga * r.trafność
+            pc = korekta_wlasna(pc, kor[kor.rynek == k])
         rows.append((k, p, pc))
     print('\nRynek            P_model  P_skalibr.' + ('   (v5n: korekta per rynek z backtestu; „poniżej” już −4 pp — nie odejmuj drugi raz)' if calibrate_v5n else ''))
     # 23.09.2026, USTERKA U4: przy danych nieswiezych albo jednym modelu tabela nie moze udawac
