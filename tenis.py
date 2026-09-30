@@ -517,6 +517,9 @@ def main():
         t = d.iloc[:len(pre)].assign(rw=[x[0] for x in pre], rl=[x[1] for x in pre], sw=[x[2] for x in pre], sl=[x[3] for x in pre],
                                       nw=[x[4] for x in pre], nl=[x[5] for x in pre])
         t = t[(t.date >= cut) & (t.nw >= 10) & (t.nl >= 10)]
+        # 30.09.2026 (przeglad): tylko mecze do 2 wygranych setow — p_skalibr kalibruje P skali bo3 i dopiero potem
+        # przelicza na bo5; ok. 1350 meczow bo5 w dopasowaniu podnosilo krzywa (wzmocnienie bo5 liczone dwa razy)
+        if 'best_of' in t: t = t[t.best_of.astype(str) != '5']
         ew = 0.5 * t.rw + 0.5 * t.sw; el = 0.5 * t.rl + 0.5 * t.sl
         pw = 1 / (1 + 10 ** ((el - ew) / 400))
         # faworyt = wyższe P; trafienie = faworyt wygrał
@@ -524,7 +527,8 @@ def main():
         c = pd.DataFrame({'p': pf, 'hit': hit}).sort_values('p')
         q = np.array_split(np.arange(len(c)), 15)
         cal = pd.DataFrame([(c.p.values[i].mean(), c.hit.values[i].mean(), len(i)) for i in q], columns=['p_model', 'p_kalibr', 'n'])
-        cal['p_kalibr'] = np.maximum.accumulate(cal.p_kalibr.values)
+        from kalib import pav
+        cal['p_kalibr'] = pav(cal.p_kalibr.values, cal.n.values)   # 30.09.2026: PAV zamiast biezacego maksimum
         cal.to_csv(CAL, index=False, float_format='%.4f')
         print(f'mecze testowe {len(c)}, trafność faworyta {hit.mean():.1%}, Brier {((pw - 1) ** 2).mean():.4f}')
         print(cal.to_string(index=False, float_format=lambda x: f'{x:.3f}')); return

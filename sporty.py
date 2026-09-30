@@ -820,7 +820,8 @@ def backtest(d, sport, od='2015-01-01', maska=None, klucz=None, do=None):
     pf = np.maximum(e, 1 - e); hit = np.where(e >= 0.5, win, 1 - win)
     c = pd.DataFrame({'p': pf, 'h': hit}).sort_values('p'); q = np.array_split(np.arange(len(c)), 12)
     cal = pd.DataFrame([(sport, c.p.values[i].mean(), c.h.values[i].mean(), len(i)) for i in q], columns=['sport', 'p_model', 'p_kalibr', 'n'])
-    cal['p_kalibr'] = np.maximum.accumulate(cal.p_kalibr.values)
+    from kalib import pav
+    cal['p_kalibr'] = pav(cal.p_kalibr.values, cal.n.values)   # 30.09.2026: PAV zamiast biezacego maksimum
     home = win.mean()
     print(f'{sport}: test {len(t)} m. od {od}, trafność faworyta {hit.mean():.1%}, Brier {((e - win) ** 2).mean():.4f}, gospodarz wygrywa {home:.1%}')
     print(cal[['p_model', 'p_kalibr', 'n']].to_string(index=False, float_format=lambda x: f'{x:.3f}'))
@@ -1124,7 +1125,8 @@ def main(a):
             for i in q: rows.append((sp, g.p.values[i].mean(), g.trafiony.values[i].mean(), len(i)))
             print(f'{sp}: {len(g)} prognoz, średnie P {g.p.mean():.1%}, trafność {g.trafiony.mean():.1%}')
         c = pd.DataFrame(rows, columns=['sport', 'p_model', 'p_kalibr', 'n'])
-        c['p_kalibr'] = c.groupby('sport').p_kalibr.transform(lambda s: np.maximum.accumulate(s.values))
+        from kalib import pav
+        c['p_kalibr'] = np.concatenate([pav(g.p_kalibr.values, g.n.values) for _, g in c.groupby('sport', sort=False)])
         c.to_csv(CAL, index=False, float_format='%.4f')
 
 
