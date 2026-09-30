@@ -193,7 +193,10 @@ def czytaj(wzor, bez=None):
     _kw = [c for c in ('wg', 'wa', 'gg', 'ga', 'pg', 'pa') if c in d.columns]
     if 'sport' in d.columns and _kw:
         _dw = d.sport.astype(str).str.lower().isin({'baseball'})
-        d = d.assign(_wyn=d[_kw].astype(str).agg(':'.join, axis=1).where(_dw, ''))
+        # 30.09.2026 (czas przebiegu): sklejanie kolumnami zamiast .agg(axis=1) wiersz po wierszu (ok. 40 s) — ten sam napis
+        _s = d[_kw[0]].astype(str)
+        for _c in _kw[1:]: _s = _s + ':' + d[_c].astype(str)
+        d = d.assign(_wyn=_s.where(_dw, ''))
     else:
         d = d.assign(_wyn='')
     # 29.09.2026 (Liga Pro): ta sama para gra kilka razy dziennie — mecze ze scores24 maja id w kolumnie
@@ -730,10 +733,14 @@ def _przemianowane_dubli(d):
     ile = pd.concat([d.gosp, d.gosc]).value_counts()
     dzien = d.data.astype(str).str[:10]
     usun = set()
-    for (sp, dz, t, a, b), gr in pd.concat([
-            pd.DataFrame({'i': d.index, 'sp': d.sport, 'dz': dzien, 't': d.gosp, 'a': d.pg, 'b': d.pa, 'r': d.gosc}),
-            pd.DataFrame({'i': d.index, 'sp': d.sport, 'dz': dzien, 't': d.gosc, 'a': d.pa, 'b': d.pg, 'r': d.gosp})])[
-            lambda x: m[x.i].values].groupby(['sp', 'dz', 't', 'a', 'b']):
+    x = pd.concat([
+        pd.DataFrame({'i': d.index, 'sp': d.sport, 'dz': dzien, 't': d.gosp, 'a': d.pg, 'b': d.pa, 'r': d.gosc}),
+        pd.DataFrame({'i': d.index, 'sp': d.sport, 'dz': dzien, 't': d.gosc, 'a': d.pa, 'b': d.pg, 'r': d.gosp})])[
+        lambda x: m[x.i].values]
+    # 30.09.2026 (czas przebiegu): tylko grupy z >= 2 roznymi rywalami — reszte petla i tak pomijala (60 tys. grup, ok. 45 s).
+    # Kolejnosc pozostalych grup bez zmian (groupby sortuje klucze), wiec wynik identyczny.
+    x = x[x.groupby(['sp', 'dz', 't', 'a', 'b']).r.transform('nunique') >= 2]
+    for (sp, dz, t, a, b), gr in x.groupby(['sp', 'dz', 't', 'a', 'b']):
         gr = gr[~gr.i.isin(usun)]
         if len(gr) < 2 or gr.r.nunique() < 2: continue
         zost = max(gr.itertuples(), key=lambda z: (ile.get(z.r, 0), z.i)).i

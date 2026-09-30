@@ -216,7 +216,9 @@ def dart():
     """Dart PDC 02–dziś 2026 (walker95sam/darts: ostatnie mecze posiadaczy kart tourowych z dartsorakel, dzienne migawki
     w historii gita → suma migawek). pg/pa = legi; średnie 3-lotkowe → dart_srednie.csv."""
     p = os.path.join(RAW, 'darts_git')
-    if not os.path.exists(p): sh('git', 'clone', '-q', '--filter=blob:none', 'https://github.com/walker95sam/darts', p)
+    # 30.09.2026 (czas przebiegu): pelny klon (10 MB, ok. 1 s) zamiast --filter=blob:none — przy filtrze kazdy „git show”
+    # migawki (ok. 130) dociagal blob z sieci osobno: ok. 60 s. Tresc migawek identyczna.
+    if not os.path.exists(p): sh('git', 'clone', '-q', 'https://github.com/walker95sam/darts', p)
     else: sh('git', '-C', p, 'pull', '-q')
     f = 'docs/data/tourcard_matches_long.csv'
     hs = subprocess.run(['git', '-C', p, 'log', '--format=%h', '--', f], capture_output=True, text=True).stdout.split()
