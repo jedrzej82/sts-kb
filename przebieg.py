@@ -81,16 +81,56 @@ def mecze_w_terminarzu(sport, dzien=None):
     return int(((t.sport == sport) & (t.data.astype(str).str[:10] == d)).sum())
 
 
+def _aktualizacja(f):
+    try:
+        return str(pd.read_csv(f, usecols=['data_aktualizacji'], low_memory=False).data_aktualizacji.astype(str).max())[:16]
+    except Exception:
+        return ''
+
+
+def rozpakuj_arkusze():
+    """30.09.2026 (Raport 15:00, usterka 4): arkusz pobrany jako tekst CSV konektor zwraca W TRESCI odpowiedzi,
+    a przepisanie go w calosci nie miescilo sie w budzecie — przebieg zapisal hokej i reczna NIEPELNE (85 i 39 wierszy).
+    Apps Script arkusze.gs zapisuje co 30 min statystyki_*.csv.gz (i absencje.csv.gz) — kilka razy mniej tekstu.
+    Zapisz je do kb/ jako NAZWA.csv.gz (duzy plik: jq -r .content | base64 -d) albo tekst base64 jako NAZWA.csv.gz.b64;
+    ten krok sprawdza gzip i rozpakowuje do NAZWA.csv. Gdy jest tez NAZWA.csv, zostaje ten z nowsza data_aktualizacji."""
+    import base64, json, gzip
+    for f in sorted(glob.glob(os.path.join(HERE, 'statystyki_*.csv.gz.b64')) + glob.glob(os.path.join(HERE, 'absencje.csv.gz.b64'))):
+        t = open(f, encoding='utf-8', errors='replace').read().strip()
+        try:
+            if t.startswith('{'): t = json.loads(t)['content']
+            raw = base64.b64decode(''.join(t.split())); gzip.decompress(raw)
+        except Exception as e:
+            print(f'  BLAD: {os.path.basename(f)} nie jest poprawnym base64 pliku gzip ({e}) — pobierz ponownie')
+            continue
+        open(f[:-4], 'wb').write(raw); os.remove(f)
+    for f in sorted(glob.glob(os.path.join(HERE, 'statystyki_*.csv.gz')) + glob.glob(os.path.join(HERE, 'absencje.csv.gz'))):
+        cel = f[:-3]
+        try:
+            raw = gzip.decompress(open(f, 'rb').read())
+        except Exception as e:
+            print(f'  BLAD: {os.path.basename(f)} nie jest poprawnym gzip ({e}) — pobierz ponownie'); continue
+        tmp = cel + '.nowy'; open(tmp, 'wb').write(raw)
+        if os.path.exists(cel) and _aktualizacja(cel) > _aktualizacja(tmp):
+            print(f'  {os.path.basename(f)}: starszy niz {os.path.basename(cel)} ({_aktualizacja(tmp)} < {_aktualizacja(cel)}) — zostaje CSV')
+            os.remove(tmp)
+        else:
+            os.replace(tmp, cel); n = raw.count(b'\n')
+            print(f'  rozpakowano {os.path.basename(f)} -> {os.path.basename(cel)} ({n} wierszy)')
+        os.remove(f)
+
+
 def kontrola_arkuszy():
     """Poprawka 53 (24.09, przebieg 21:00): arkusze statystyk to DRUGIE ZRODLO dla pilki klubowej (sezon.py),
     tenisa, koszykowki i siatkowki. Przebieg 21:00 ich nie pobral i sezon.py konczyl sie „BRAK PLIKU”.
     Brak arkusza = BLAD (bez niego te sporty nie maja drugiego zrodla). Arkusz starszy niz 24 h = ostrzezenie."""
+    rozpakuj_arkusze()
     bledy = []
     for a in ARKUSZE:
         f = os.path.join(HERE, a + '.csv')
         if not os.path.exists(f):
-            bledy.append(f'brak {a}.csv — pobierz arkusz Google „{a}” z Dysku (download_file_content, '
-                         f'exportMimeType text/csv) i zapisz jako kb/{a}.csv')
+            bledy.append(f'brak {a}.csv — pobierz z Dysku plik {a}.csv.gz do kb/ (Apps Script arkusze.gs); gdy go nie ma — '
+                         f'arkusz Google „{a}” (download_file_content, exportMimeType text/csv) jako kb/{a}.csv')
             continue
         try:
             d = pd.read_csv(f, usecols=['data_aktualizacji'], low_memory=False).data_aktualizacji.astype(str).max()
