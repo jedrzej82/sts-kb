@@ -197,12 +197,16 @@ def kontrola_zewn():
                 print(f'  UWAGA: zewn/{nazwa} nieczytelny ({e}) — kontrola terminarza w typuj.py bez tego pliku')
         else:
             print(f'  zewn/{nazwa}: brak (opcjonalny — pobierz z Dysku, jesli Apps Script go zapisuje)')
-    arch = glob.glob(os.path.join(ZD, 'wyniki_365_pilka_archiwum_*.csv.gz'))
-    if not arch:
-        bledy.append('brak zewn/wyniki_365_pilka_archiwum_*.csv.gz (sezon 2025/26) — pobierz z Dysku; '
-                     'bez niego baza ma ~60 tys. meczow mniej')
-    else:
-        print(f'  archiwum: {", ".join(os.path.basename(a) for a in sorted(arch))}')
+    # archiwa sezonu 2025/26 sa w repo (Poprawka 74); „inne” niesie cala historie hokeja/koszykowki/siatkowki —
+    # bez niego sporty.py liczy Elo z samych biezacych miesiecy i nikt tego nie widzi
+    for rodzaj, skutek in (('pilka', 'baza pilkarska ma ~60 tys. meczow mniej'),
+                           ('inne', 'Elo innych sportow tylko z biezacych miesiecy')):
+        arch = glob.glob(os.path.join(ZD, f'wyniki_365_{rodzaj}_archiwum_*.csv.gz'))
+        if not arch:
+            bledy.append(f'brak zewn/wyniki_365_{rodzaj}_archiwum_*.csv.gz (sezon 2025/26, powinien byc w repo) — '
+                         f'pobierz z Dysku; bez niego {skutek}')
+        else:
+            print(f'  archiwum: {", ".join(os.path.basename(a) for a in sorted(arch))}')
     return bledy
 
 
