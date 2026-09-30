@@ -139,3 +139,13 @@ def test_sezon_tenis_drugie_imie_w_arkuszu():
     assert sezon.znajdz(w, 'Schwaerzler Joel', sport='tenis')[0]['druzyna'] == 'Joel Josef Schwaerzler'
     assert sezon.znajdz(w, 'Starodubtseva Yuliia', sport='tenis')[0]['druzyna'] == 'Yulia Starodubtsewa'
     assert sezon.znajdz(w, 'Kowalska Anna', sport='tenis')[0] is None          # dwie rozne osoby — bez zgadywania
+
+
+def test_rozliczenie_skroty_krajow_i_zwyciezca_bez_strony():
+    import typuj, dzienniki
+    pula = {'North Macedonia', 'Northern Ireland', 'South Korea', 'North Korea', 'Macedonia'}
+    assert typuj.resolve('Macedonia Pn.', pula) == 'North Macedonia'
+    assert typuj.resolve('Irlandia Pn.', pula) == 'Northern Ireland'
+    assert typuj.resolve('Korea Pd.', pula) == 'South Korea' and typuj.resolve('Korea Pn.', pula) == 'North Korea'
+    assert dzienniki._bez_strony('zwyciezca') and dzienniki._bez_strony('Zwycięzca meczu (z dogrywką)')
+    assert not dzienniki._bez_strony('Zwyciezca 1') and not dzienniki._bez_strony('zwyciezca Hapoel')

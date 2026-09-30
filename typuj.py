@@ -160,6 +160,9 @@ _KRAJE_PL = {
     'chiny': ('China', 'China PR'), 'chorwacja': ('Croatia',), 'cypr': ('Cyprus',),
     'czarnogora': ('Montenegro',), 'czechy': ('Czechia', 'Czech Republic'),
     'dania': ('Denmark',), 'dominikana': ('Dominican Republic',), 'dominika': ('Dominica',),   # 30.09: Dominika != Dominikana
+    # 30.09 (Rozliczenie 29.09): skroty STS „Pn.”/„Pd.” — „Macedonia Pn.” nie rozliczala sie (BRAK WYNIKU)
+    'macedoniapn': ('North Macedonia',), 'irlandiapn': ('Northern Ireland',),
+    'koreapd': ('South Korea', 'Korea Republic'), 'koreapn': ('North Korea', 'Korea DPR'),
     'brytyjskiewyspydziewicze': ('British Virgin Islands',), 'wyspydziewiczeusa': ('United States Virgin Islands',),
     'amerykanskiewyspydziewicze': ('United States Virgin Islands',), 'egipt': ('Egypt',),
     'ekwador': ('Ecuador',), 'estonia': ('Estonia',), 'filipiny': ('Philippines',),

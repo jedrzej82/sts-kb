@@ -314,6 +314,9 @@ def _rozlicz_noge(r, W):
     pg, pa = (x.pa, x.pg) if odw else (x.pg, x.pa)
     wyn = f'{int(pg)}:{int(pa)}' + (' (dogr.)' if x.ot == 1 else '')
     typ = _typ_zwyciezcy(rynek, gosp, gosc, gosp, gosc)
+    if typ is None and _bez_strony(rynek):
+        # 30.09.2026 (Rozliczenie 29.09, Hapoel Jerozolima – Rostock): w ako_log samo „zwyciezca” — nie wiadomo, na kogo
+        return 'BRAK WYNIKU', wyn, 'rynek „zwyciezca” BEZ STRONY w ako_log — nie zgadujemy (zapisuj „Zwyciezca 1/2” albo nazwe druzyny)'
     if typ is None: return 'BRAK WYNIKU', wyn, f'rynek „{rynek}” nieobslugiwany'
     regulamin = not re.search(r'dogryw|z OT|incl', rynek, re.I) and sp in sporty.DRAW_PRIOR
     if regulamin and x.ot == 1: return 'PRZEGRANY', wyn, 'rozstrzygniety w dogrywce, a rynek w czasie regulaminowym'
@@ -324,6 +327,10 @@ def _rozlicz_noge(r, W):
         return 'BRAK WYNIKU', wyn, 'remis przy rynku zwyciezcy — sprawdz recznie'
     zw = gosp if pg > pa else gosc
     return ('TRAFIONY' if typ == zw else 'PRZEGRANY'), wyn, ''
+
+
+def _bez_strony(rynek):
+    return not re.sub(r'(?i)^zwyci[eę]zca(\s+meczu)?|\(?z?\s*dogryw\w*\)?', '', str(rynek)).strip()
 
 
 def _typ_zwyciezcy(rynek, gosp, gosc, h, g):
