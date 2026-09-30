@@ -217,6 +217,9 @@ def elo(d, sport, pre=None, info=None):
         a, b = R.get(r.gosp, 1500.), R.get(r.gosc, 1500.)
         if pre is not None: pre.append((a, b, N.get(r.gosp, 0), N.get(r.gosc, 0)))
         e = 1 / (1 + 10 ** ((b - a - hfa) / 400))
+        # 30.09.2026 (przeglad): remis w sporcie bez remisow (82:82 w koszykowce, 0:0 w baseballu) to migawka albo mecz
+        # przelozony — dotad liczony jako wygrana GOSCIA z pelnym K
+        if not draws and r.pg == r.pa: continue
         reg_draw = getattr(r, 'dogrywka', 0) == 1 and draws
         s = 0.5 if (r.pg == r.pa or reg_draw) and draws else (1.0 if r.pg > r.pa else 0.0)
         margin = np.log1p(abs(r.pg - r.pa)) if r.pg != r.pa else 1
@@ -387,7 +390,10 @@ _OGOLNE = frozenset('fc cf sc ac as ss sv fk nk sk bk hk hc mhk vk kk rk ok ks c
 _PRZYDOMKI_USA = frozenset('''49ers aggies anteaters antelopes aztecs badgers baylor bearcats bears beavers bengals big bison black blazers blue bobcats boilermakers bonnies broncos bruins buccaneers buckeyes bucs buffaloes bulldogs bulls cajuns cardinal cardinals catamounts cavaliers chanticleers chargers chippewas colonels commodores cornhuskers cougars cowboys coyotes crimson crusaders cyclones deacons demon devils dolphins dons ducks dukes eagles explorers falcons fighting flames flash flashes friars frogs gaels gamecocks gators golden gophers governors green greyhounds grizzlies hatters hawkeyes hawks heels herd highlanders hilltoppers hokies hoosiers horned hornets hoyas hurricane hurricanes huskers huskies illini irish jackets jackrabbits jaguars jayhawks keydets knights lancers leathernecks lions lobos longhorns lumberjacks matadors mavericks mean midshipmen miners minutemen mocs monarchs mountaineers mustangs niners nittany orange ospreys owls pack paladins panthers penguins phoenix pilots pirates quakers racers ragin raiders rainbow rams razorbacks rebels red redbirds redhawks retrievers roadrunners rockets runnin salukis scarlet seahawks seawolves seminoles skyhawks sooners spartans spiders stags statesmen sun sycamores tar terrapins terriers thunderbirds thundering tide tigers titans toreros tribe tritons trojans utes vandals volunteers warhawks warriors wave wildcats wolf wolfpack wolverines wolves yellow zips'''.split())
 
 
-def _skrot_albo_nic(name, wyn, pula):
+OSOBOWE = {'snooker', 'dart', 'mma', 'boks', 'tenis stołowy', 'badminton', 'żużel'}   # nazwa = imie i nazwisko osoby
+
+
+def _skrot_albo_nic(name, wyn, pula, osoba=True):
     """22.09.2026, USTERKA U1 z przebiegu 21:00: "Independiente Yumbo" (Kolumbia, II liga) zostalo
     policzone jako "Independiente" (Argentyna, Avellaneda) — oczekiwane gole 2,05 : 0,84 z sily
     klubu z innego kraju. Kod wypisywal ostrzezenie i MIMO TO zwracal klub. Ostrzezenie w logu
@@ -399,7 +405,18 @@ def _skrot_albo_nic(name, wyn, pula):
           z ostrzezeniem. Tego przypadku NIE DA SIE odroznic od "Independiente Yumbo" po samym
           napisie (w bazie jest jedno Independiente), dlatego typuj.py sprawdza dodatkowo KRAJ ligi."""
     tn, tk = _tokeny(name), _tokeny(wyn)
-    if len(tn) <= len(tk): return wyn
+    if len(tn) <= len(tk):
+        # 30.09.2026 (przeglad): nazwa z oferty KROTSZA niz w bazie wracala bez kontroli („Zenit” -> „Zenit-2”,
+        # „New Zealand” -> „New Zealand Breakers”, „Nigeria” -> „Nigeria Customs”). Dodatkowe czlony w bazie wolno
+        # pominac tylko, gdy sa ogolne („Nitra” -> „MHK Nitra”) albo sa przydomkiem druzyny z USA („Boston” -> „Boston Celtics”).
+        dod = tk[len(tn):] if tk[:len(tn)] == tn else tk[:-len(tn)] if tn and tk[-len(tn):] == tn else tuple(t for t in tk if t not in tn)
+        if all(t in _OGOLNE for t in dod) or (tk[:len(tn)] == tn and all(t in _PRZYDOMKI_USA for t in dod)):
+            return wyn
+        if osoba and len(tn) == 1 and len(tk) == 2 and tk[1] == tn[0]:   # samo nazwisko osoby: „Littler” -> „Luke Littler”
+            print(f'  UWAGA: "{name}" -> "{wyn}" (samo nazwisko, jeden kandydat w bazie)')
+            return wyn
+        print(f'  ODRZUCONO: "{name}" -> "{wyn}": w bazie dodatkowe czlony {" ".join(dod)} — to moze byc INNA druzyna, noga MNIEJ.')
+        return None
     if tn[:len(tk)] == tk: odp = tn[len(tk):]
     elif tn[-len(tk):] == tk: odp = tn[:-len(tk)]
     else: odp = tuple(t for t in tn if t not in tk)
@@ -558,7 +575,30 @@ def _osoba_rowna(a, b):
     return False
 
 
+_KRAJE_EN = None
+
+
+def _kraj(s):
+    """Czy nazwa (bez znacznika kobiet) to nazwa kraju — polska albo angielska z _KRAJE_PL."""
+    global _KRAJE_EN
+    if _KRAJE_EN is None:
+        _KRAJE_EN = set(_KRAJE_PL) | {norm(x) for v in _KRAJE_PL.values() for x in v}
+    t = [x for x in _tokeny(s) if x not in _KOBIETY]
+    return bool(t) and norm(' '.join(t)) in _KRAJE_EN
+
+
 def resolve(name, pool, sport=None):
+    """30.09.2026 (przeglad): reprezentacja nie moze trafic w klub — „Qatar” -> „Qatar SC”, „Cameroon” -> „Cameron”,
+    „El Salvador (W)” -> „Salvador Basketball (W)”, „Hong Kong (W)” -> „Hong Kong VC (W)” (sciezki rdzenia i rozmyta).
+    Gdy nazwa z oferty to kraj, wynik tez musi byc krajem — inaczej None (noga MNIEJ)."""
+    r = _resolve(name, pool, sport)
+    if r and _kraj(name) and not _kraj(r):
+        print(f'  ODRZUCONO: "{name}" to reprezentacja, a "{r}" nie — noga MNIEJ.')
+        return None
+    return r
+
+
+def _resolve(name, pool, sport=None):
     """Zwraca nazwe z bazy albo None. None JEST POPRAWNYM WYNIKIEM — wolacz ma sie wtedy zatrzymac.
     21.09.2026: naprawiona ta sama usterka, ktora wykryto w typuj.py. Nazwa zapisana cyrylica
     (np. "Pyx") po norm() daje PUSTY klucz, a pusty ciag zawiera sie w kazdym napisie, wiec
@@ -600,7 +640,8 @@ def resolve(name, pool, sport=None):
     # 29.09.2026 (Liga Pro): scores24 pisze gracza "Jakub Stolfa", STS "Stolfa Jakub" albo "Stolfa J." —
     # dwuczlonowe nazwy osob porownujemy tez w odwrotnej kolejnosci i z inicjalem imienia; tylko jeden kandydat.
     # 29.09.2026: apostrof nie dzieli nazwiska („O'Connor William” to 2 czlony, nie 3) i 3-4 czlony („van Veen Gian”)
-    _czl = lambda s: [norm(x) for x in re.findall(r'[^\W\d_]+', re.sub(r"['’ʼ`´]", '', html.unescape(str(s))).translate(_LITERY))]
+    # 30.09.2026 (przeglad): cyfry zostaja czlonami — „CSKA-2 Moscow” nie jest „CSKA Moscow”
+    _czl = lambda s: [norm(x) for x in re.findall(r'[^\W_]+', re.sub(r"['’ʼ`´]", '', html.unescape(str(s))).translate(_LITERY))]
     _n2 = _czl(name)
     if 2 <= len(_n2) <= 4:
         kand = sorted({p for p in by.values() if _osoba_rowna(_n2, _czl(p))})
@@ -645,7 +686,7 @@ def resolve(name, pool, sport=None):
                 print(f'  ODRZUCONO: "{name}" pasuje do {len(c)} wpisow ({", ".join(sorted(c)[:5])}) — '
                       f'nie zgadujemy, noga MNIEJ.')
                 return None
-        return _skrot_albo_nic(name, wyn, by.values())
+        return _skrot_albo_nic(name, wyn, by.values(), osoba=sport is None or sport in OSOBOWE)
     # prog 0.7 byl za luzny i milczacy; 0.80 jak w typuj.py, z ostrzezeniem dla czlowieka
     # rozmyte tylko dla dluzszych nazw i z wysokim progiem (0,87 zamiast 0,80:
     # przy 0,80 "Argentinos"->"Argentino MM", "Champions"->"Campion", "Karlstad"->"Harstad") — przy 3-5 znakach prog 0,80 osiaga sie trywialnie
@@ -655,7 +696,9 @@ def resolve(name, pool, sport=None):
     # przechodzilo jeszcze "Champions"->"Campion" i "Academico"->"Academica" (dwa rozne kluby).
     # Brak dopasowania to noga MNIEJ na kuponie, pomylona druzyna to kupon przegrany —
     # ta asymetria kaze wybrac ostroznosc.
-    m = [x for x in m if x[:3] == k_[:3]]
+    # 30.09.2026 (przeglad): i dlugosc rozna najwyzej o 1 znak (literowka, transliteracja „Moskva”/„Moskwa”) —
+    # „Club Italiano (W)” -> „Club Italia (W)” i „Cameroon” -> „Cameron” to inne druzyny, nie literowki
+    m = [x for x in m if x[:3] == k_[:3] and abs(len(x) - len(k_)) <= 1]
     if m:
         print(f'  UWAGA: "{name}" dopasowane ROZMYTO do "{by[m[0]]}" — upewnij sie, ze to ta sama druzyna.')
         return by[m[0]]
@@ -716,7 +759,9 @@ def poza_nhl(ligi):
 def calibrate(sport, p, klucz=None):
     """Najpierw własne rozliczone prognozy (n≥150), potem backtest historyczny (dotyczy P faworyta/zwycięzcy, bez remisu).
     klucz: osobna tabela w backteście historycznym (np. 'hokej_poza_nhl'); brak jej w pliku = tabela sportu."""
-    for path, lab in ((CAL, 'własne prognozy'), (CALH, 'backtest historyczny')):
+    # 30.09.2026 (przeglad): tabela WLASNYCH prognoz (CAL) mierzy logowane P (juz skalibrowane, P do kuponu) — stosowanie
+    # jej do surowego Elo kalibrowalo dwa razy; teraz idzie osobno, na koncu (kal_wlasna), a tu tylko backtest historyczny.
+    for path, lab in ((CALH, 'backtest historyczny'),):
         if not os.path.exists(path): continue
         c = pd.read_csv(path)
         if klucz and path == CALH and (c.sport == klucz).any(): c, lab = c[c.sport == klucz], f'{lab}, {klucz}'
@@ -725,6 +770,21 @@ def calibrate(sport, p, klucz=None):
         q = max(p, 1 - p); pc = float(np.interp(q, c.p_model, c.p_kalibr))
         return (pc if p >= 0.5 else 1 - pc), f'skalibrowane ({lab}, n={int(c.n.sum())})'
     return p, 'BRAK KALIBRACJI dla tego sportu — P traktuj jak „szacunek” (max 1 na kupon), dopóki sporty.py rozlicz nie zbierze ≥150 prognoz'
+
+
+def rynki_60min(ec, pdraw):
+    """P wygranej 1 i 2 w czasie regulaminowym przy P meczu z dogrywka `ec` i P remisu po 60 min `pdraw`.
+    Mniejsza z dwoch wersji (dogrywka wygrywana z P = ec albo 50/50) — nigdy nie zawyza zadnej strony."""
+    return (max(0.0, min(ec * (1 - pdraw), ec - pdraw / 2)), max(0.0, min((1 - ec) * (1 - pdraw), (1 - ec) - pdraw / 2)))
+
+
+def kal_wlasna(sport, p):
+    """Korekta z wlasnych rozliczonych prognoz (sporty_kalibracja.csv, rynki 1/2, n >= 150) na KONCOWYM P faworyta."""
+    if not os.path.exists(CAL): return p, ''
+    c = pd.read_csv(CAL); c = c[c.sport == sport]
+    if c.n.sum() < 150: return p, ''
+    q = max(p, 1 - p); pc = float(np.interp(q, c.p_model, c.p_kalibr))
+    return (pc if p >= 0.5 else 1 - pc), f'; korekta z wlasnych prognoz (n={int(c.n.sum())})'
 
 
 PARAM = os.path.join(HERE, 'sporty_param.json')   # v5n: model marży punktowej + zespół z Elo (sporty_bt.py)
@@ -974,8 +1034,13 @@ def main(a):
             print(f'  v5n: przewidywana różnica punktów {pm_:+.1f} (odch. std {prm["sd"]:.1f}); P Elo {e:.1%}, P marży {p_m:.1%}')
             note = (f'v5n: zespół Elo + marża punktowa, kalibracja Platta (test od {prm["test_od"]}: logloss '
                     f'{prm["logloss_obecny"]:.4f} → {prm["logloss_nowy"]:.4f})')
+        ec, _kw = kal_wlasna(sport, ec); note += _kw
         if draws:
-            for k_, p in (('1 (60 min / regulaminowy czas)', ec * (1 - pdraw)), ('X', pdraw), ('2', (1 - ec) * (1 - pdraw)),
+            # 30.09.2026 (przeglad): ec*(1-pdraw) zaklada, ze dogrywke wygrywa faworyt z P = ec; przy dogrywce ~50/50
+            # wychodzi ec - pdraw/2. Bez danych o dogrywkach (dogrywka = -1) nie da sie tego zmierzyc — bierzemy MNIEJSZA
+            # wartosc z obu, zeby nie zawyzac zadnej strony (dotad slabszy dostawal ok. 15,6% zamiast ok. 10%).
+            p1_60, p2_60 = rynki_60min(ec, pdraw)
+            for k_, p in (('1 (60 min / regulaminowy czas)', p1_60), ('X', pdraw), ('2', p2_60),
                           ('1 z dogrywką', ec), ('2 z dogrywką', 1 - ec)):
                 print(f'  {k_:<32} {p:6.1%}')
         else:
@@ -1026,17 +1091,32 @@ def main(a):
     elif a[0] == 'rozlicz':
         if not os.path.exists(LOG): sys.exit('brak prognoz')
         L = pd.read_csv(LOG); d = load()
-        key = {(str(r.data.date()), r.sport, norm(r.gosp), norm(r.gosc)): r for r in d.itertuples()}
+        key = {}
+        for r in d.itertuples(): key.setdefault((str(r.data.date()), r.sport, norm(r.gosp), norm(r.gosc)), []).append(r)
         for i, r in L[L.trafiony.isna()].iterrows():
-            x = key.get((str(r.data)[:10], r.sport, norm(r.gosp), norm(r['gosc'])))
-            if x is None: continue
-            reg_draw = bool(x.dogrywka) or x.pg == x.pa
+            # 30.09.2026 (przeglad): daty NHL/NBA sa amerykanskie, 365 w UTC, log po polsku — wieczorny mecz w Ameryce
+            # ma w bazie dzien wczesniej. Szukamy w oknie ±1 dnia, rozliczamy tylko JEDEN pasujacy mecz.
+            d0 = pd.Timestamp(str(r.data)[:10])
+            kand = [x for k in (-1, 0, 1) for x in key.get((str((d0 + pd.Timedelta(days=k)).date()), r.sport, norm(r.gosp), norm(r['gosc'])), [])]
+            if len(kand) != 1:
+                if len(kand) > 1: print(f'  NIEROZLICZONE: {r.gosp} – {r["gosc"]} {str(r.data)[:10]}: {len(kand)} meczow w oknie ±1 dnia')
+                continue
+            x = kand[0]
             m = str(r.rynek)
-            hit = {'1': x.pg > x.pa, '2': x.pa > x.pg, 'X': reg_draw, '1_60min': (x.pg > x.pa) and not reg_draw,
-                   '2_60min': (x.pa > x.pg) and not reg_draw}.get(m)
+            dg = getattr(x, 'dogrywka', -1)
+            if pd.isna(dg) or dg == -1:
+                # 30.09.2026 (przeglad): „nie wiadomo” (-1) bylo liczone jak „byla dogrywka” — X zawsze trafione,
+                # 1_60min/2_60min zawsze chybione. Bez wiedzy o dogrywce rozliczamy tylko rynki z dogrywka
+                # (i X, gdy wynik koncowy jest remisem).
+                hit = {'1': x.pg > x.pa, '2': x.pa > x.pg, 'X': True if x.pg == x.pa else None}.get(m)
+            else:
+                reg_draw = dg == 1 or x.pg == x.pa
+                hit = {'1': x.pg > x.pa, '2': x.pa > x.pg, 'X': reg_draw, '1_60min': (x.pg > x.pa) and not reg_draw,
+                       '2_60min': (x.pa > x.pg) and not reg_draw}.get(m)
             if hit is not None: L.loc[i, 'trafiony'] = int(hit)
         L.to_csv(LOG, index=False)
         done = L.dropna(subset=['trafiony'])
+        done = done[done.rynek.astype(str).isin(['1', '2'])]   # tabela kal_wlasna: tylko rynki 1/2 (P faworyta z dogrywka)
         if done.empty: print('brak rozliczonych'); return
         rows = []
         for sp, g in done.groupby('sport'):
