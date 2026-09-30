@@ -27,8 +27,6 @@ kursy*.csv
 sklady_kursy*.csv
 porownanie_zrodel*.csv
 arkusze_*.tar.gz
-zewn/wyniki_*.csv.gz
-zewn/terminarz_*.csv.gz
 paczka.zip
 dzienniki.zip
 dzienniki/
