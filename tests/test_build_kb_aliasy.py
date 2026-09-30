@@ -34,3 +34,10 @@ def test_prawdziwy_alias_nadal_dziala():
         w += [('BRA', dz, 'Fluminense FC', 'CA Mineiro', *wy), ('BRA', dz, 'Fluminense', 'Atletico-MG', *wy)]
     out, n = build_kb._aliasy_raz(_m(w))
     assert n >= 2 and out.HomeTeam.nunique() == 1 and out.AwayTeam.nunique() == 1
+
+
+def test_vinotinto_nie_sklejane_z_rownoleglym_zespolem_2025():
+    # 30.09.2026: w 2025 „Vinotinto” (Serie A) i „Vinotinto del Ecuador FC” (Serie B) graly rownolegle (10.08.2025 oba)
+    import kluby
+    assert ('Ecuador | Serie B', 'Vinotinto') not in kluby.SCAL_RECZNIE
+    assert ('Ecuador | Serie B', 'Vinotinto', '2026-01-01') in kluby.SCAL_TYLKO_LIGA

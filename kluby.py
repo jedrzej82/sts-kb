@@ -65,7 +65,9 @@ SCAL_RECZNIE = {
     ('D3', "Jahn R'burg"): 'SSV Jahn Regensburg',   # cel = pelna nazwa: pod nia sa swieze mecze i oferta
     ('D3', "W'burg Kickers"): 'Würzburger Kickers',   # jw.; Regionalliga ma ten sam zapis
     ('ECU', 'Universidad Catolica'): 'Univ Católica',
-    ('Ecuador | Serie B', 'Vinotinto'): 'Vinotinto del Ecuador FC',
+    # 30.09.2026 (przeglad): tylko od 2026 — w 2025 „Vinotinto” z Serie B gralo ROWNOLEGLE z Vinotinto del Ecuador FC
+    # z Serie A (07–10.2025 po 4–5 meczow miesiecznie w kazdej lidze, 10.08.2025 oba tego samego dnia) — inny zespol.
+    ('Ecuador | Serie B', 'Vinotinto', '2026-01-01'): 'Vinotinto del Ecuador FC',
     ('Spain | Segunda RFEF', 'CD Ourense'): 'UD Ourense',   # 31 meczow do 03.05.2026, od 09.05 baraze jako UD Ourense (awans 31.05)
     ('G1', 'OFI'): 'OFI Crete',
     ('HUN', 'ETO FC Győr'): 'Győr',
@@ -182,7 +184,8 @@ def zakazane(div, a, b):
 SCAL_TYLKO_LIGA = {('B2', 'Lommel'), ('B1', 'Lommel', '<2004-07-01'), ('B1', 'Lommel', '2004-07-01'), ('N1', 'Sparta'), ('PER', 'Comerciantes'),
                    ('Argentina | Primera Nacional', 'Colon'), ('BOL', 'San Antonio'), ('AUS', 'Adelaide'),
                    ('AUS', 'Brisbane'), ('AUS', 'Newcastle'), ('Portugal | Liga Portugal 2', 'Viseu'),
-                   ('PAR', 'San Lorenzo'), ('B1', 'Beveren', '<2010-07-01'), ('T1', 'Erzurumspor', '<2010-07-01')}
+                   ('PAR', 'San Lorenzo'), ('B1', 'Beveren', '<2010-07-01'), ('T1', 'Erzurumspor', '<2010-07-01'),
+                   ('Ecuador | Serie B', 'Vinotinto', '2026-01-01')}
 # Wpis z trzecim elementem: 'RRRR-MM-DD' = tylko mecze OD tej daty, '<RRRR-MM-DD' = tylko mecze PRZED ta data.
 
 # Nazwa wspolna dla klubow z roznych krajow: ktory kraj zostaje przy nazwie BEZ przyrostka. Stala lista,
