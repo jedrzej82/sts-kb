@@ -110,3 +110,12 @@ def test_tenis_powtorzony_czlon():
     pula = {'Bryce Nakashima', 'Brandon Nakashima'}
     assert tenis.resolve('Nakashima Bryce Nakashima', pula) == 'Bryce Nakashima'
     assert tenis.resolve('Nakashima Nakashima', pula) is None          # dwa czlony — bez zgadywania
+
+
+def test_reprezentacje_concacaf():
+    import typuj
+    pula = {'Dominica', 'Dominican Republic', 'British Virgin Islands', 'United States Virgin Islands', 'Montserrat'}
+    assert typuj.resolve('Dominika', pula) == 'Dominica'
+    assert typuj.resolve('Dominikana', pula) == 'Dominican Republic'
+    assert typuj.resolve('Brytyjskie Wyspy Dziewicze', pula) == 'British Virgin Islands'
+    assert typuj.resolve('Wyspy Dziewicze USA', pula) == 'United States Virgin Islands'

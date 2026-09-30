@@ -159,7 +159,9 @@ _KRAJE_PL = {
     'brazylia': ('Brazil',), 'bulgaria': ('Bulgaria',), 'chile': ('Chile',),
     'chiny': ('China', 'China PR'), 'chorwacja': ('Croatia',), 'cypr': ('Cyprus',),
     'czarnogora': ('Montenegro',), 'czechy': ('Czechia', 'Czech Republic'),
-    'dania': ('Denmark',), 'dominikana': ('Dominican Republic',), 'egipt': ('Egypt',),
+    'dania': ('Denmark',), 'dominikana': ('Dominican Republic',), 'dominika': ('Dominica',),   # 30.09: Dominika != Dominikana
+    'brytyjskiewyspydziewicze': ('British Virgin Islands',), 'wyspydziewiczeusa': ('United States Virgin Islands',),
+    'amerykanskiewyspydziewicze': ('United States Virgin Islands',), 'egipt': ('Egypt',),
     'ekwador': ('Ecuador',), 'estonia': ('Estonia',), 'filipiny': ('Philippines',),
     'finlandia': ('Finland',), 'francja': ('France',), 'ghana': ('Ghana',),
     'gibraltar': ('Gibraltar',), 'grecja': ('Greece',), 'gruzja': ('Georgia',),
