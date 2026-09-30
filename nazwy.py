@@ -28,9 +28,13 @@ def znaczniki(s):
     22.09.2026: STS pisze "[K]" i "(W)" — nawiasy zdejmujemy. 23.09.2026: porownujemy RODZAJE, nie liczbe
     ("Barcelona (K)" to nie "Barcelona B", choc obie maja po jednym znaczniku)."""
     out = []
-    for t in re.split(r'[\s]+', str(s).strip()):
-        t = t.strip('[](){}<>.,;:')
-        if not ZNACZNIK.match(t): continue
+    for t0 in re.split(r'[\s]+', str(s).strip()):
+        t0 = t0.strip('[](){}<>.,;:')
+        # 30.09.2026 (przeglad): „Zenit-2”, „CSKA-2 Moscow” — znacznik po lacznika nie byl widziany i pierwsza druzyna
+        # („Zenit”) trafiala w rezerwy. Ostatni czlon po '-' sprawdzamy osobno (bez rozbijania „U-19”, „Sub-21”).
+        cz = [t0] + ([t0.rsplit('-', 1)[1]] if '-' in t0 and not re.match(r'^(u|sub)-?\d+$', t0, re.I) else [])
+        t = next((c for c in cz if ZNACZNIK.match(c)), None)
+        if t is None: continue
         t = t.lower().rstrip('.')
         if re.match(r'^(k|w|women|kobiet[ay]?|damen|femenino|femenil|feminin[oa]?|fem)$', t): out.append('kobiety')
         elif re.match(r'^(b|ii|2|res|reserves?|jong)$', t): out.append('rezerwy')
