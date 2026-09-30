@@ -75,6 +75,10 @@ SCAL_RECZNIE = {
     ('JAP2', 'Kamatamare'): 'Kamatamare Sanuki',
     ('JAP2', 'Yamaga'): 'Matsumoto Yamaga',
     ('JAP2', 'Thespakusatsu Gunma'): 'Thespa Gunma',   # zmiana nazwy klubu
+    # 30.09.2026 (przeglad): fbref do 08.2025 i 365scores od 08.2025 pisza inaczej — historia klubu byla rozcieta na dwie
+    # nazwy (bez wspolnych czlonow, wiec canon ich nie laczyl). Zakresy dat sie nie nakladaja. Cel = zapis z J1.
+    ('JAP2', 'Montedio'): 'Montedio Yamagata', ('JAP2', 'Yamagata'): 'Montedio Yamagata',
+    ('JAP2', 'Vortis'): 'Tokushima', ('JAP2', 'Roasso'): 'Kumamoto',
     ('JAP2', 'Zweigen'): 'Zweigen Kanazawa',
     ('KOR', 'Daejeon Cit'): 'Daejeon Hana Citizen',
     ('KOR', 'Gimcheon Sangmu FC'): 'Sangju Sangmu',   # druzyna wojskowa, od 2021 w Gimcheon

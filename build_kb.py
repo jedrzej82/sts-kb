@@ -281,8 +281,9 @@ def _aliasy_raz(allm):
                 # takze ich rywali: "Hebburn Town" ze "Spalding United". Cztery rozne kluby.
                 # Samo podobienstwo nie rozdziela: poprawne "CA Mineiro"="Atletico-MG" ma 0.118,
                 # a bledne "Bedford"/"Hednesford" ma 0.800.
-                if max(sh, sa) < 0.90 and not (_zawiera(a.HomeTeam, b.HomeTeam)
-                                               or _zawiera(a.AwayTeam, b.AwayTeam)):
+                # 30.09.2026 (przeglad): samo „zawieranie” nazw nie jest pewna strona — po zdjeciu FC „FC United” = {united}
+                # zawiera sie w kazdym „X United” (FC United -> Spalding United, Hashtag United -> Banbury United).
+                if max(sh, sa) < 0.90:
                     continue
                 oceny.append((sh + sa, i, j, sh, sa))
         oceny.sort(key=lambda x: (-x[0], x[1], x[2]))
@@ -299,17 +300,27 @@ def _aliasy_raz(allm):
     spotkania = {(dv,) + tuple(sorted((h, a)))
                  for dv, h, a in zip(d.Division, d.HomeTeam.astype(str), d.AwayTeam.astype(str))}
 
-    ile = pd.concat([d.HomeTeam, d.AwayTeam]).value_counts()
+    # 30.09.2026 (przeglad): liczba meczow W TEJ LIDZE, nie globalnie — „Chattanooga Red Wolves” (USL1, 26 m.) byl
+    # przemianowywany na „Chattanooga FC” (MLS Next Pro), bo ta nazwa miala wiecej meczow w innych ligach.
+    ile = pd.concat([d[['Division', 'HomeTeam']].set_axis(['d', 't'], axis=1),
+                     d[['Division', 'AwayTeam']].set_axis(['d', 't'], axis=1)]).astype(str).value_counts()
+    ile = {(dv, t): n for (dv, t), n in ile.items()}
+    from nazwy import znaczniki as _znaczniki
+    from kluby import zakazane as _zakazane
     mapa, odrzucone = {}, 0
     for (div, x, y), n in sorted(kandydaci.items(), key=lambda kv: (-kv[1], kv[0])):
         if (div, x, y) in spotkania:       # zagrali ze soba, wiec to DWA rozne kluby
+            odrzucone += 1; continue
+        # 30.09.2026 (przeglad): rezerwy nigdy nie sa aliasem pierwszej druzyny („FC Nomme United II” -> „Nõmme United”),
+        # a pary z NIE_SKLEJAJ (kluby.py) sa roznymi klubami z definicji
+        if _znaczniki(x) != _znaczniki(y) or _zakazane(div, x, y):
             odrzucone += 1; continue
         # Para o NISKIM wlasnym podobienstwie jest wnioskowana z eliminacji, wiec wymaga
         # POTWIERDZENIA: musi wyjsc z co najmniej trzech niezaleznych meczow. Jednorazowe
         # zderzenie to za malo — tak powstalo bledne "Hebburn Town" = "Spalding United".
         if sim(x, y) < 0.90 and not _zawiera(x, y) and n < 3:
             odrzucone += 1; continue
-        zwyciezca, przegrany = (x, y) if (ile.get(x, 0), len(x)) >= (ile.get(y, 0), len(y)) else (y, x)
+        zwyciezca, przegrany = (x, y) if (ile.get((div, x), 0), len(x)) >= (ile.get((div, y), 0), len(y)) else (y, x)
         while (div, zwyciezca) in mapa:    # domykamy lancuchy A->B->C
             zwyciezca = mapa[(div, zwyciezca)]
         if zwyciezca != przegrany:
