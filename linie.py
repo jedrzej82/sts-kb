@@ -55,10 +55,15 @@ def _iso(p, y, nb=15):
     return B
 
 
+def ma_tabele(sport, fam):
+    """Czy dla rodziny rynkow jest tabela kalibracji linii (>= 300 typow)."""
+    if not fam or not os.path.exists(CAL): return False
+    c = pd.read_csv(CAL); return c[(c.sport == sport) & (c.rodzina == fam)].n.sum() >= 300
+
+
 def cal_apply(sport, fam, p):
-    if not os.path.exists(CAL): return p
+    if not ma_tabele(sport, fam): return p
     c = pd.read_csv(CAL); c = c[(c.sport == sport) & (c.rodzina == fam)]
-    if c.n.sum() < 300: return p
     return float(np.interp(p, c.p_model, c.p_kalibr))
 
 
@@ -243,26 +248,37 @@ def main(a):
     elif a[0] == 'mapy':   # python3 linie.py mapy esport_cs2|esport_lol "A" "B" [--bo5]
         import sporty as sp
         sport = a[1]; d = sp.load(); R, N, *_ = sp.elo(d, sport); A, B = sp.resolve(a[2], set(R), sport), sp.resolve(a[3], set(R), sport)
+        # 30.09.2026 (przeglad): brak druzyny dawal Elo 1500 i pelna tabele P (potem TypeError) — nie zgadujemy
+        if not A or not B: sys.exit('Brak drużyny w bazie — noga MNIEJ.')
         e = 1 / (1 + 10 ** ((R.get(B, 1500) - R.get(A, 1500)) / 400)); bo = 5 if '--bo5' in a else 3
-        ec, _ = sp.calibrate(sport, e)
-        pm = ec if sport == 'esport_lol' else _inv(ec, 3)   # LoL: Elo liczone na mapach; CS2: na seriach
+        # 30.09.2026 (przeglad): tabele 'mapy O/U' / 'handicap mapowy' dopasowano (backtest_cs2) do SUROWEGO e —
+        # dotad szlo e po sp.calibrate i drugi raz cal_apply; LoL dostawal krzywa CS2.
+        if sport == 'esport_cs2':
+            pm, kal = _inv(e, 3), True                                   # CS2: Elo liczone na seriach
+        else:
+            pm, kal = sp.calibrate(sport, e)[0], False                   # LoL: Elo na mapach, bez tabel linii
         mk = mapy_markets(p_mapa=pm, bo=bo)
-        print(f'{sport}: {A} – {B} | P mapy {A}: {pm:.1%}')
+        print(f'{sport}: {A} – {B} | P mapy {A}: {pm:.1%}' + ('' if kal else '  (rynki mapowe nieskalibrowane — szacunek)'))
         for k, v in mk.items():
             fam = 'mapy O/U' if 'mapy' in k and ('powyżej' in k or 'poniżej' in k) else 'handicap mapowy' if 'mapy' in k else None
-            print(f'  {k.replace("A ", A + " ").replace("B ", B + " "):<34} {cal_apply("esport_cs2", fam, v) if fam else v:6.1%}')
+            print(f'  {k.replace("A ", A + " ").replace("B ", B + " "):<34} {cal_apply("esport_cs2", fam, v) if fam and kal else v:6.1%}')
     elif a[0] == 'tenis':
         import tenis as T
         st = T.state(); pl = set(st['R']); T.NCOUNT.update(st['N']); T.ALIASY.update(st.get('alias', {}))
         A, B = T.resolve(a[1], pl), T.resolve(a[2], pl)
         surf = 'Clay' if '--clay' in a else 'Grass' if '--grass' in a else 'Hard'; bo5 = '--bo5' in a
         if not A or not B: sys.exit('Brak zawodnika w bazie.')
-        p = T.p_win(st, A, B, surf, bo5); pc = T.calibrate(max(p, 1 - p)); pA = pc if p >= 0.5 else 1 - pc
-        print(f'{A} – {B} ({surf}{", bo5" if bo5 else ""}): P({A} wygra) = {pA:.1%}')
-        mk = tennis_markets(pA, bo5)
+        # 30.09.2026 (przeglad): tabele 'sety O/U' / 'handicap setowy' (backtest_tennis) dopasowano do SUROWEGO P Elo
+        # meczow do 2 setow. Dotad szlo P juz skalibrowane (tenis_kalibracja) i drugi raz cal_apply (Sinner–Mensik
+        # „-1,5 seta” 57% zamiast 68%), a w bo5 krzywa linii 2,5 seta trafiala na linie 3,5/4,5.
+        p, pA = T.p_skalibr(st, A, B, surf, bo5)
+        print(f'{A} – {B} ({surf}{", bo5" if bo5 else ""}): P({A} wygra) = {pA:.1%}'
+              + ('  (rynki setowe bo5 nieskalibrowane — szacunek)' if bo5 else ''))
+        mk, mk_sur = tennis_markets(pA, bo5), tennis_markets(p, bo5)
         for k, v in mk.items():
-            fam = 'sety O/U' if 'seta' in k and 'handicap' not in k else 'handicap setowy' if 'handicap' in k else None
-            vv = cal_apply('tenis', fam, v) if fam else v
+            fam = None if bo5 else 'sety O/U' if 'seta' in k and 'handicap' not in k else 'handicap setowy' if 'handicap' in k else None
+            # rodzina z tabela: surowe P -> tabela linii (raz); reszta (dokladne wyniki, brak tabeli): ze skalibrowanego P meczu
+            vv = cal_apply('tenis', fam, mk_sur[k]) if ma_tabele('tenis', fam) else v
             print(f'  {k.replace("A ", A.split()[-1] + " ").replace("B ", B.split()[-1] + " "):<32} {vv:6.1%}')
 
 
