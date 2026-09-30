@@ -11,3 +11,11 @@ def test_aliasy_typuj_oferta_3009():
 
 def test_alias_tylko_gdy_cel_w_puli():
     assert typuj.resolve('Zamora FC II', {'Zamora FC'}) is None   # rezerwa nie trafia w pierwsza druzyne
+
+
+def test_aliasy_raport_3009_1800():
+    """Raport 30.09 18:00, usterka 5: pary z Raportu — jedyny klub o tej nazwie w bazie; kobiety nie trafiaja."""
+    import sporty
+    assert typuj.resolve('CA Rentistas', {'Rentistas', 'Cerro Largo'}) == 'Rentistas'
+    assert sporty.resolve('UMF Tindastoll', {'Tindastoll', 'Tindastoll W', 'Bristol Flyers'}, 'koszykówka') == 'Tindastoll'
+    assert sporty.resolve('Tatran Presov', {'Presov', 'Bergischer HC'}, 'piłka ręczna') == 'Presov'
