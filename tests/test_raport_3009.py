@@ -119,3 +119,14 @@ def test_reprezentacje_concacaf():
     assert typuj.resolve('Dominikana', pula) == 'Dominican Republic'
     assert typuj.resolve('Brytyjskie Wyspy Dziewicze', pula) == 'British Virgin Islands'
     assert typuj.resolve('Wyspy Dziewicze USA', pula) == 'United States Virgin Islands'
+
+
+def test_sezon_formy_niemieckie_i_aliasy():
+    import sezon
+    w = [{'druzyna': 'Stuttgart', 'liga': 'Bundesliga', 'mecze': '5'}, {'druzyna': 'Wolfsburg', 'liga': 'Bundesliga', 'mecze': '5'},
+         {'druzyna': 'Atletico Nacional', 'liga': 'Primera A COL', 'mecze': '9'}, {'druzyna': 'Junior FC', 'liga': 'Primera A COL', 'mecze': '9'}]
+    assert sezon.znajdz(w, 'VfB Stuttgart')[0]['druzyna'] == 'Stuttgart'
+    assert sezon.znajdz(w, 'VfL Wolfsburg')[0]['druzyna'] == 'Wolfsburg'
+    assert sezon.znajdz(w, 'Atletico Nacional Medellin')[0]['druzyna'] == 'Atletico Nacional'
+    assert sezon.znajdz(w, 'CD Junior Barranquilla')[0]['druzyna'] == 'Junior FC'
+    assert sezon.znajdz(w, 'VfB Lubeck')[0] is None                   # inna druzyna — nie zgadujemy

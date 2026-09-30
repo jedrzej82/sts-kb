@@ -82,7 +82,9 @@ def _zaw_czlony(a, b):
 # i "Racing" to rozne kluby (recenzja 24.09).
 _OGOLNE = frozenset('fc cf sc ac afc cfc fk nk sk bk hk hc kk rk ok ks sv ss ec fbc sad bc '
                     'basket basketball volley volleyball hockey ishockey handball calcio futbol football fussball '
-                    'county rugby ik if'.split())
+                    'county rugby ik if '
+                    # 30.09.2026 (audyt oferty 01.10): niemieckie formy stowarzyszenia — „VfB Stuttgart” w arkuszu to „Stuttgart”
+                    'vfb vfl tsg fsv spvgg tsv'.split())
 # polskie nazwy miast z oferty STS -> zapisy zrodlowe (te same co w sporty.py i typuj.py)
 _MIASTA_PL = {'madryt': ('madrid',), 'monachium': ('munich', 'munchen', 'muenchen'), 'wieden': ('wien', 'vienna'),
               'lizbona': ('lisbon', 'lisboa'), 'mediolan': ('milan', 'milano'), 'rzym': ('roma', 'rome'),
