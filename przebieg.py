@@ -4,6 +4,8 @@
   python3 przebieg.py --kontrola — tylko kontrola plikow zewn/ (sekundy), bez budowy
   python3 przebieg.py --archiwum-arkuszy — spakuj statystyki_*.csv do arkusze_RRRR-MM-DD.tar.gz (historia arkuszy)
   python3 przebieg.py --dzienniki — rozpakuj kb/dzienniki.zip (Apps Script dzienniki.gs) do kb/dzienniki/ i scal dzienniki
+  python3 przebieg.py --paczka — rozpakuj kb/paczka.zip (Apps Script paczka.gs): zewn/wyniki_*, terminarze, arkusze,
+      dzienniki — WSZYSTKIE dane przebiegu jednym pobraniem; zwykly przebieg robi to sam, gdy paczka.zip lezy w kb/
   Pliki zwrocone przez Dysk W TRESCI (base64): zapisz tekst jako zewn/NAZWA.csv.gz.b64 — przebieg sam je zdekoduje.
 
 Ostatnia linia wyniku to WERDYKT:
@@ -175,6 +177,60 @@ def rozpakuj_dzienniki(zrodlo=HERE, cel=None):
         os.utime(f, (t, t)); n += 1
     print(f'  rozpakowano dzienniki.zip -> {os.path.relpath(cel, zrodlo)}/ ({n} plikow dziennikow)')
     return n
+
+
+# 30.09.2026 (Raport 18:00): kazde pobranie z Dysku kosztuje przebieg ok. 1,5 min; poza dziennikami bylo ich ~17
+# (wyniki_*, terminarze, arkusze). paczka.gs pakuje wszystko w paczka.zip. Dozwolone sciezki w paczce — nic innego
+# nie jest rozpakowywane (zip z Dysku nie moze nadpisac kodu repo).
+_PACZKA_WZORCE = (r'zewn/wyniki_[a-z0-9]+_[a-z]+_\d{4}-\d{2}\.csv\.gz', r'zewn/terminarz_(fs|365)\.csv\.gz',
+                  r'statystyki_[a-z_]+\.csv\.gz', r'absencje\.csv\.gz', r'dzienniki\.zip')
+
+
+def rozpakuj_paczke(zrodlo=HERE):
+    """paczka.zip (albo paczka.zip.b64 z konektora) -> pliki na swoje miejsca w kb/, czas pliku = czas zmiany na Dysku.
+    Sprawdza: zip caly, manifest paczka_manifest.csv, rozmiary zgodne z manifestem, kazdy .gz sie rozpakowuje,
+    sciezki tylko z _PACZKA_WZORCE. Blad = nic nie rozpakowane (przebieg bierze pliki pojedynczo, jak dotad).
+    Zwraca liczbe plikow albo None, gdy paczki nie ma lub jest bledna."""
+    import base64, json, zipfile, io, csv, gzip, re
+    b64, zp = os.path.join(zrodlo, 'paczka.zip.b64'), os.path.join(zrodlo, 'paczka.zip')
+    if os.path.exists(b64):
+        t = open(b64, encoding='utf-8', errors='replace').read().strip()
+        try:
+            if t.startswith('{'): t = json.loads(t)['content']
+            raw = base64.b64decode(''.join(t.split())); zipfile.ZipFile(io.BytesIO(raw)).testzip()
+        except Exception as e:
+            print(f'  BLAD: paczka.zip.b64 nie jest poprawnym base64 pliku zip ({e}) — pobierz ponownie'); return None
+        open(zp, 'wb').write(raw); os.remove(b64)
+    if not os.path.exists(zp): return None
+    try:
+        z = zipfile.ZipFile(zp)
+        zly = z.testzip()
+        if zly: raise ValueError(f'uszkodzony wpis {zly}')
+        man = list(csv.DictReader(io.StringIO(z.read('paczka_manifest.csv').decode('utf-8'))))
+        if not man: raise ValueError('pusty manifest')
+        tresc = {}
+        for r in man:
+            n = r['plik']
+            if not any(re.fullmatch(w, n) for w in _PACZKA_WZORCE): raise ValueError(f'niedozwolona sciezka {n!r}')
+            b = z.read(n)
+            if len(b) != int(r['bajty']): raise ValueError(f'{n}: {len(b)} B, a w manifescie {r["bajty"]} B')
+            if n.endswith('.gz'): gzip.decompress(b)
+            if n.endswith('.zip'): zipfile.ZipFile(io.BytesIO(b)).testzip()
+            tresc[n] = b
+    except Exception as e:
+        print(f'  BLAD: paczka.zip niepoprawna ({e}) — nic nie rozpakowane; pobierz pliki pojedynczo'); return None
+    for r in man:
+        f = os.path.join(zrodlo, r['plik'])
+        os.makedirs(os.path.dirname(f), exist_ok=True)
+        open(f, 'wb').write(tresc[r['plik']])
+        t = pd.Timestamp(r['zmieniony']); t = (t.tz_localize('UTC') if t.tzinfo is None else t).timestamp()
+        os.utime(f, (t, t))
+    os.remove(zp)
+    print(f'  rozpakowano paczka.zip: {len(man)} plikow (' + ', '.join(sorted({r["plik"].split("/")[0].split("_")[0] for r in man})) + ')')
+    if any(r['plik'] == 'dzienniki.zip' for r in man) and rozpakuj_dzienniki(zrodlo):
+        import dzienniki
+        dzienniki.scal(os.path.join(zrodlo, 'dzienniki'), cel=zrodlo)
+    return len(man)
 
 
 def kontrola_arkuszy():
@@ -380,6 +436,10 @@ def archiwum_arkuszy():
 def main():
     if '--archiwum-arkuszy' in sys.argv:
         return archiwum_arkuszy()
+    if '--paczka' in sys.argv:
+        return 0 if rozpakuj_paczke() else 2
+    if os.path.exists(os.path.join(HERE, 'paczka.zip')) or os.path.exists(os.path.join(HERE, 'paczka.zip.b64')):
+        print('0) Paczka z Dysku:'); rozpakuj_paczke()
     if '--dzienniki' in sys.argv:
         n = rozpakuj_dzienniki()
         if not n:

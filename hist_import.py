@@ -37,25 +37,34 @@ def get(url, path, force=False):
     return os.path.exists(path) and os.path.getsize(path) > 0
 
 
+def _repo(d, repo, pat):
+    p = os.path.join(RAW, d)
+    if not os.path.exists(p):
+        sh('git', 'clone', '-q', '--depth', '1', '--filter=blob:none', '--no-checkout', f'https://github.com/{repo}', p)
+        sh('git', '-C', p, 'sparse-checkout', 'set', '--no-cone', pat); sh('git', '-C', p, 'checkout', '-q', 'HEAD')
+    else:
+        sh('git', '-C', p, 'pull', '-q')
+
+
 def fetch():
+    """30.09.2026 (czas przebiegu): raw/ nie jest w repo, wiec kazdy przebieg pobiera ok. 900 plikow od nowa — po kolei
+    ok. 2 min. Te same pobrania rownolegle (8 naraz); kazde pisze do innego pliku/katalogu, wynik identyczny."""
+    from concurrent.futures import ThreadPoolExecutor
     os.makedirs(REL, exist_ok=True)
-    for d, (repo, pat) in REPOS.items():
-        p = os.path.join(RAW, d)
-        if not os.path.exists(p):
-            sh('git', 'clone', '-q', '--depth', '1', '--filter=blob:none', '--no-checkout', f'https://github.com/{repo}', p)
-            sh('git', '-C', p, 'sparse-checkout', 'set', '--no-cone', pat); sh('git', '-C', p, 'checkout', '-q', 'HEAD')
-        else:
-            sh('git', '-C', p, 'pull', '-q')
-    get('https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv', os.path.join(RAW, 'nfl_games.csv'), force=True)
+    td = os.path.join(RAW, 'tcl'); os.makedirs(td, exist_ok=True)
+    zadania = [(_repo, (d, repo, pat)) for d, (repo, pat) in REPOS.items()]
+    zadania.append((get, ('https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv', os.path.join(RAW, 'nfl_games.csv'), True)))
     for y in range(2002, YEAR + 2):  # bieżący i przyszły sezon zawsze świeżo
         f = y >= YEAR
-        get(f'{SDV}/espn_nba_schedules/nba_schedule_{y}.parquet', os.path.join(REL, f'nba_{y}.parquet'), f)
-        get(f'{SDV}/espn_wnba_schedules/wnba_schedule_{y}.parquet', os.path.join(REL, f'wnba_{y}.parquet'), f)
-        get(f'{SDV}/nhl_schedules/nhl_schedule_{y}.parquet', os.path.join(REL, f'nhl_{y}.parquet'), f)
-    td = os.path.join(RAW, 'tcl'); os.makedirs(td, exist_ok=True)
+        zadania.append((get, (f'{SDV}/espn_nba_schedules/nba_schedule_{y}.parquet', os.path.join(REL, f'nba_{y}.parquet'), f)))
+        zadania.append((get, (f'{SDV}/espn_wnba_schedules/wnba_schedule_{y}.parquet', os.path.join(REL, f'wnba_{y}.parquet'), f)))
+        zadania.append((get, (f'{SDV}/nhl_schedules/nhl_schedule_{y}.parquet', os.path.join(REL, f'nhl_{y}.parquet'), f)))
     for t in ('atp', 'wta'):
         for y in range(1968, YEAR + 1):
-            get(f'{TCL}/tennis_{t}/{t}_matches_{y}.csv', os.path.join(td, f'{t}_{y}.csv'), force=y >= YEAR - 1)
+            zadania.append((get, (f'{TCL}/tennis_{t}/{t}_matches_{y}.csv', os.path.join(td, f'{t}_{y}.csv'), y >= YEAR - 1)))
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        for fut in [ex.submit(fn, *a) for fn, a in zadania]:
+            fut.result()
 
 
 def espn(prefix, liga):
