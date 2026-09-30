@@ -58,3 +58,33 @@ w `ensemble.comb` log(0) = −∞).
 | 2026-07-01 | 13 359 | 2.98779 | 0 | 2.98637 | 2.98545 | 2.98436 | **2.98334** |
 
 Każde K > 0 jest lepsze od stanu poprzedniego przy każdym cięciu; K = 50 najlepsze z badanych. Przy K = 50 nie ma już λ = 0.
+
+# Hokej: kalibracja `sporty.p_gospodarza` — 30.09.2026
+
+**Decyzja: bez korekty.** Wrzesień 2026 wyglądał na zawyżony (P 0,626 vs trafność 0,579, n = 558, ok. 2σ),
+ale na całym sezonie model hokejowy jest skalibrowany, a korekta nie przenosi się poza próbę.
+
+**Metoda:** pi/Elo z `sporty.elo` dopasowane na danych sprzed każdego tygodnia, P z `p_gospodarza` (produkcja),
+mecze z ≥ 10 meczami obu drużyn, bez remisów; 2025-10-01 … 2026-09-28, 8 704 mecze.
+
+| przedział P (faworyt) | n | P | trafność |
+|---|---|---|---|
+| 0,5–0,6 | 4 543 | 0,555 | 0,553 |
+| 0,6–0,7 | 1 454 | 0,638 | 0,627 |
+| 0,7–0,8 | 2 444 | 0,742 | 0,756 |
+| 0,8–0,9 | 263 | 0,807 | 0,867 |
+
+Platt (a·logit P + b) i sama skala uczone przed cięciem, log loss po cięciu (bez korekty / Platt / skala):
+
+| cięcie | a | log loss |
+|---|---|---|
+| 2025-12-01 | 1,019 | 0,63316 / 0,63320 / 0,63306 |
+| 2026-01-01 | 1,039 | 0,63138 / 0,63108 / 0,63127 |
+| 2026-02-01 | 1,045 | 0,63277 / 0,63251 / 0,63263 |
+| 2026-03-01 | 1,072 | 0,64179 / 0,64160 / 0,64187 |
+| 2026-04-01 | 1,080 | 0,65039 / 0,65042 / 0,65071 |
+| 2026-09-01 | 1,097 | 0,67423 / 0,67682 / 0,67673 |
+
+Wyuczone a > 1 (model raczej *niedoszacowany*), zyski ≤ 0,0003, a na wrześniu 2026 korekta wyraźnie szkodzi.
+Początek sezonu nie jest systematycznie zawyżony: wrzesień 2025 P 0,600 vs trafność 0,646 (n = 364).
+Obniżanie P w hokeju nie ma oparcia w danych; wrócić po ≥ 30 rozliczonych własnych nogach hokejowych.
