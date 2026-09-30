@@ -141,7 +141,16 @@ def czytaj(wzor, bez=None):
     fs = sorted(glob.glob(os.path.join(ZD, wzor)) + glob.glob(os.path.join(ZD, wzor + '.gz')))
     if bez: fs = [f for f in fs if not re.search(bez, os.path.basename(f))]
     if not fs: return pd.DataFrame()
-    d = pd.concat([pd.read_csv(f, dtype=str, keep_default_na=False) for f in fs], ignore_index=True).drop_duplicates()
+    # 30.09.2026 (przeglad): jeden nieczytelny plik (np. uciete pobranie opcjonalnego wyniki_fsx_inne) wywracal CALE
+    # czytanie — hist_import tracil wtedy ~63 tys. meczow innych sportow. Pomijamy tylko ten plik, glosno.
+    # (Wymagane pliki 365/fs sprawdza osobno przebieg.kontrola_zewn — tam nieczytelny = BLAD.)
+    czesci = []
+    for f in fs:
+        try: czesci.append(pd.read_csv(f, dtype=str, keep_default_na=False))
+        except Exception as e:
+            print(f'  BLAD ODCZYTU zewn/{os.path.basename(f)} ({type(e).__name__}: {e}) — plik POMINIETY; pobierz go ponownie z Dysku.')
+    if not czesci: return pd.DataFrame()
+    d = pd.concat(czesci, ignore_index=True).drop_duplicates()
 
     # 22.09.2026. Pliki z Apps Script zawieraja pojedyncze wiersze uszkodzone przy zapisie,
     # np. "\t\t\t\t   (W): 2" w kolumnie daty. To nie jest mecz — to smiec z parsowania.

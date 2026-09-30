@@ -13,6 +13,7 @@ MAXG = 10
 def fit_dc(df, ref_date, years=3.0):
     """df: mecze jednej ligi przed ref_date. Zwraca dict z parametrami."""
     ref = pd.Timestamp(ref_date)
+    df = df.dropna(subset=['FTHome', 'FTAway'])   # 30.09.2026: jeden mecz bez wyniku zerowal cale dopasowanie (bez bledu)
     d = df[(df.MatchDate < ref) & (df.MatchDate >= ref - pd.Timedelta(days=int(365 * years)))]
     if len(d) < 80:
         return None
@@ -67,7 +68,7 @@ def dc_lambdas(m, ht, at):
 
 def fit_elo_glm(df):
     """Globalny Poisson: log λ = b0 + b1*dElo/100 (+ domowy), per liga baza goli. df z HomeElo/AwayElo."""
-    d = df.dropna(subset=['HomeElo', 'AwayElo'])
+    d = df.dropna(subset=['HomeElo', 'AwayElo', 'FTHome', 'FTAway'])   # 30.09.2026: NaN wyniku dawal bh = [nan nan]
     d = d[d.MatchDate >= d.MatchDate.max() - pd.Timedelta(days=365 * 6)]
     x = ((d.HomeElo - d.AwayElo) / 100.0).values
     lg = d.groupby('Division').apply(lambda g: (g.FTHome.mean(), g.FTAway.mean()), include_groups=False).to_dict()
