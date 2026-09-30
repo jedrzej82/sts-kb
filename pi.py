@@ -36,11 +36,19 @@ def gd_hat_for(ratings, h, a):
     return _g(ratings[h][0]) - _g(ratings[a][1])
 
 
+K_LIGA = 50   # docs/BACKTEST_KOREKTA.md (sekcja pi)
+
+
 def fit_pi_glm(d):
     """d: mecze z kolumną gd_hat (tylko drużyny z ≥10 meczami historii). Poisson: log λ_h = b0 + b1·x, log λ_a = c0 − c1·x."""
     d = d.dropna(subset=['gd_hat', 'FTHome', 'FTAway'])
     x = np.clip(d.gd_hat.values, -4, 4)
-    lg = d.groupby('Division').apply(lambda g: (g.FTHome.mean(), g.FTAway.mean()), include_groups=False).to_dict()
+    # 30.09.2026: srednia ligi z kilku meczow (same 0:0) dawala wspolczynnik 0 -> λ = 0 i zdegenerowane rynki w zespole
+    # (214 meczow w backteście 2025/26). Srednia ligi sciagana do globalnej jak po K_LIGA meczach sredniej:
+    # log loss poza proba lepszy przy kazdym cieciu (2025-10…2026-07), np. 3,0361 -> 2,9623 (kw. 2026-04), 0 przypadkow λ = 0.
+    gh, ga = d.FTHome.mean(), d.FTAway.mean()
+    lg = {div: ((g.FTHome.sum() + K_LIGA * gh) / (len(g) + K_LIGA), (g.FTAway.sum() + K_LIGA * ga) / (len(g) + K_LIGA))
+          for div, g in d.groupby('Division')}
 
     def fit(y, s):
         X = np.c_[np.ones_like(x), s * x]; b = np.zeros(2)
@@ -48,7 +56,7 @@ def fit_pi_glm(d):
             lam = np.exp(X @ b); b += np.linalg.solve((X * lam[:, None]).T @ X, X.T @ (y - lam))
         return b
     return dict(bh=fit(d.FTHome.values.astype(float), 1.0), ba=fit(d.FTAway.values.astype(float), -1.0),
-                league=lg, gh=d.FTHome.mean(), ga=d.FTAway.mean())
+                league=lg, gh=gh, ga=ga)
 
 
 def pi_lambdas(g, gd_hat, div=None):

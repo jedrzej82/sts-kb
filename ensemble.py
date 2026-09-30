@@ -29,9 +29,10 @@ def outcomes(fh, fa, hth, hta):
     return o
 
 
-def build_rows():
+def build_rows(tag=''):
     from typuj import stan_bazy   # 30.09.2026: klucz ze stanem kb.sqlite, jak cache typuj.py
-    cp = os.path.join(HERE, 'cache', f'bt_v5n_{START}_{END}_{stan_bazy()}.pkl')
+    # 30.09.2026: v3 — pi ze sciagnietymi srednimi lig; wiersze maja tez nazwy druzyn i rozne (test_ostatnie.py ocenia na nich model produkcyjny)
+    cp = os.path.join(HERE, 'cache', f'bt_v5n3{tag}_{START}_{END}_{stan_bazy()}.pkl')
     if os.path.exists(cp): return pickle.load(open(cp, 'rb'))
     os.makedirs(os.path.dirname(cp), exist_ok=True)   # 29.09.2026: na swiezym klonie cache/ nie istnial -> FileNotFoundError
     m = pd.read_sql('select * from matches', sqlite3.connect(os.path.join(HERE, 'kb.sqlite')), parse_dates=['MatchDate'])
@@ -53,7 +54,8 @@ def build_rows():
                 lel = elo_lambdas(glm, r.HomeElo, r.AwayElo, div) if pd.notna(r.HomeElo) and pd.notna(r.AwayElo) else None
                 lpi = pi_lambdas(pg, r.gd_hat, div)
                 rows.append(dict(div=div, date=r.MatchDate, fh=r.FTHome, fa=r.FTAway, hth=r.HTHome, hta=r.HTAway,
-                                 ldc=ldc, lel=lel, lpi=lpi, rho=mdl['rho'] if mdl else -0.05))
+                                 ldc=ldc, lel=lel, lpi=lpi, rho=mdl['rho'] if mdl else -0.05,
+                                 gosp=r.HomeTeam, gosc=r.AwayTeam, hc=getattr(r, 'HomeCorners', np.nan), ac=getattr(r, 'AwayCorners', np.nan)))
         print(ms.date(), len(rows), flush=True)
     bt = pd.DataFrame(rows); pickle.dump(bt, open(cp, 'wb')); return bt
 

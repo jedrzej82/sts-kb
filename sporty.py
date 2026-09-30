@@ -820,6 +820,40 @@ def kal_wlasna(sport, p):
 PARAM = os.path.join(HERE, 'sporty_param.json')   # v5n: model marży punktowej + zespół z Elo (sporty_bt.py)
 
 
+def p_gospodarza(d, sport, R, L_, hfa, draws, h, g, neutral=False, dzien=None, pamiec=None):
+    """P wygranej gospodarza tak, jak liczy `sporty.py typuj` (Elo z regresja po przerwie > 90 dni, kalibracja historyczna
+    — dla hokeja poza NHL osobna — zespol v5n z marza punktowa i Plattem, korekta z wlasnych prognoz).
+    30.09.2026: wyjete z main(), zeby test_ostatnie.py oceniał ten sam model, ktory typuje. Zwraca (P, notka, P_Elo, linie).
+    R nie jest zmieniane (regresja liczona na kopii dwoch ocen). pamiec: slownik na tabele marzy tego samego d
+    (test_ostatnie.py liczy wiele meczow jednego dnia — marza() to ~1 s na wywolanie)."""
+    hf = 0 if neutral else hfa
+    dzien = pd.Timestamp.today().normalize() if dzien is None else dzien
+    Rt = {}
+    for t in (h, g):  # ostatnie dane > 90 dni temu = nowy sezon → regresja 1/3 do średniej (jak w pętli Elo)
+        Rt[t] = R.get(t, 1500)
+        if t in R and t in L_ and (dzien - L_[t]).days > 90: Rt[t] = 1500 + (R[t] - 1500) * 0.67
+    e = 1 / (1 + 10 ** ((Rt[g] - Rt[h] - hf) / 400))
+    _, Lh0, Lg0 = wspolna_skala(d, sport, h, g)
+    ec, note = calibrate(sport, e, KAL_POZA_NHL if sport == 'hokej' and poza_nhl(Lh0 | Lg0) else None)
+    linie = []
+    prm = (__import__('json').load(open(PARAM)) if os.path.exists(PARAM) else {}).get(sport)
+    if prm and not draws:
+        from scipy.stats import norm as _nd
+        M = pamiec.get('marza') if pamiec is not None else None
+        if M is None:
+            M = marza(d, sport, prm)
+            if pamiec is not None: pamiec['marza'] = M
+        pm_ = M.get(h, 0.) - M.get(g, 0.) + (0 if neutral else prm['hfa'])
+        p_m = float(_nd.cdf(pm_ / prm['sd'])); lg_ = lambda p: np.log(min(max(p, 1e-6), 1 - 1e-6) / (1 - min(max(p, 1e-6), 1 - 1e-6)))
+        z = prm['w_elo'] * lg_(e) + (1 - prm['w_elo']) * lg_(p_m); z = prm['platt'][0] * z + prm['platt'][1]
+        ec = float(1 / (1 + np.exp(-z)))
+        linie.append(f'  v5n: przewidywana różnica punktów {pm_:+.1f} (odch. std {prm["sd"]:.1f}); P Elo {e:.1%}, P marży {p_m:.1%}')
+        note = (f'v5n: zespół Elo + marża punktowa, kalibracja Platta (test od {prm["test_od"]}: logloss '
+                f'{prm["logloss_obecny"]:.4f} → {prm["logloss_nowy"]:.4f})')
+    ec, _kw = kal_wlasna(sport, ec); note += _kw
+    return ec, note, e, linie
+
+
 def marza(d, sport, k):
     """Rating w punktach (oczekiwana różnica punktów), aktualizowany po każdym meczu; nowy sezon (>90 dni) → ściągnięcie o 25%."""
     R, last = {}, {}
@@ -1046,27 +1080,11 @@ def main(a):
                      f'Sprawdz nazwy: python3 sporty.py druzyny {sport} FRAGMENT\n'
                      f'Lepiej nie miec tej nogi, niz miec ja policzona z pomylonych druzyn.')
         n = min(N.get(h, 0), N.get(g, 0))
-        hf = 0 if '--neutral' in a else hfa
-        today = pd.Timestamp.today().normalize()
-        for t in (h, g):  # ostatnie dane > 90 dni temu = nowy sezon → regresja 1/3 do średniej (jak w pętli Elo)
-            if t in R and t in L_ and (today - L_[t]).days > 90: R[t] = 1500 + (R[t] - 1500) * 0.67
-        e = 1 / (1 + 10 ** ((R.get(g, 1500) - R.get(h, 1500) - hf) / 400))
         print(f'{sport}: {h} (Elo {R.get(h, 1500):.0f}, {N.get(h, 0)} m.) – {g} (Elo {R.get(g, 1500):.0f}, {N.get(g, 0)} m.)')
         for t in (h, g):
             if t in inf['seeded']: print(f'  {t}: siła startowa z tabeli ligi {inf["seeded"][t]} (+ wyniki dopisane później)')
-        _, Lh0, Lg0 = wspolna_skala(d, sport, h, g)
-        ec, note = calibrate(sport, e, KAL_POZA_NHL if sport == 'hokej' and poza_nhl(Lh0 | Lg0) else None)
-        prm = (__import__('json').load(open(PARAM)) if os.path.exists(PARAM) else {}).get(sport)
-        if prm and not draws:
-            from scipy.stats import norm as _nd
-            M = marza(d, sport, prm); pm_ = M.get(h, 0.) - M.get(g, 0.) + (0 if '--neutral' in a else prm['hfa'])
-            p_m = float(_nd.cdf(pm_ / prm['sd'])); lg_ = lambda p: np.log(min(max(p, 1e-6), 1 - 1e-6) / (1 - min(max(p, 1e-6), 1 - 1e-6)))
-            z = prm['w_elo'] * lg_(e) + (1 - prm['w_elo']) * lg_(p_m); z = prm['platt'][0] * z + prm['platt'][1]
-            ec = float(1 / (1 + np.exp(-z)))
-            print(f'  v5n: przewidywana różnica punktów {pm_:+.1f} (odch. std {prm["sd"]:.1f}); P Elo {e:.1%}, P marży {p_m:.1%}')
-            note = (f'v5n: zespół Elo + marża punktowa, kalibracja Platta (test od {prm["test_od"]}: logloss '
-                    f'{prm["logloss_obecny"]:.4f} → {prm["logloss_nowy"]:.4f})')
-        ec, _kw = kal_wlasna(sport, ec); note += _kw
+        ec, note, e, _linie = p_gospodarza(d, sport, R, L_, hfa, draws, h, g, '--neutral' in a)
+        for _l in _linie: print(_l)
         if draws:
             # 30.09.2026 (przeglad): ec*(1-pdraw) zaklada, ze dogrywke wygrywa faworyt z P = ec; przy dogrywce ~50/50
             # wychodzi ec - pdraw/2. Bez danych o dogrywkach (dogrywka = -1) nie da sie tego zmierzyc — bierzemy MNIEJSZA
