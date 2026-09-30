@@ -136,6 +136,32 @@ def tennis_markets(p, bo5=False):
     return out
 
 
+def obie_strony(sport, fam_a, fam_b, p):
+    """Skalibrowane P strony A linii .5; strona B = 1 − wynik (srednia obu kalibracji, strony sumuja sie do 100%)."""
+    return (cal_apply(sport, fam_a, p) + 1 - cal_apply(sport, fam_b, 1 - p)) / 2
+
+
+def rynki_setowe(p, pA, bo5=False):
+    """Spojne rynki setowe tenisa. p = surowe P(A) (skala meczu do 2 setow), pA = skalibrowane P(A) (po bo5, jesli bo5).
+    30.09.2026 (proba generalna): dokladne wyniki ze skalibrowanego P, a linie z surowego P przez tabele linii sie
+    wykluczaly (Fils–Van Assche: 2:0 = 40,0%, a „Fils -1,5 seta” — to samo zdarzenie — 45,5%). Teraz jedno zrodlo:
+    P(2:0) i P(0:2) z tabeli 'handicap setowy' (surowe P, raz), 2:1 i 1:2 z reszty do skalibrowanego P meczu,
+    a wszystkie linie wyliczone z tych czterech wynikow. Bez tabeli albo w bo5: wszystko ze skalibrowanego P."""
+    if bo5 or not ma_tabele('tenis', 'handicap setowy'):
+        return tennis_markets(pA, bo5)
+    sur = tennis_markets(p)
+    p20 = cal_apply('tenis', 'handicap setowy', sur['A handicap -1,5 seta'])
+    p02 = cal_apply('tenis', 'handicap setowy', sur['B handicap -1,5 seta'])
+    p21, p12 = max(pA - p20, 0.0), max((1 - pA) - p02, 0.0)
+    s = p20 + p21 + p12 + p02
+    S = {'2:0': p20 / s, '2:1': p21 / s, '1:2': p12 / s, '0:2': p02 / s}
+    out = dict(S)
+    out['powyżej 2,5 seta'] = S['2:1'] + S['1:2']; out['poniżej 2,5 seta'] = S['2:0'] + S['0:2']
+    out['A handicap -1,5 seta'] = S['2:0']; out['B handicap +1,5 seta'] = 1 - S['2:0']
+    out['B handicap -1,5 seta'] = S['0:2']; out['A handicap +1,5 seta'] = 1 - S['0:2']
+    return out
+
+
 def backtest_tennis():
     import tenis as T
     d = T.load(); cut = pd.Timestamp('2024-01-01')
@@ -216,7 +242,7 @@ def main(a):
     elif a[0] == 'typuj':
         import sporty as sp
         sport = a[1].lower(); d = sp.load(); T, L, last = rate_pass(d, sport)
-        h, g = sp.resolve(a[2], set(T)) or a[2], sp.resolve(a[3], set(T)) or a[3]
+        h, g = sp.resolve(a[2], set(T), sport) or a[2], sp.resolve(a[3], set(T), sport) or a[3]   # sport: reguly nazw zalezne od sportu
         if h not in T or g not in T: sys.exit(f'Brak drużyny w bazie wyników ({h if h not in T else g}) — linie liczone tylko dla drużyn z historią meczów.')
         ds = d[(d.sport == sport) & ((d.gosp == h) | (d.gosc == h))]; liga = ds.liga.iloc[-1]
         lg = L[liga]; sh = lambda s, i: (s[i] * s[2] + PRIOR) / (s[2] + PRIOR)
@@ -233,13 +259,16 @@ def main(a):
         print('  SUMA (O/U):')
         for Lk in lines:
             po = 1 - norm.cdf(Lk, mu_s, sg[0])
-            print(f'    {Lk:>7.1f}:  powyżej {cal_apply(sport, "suma O", po):6.1%}   poniżej {cal_apply(sport, "suma U", 1 - po):6.1%}')
+            # 30.09.2026 (proba generalna): obie strony kalibrowane osobno nie sumowaly sie do 100% (82,5% / 12,0%)
+            po_c = obie_strony(sport, "suma O", "suma U", po)
+            print(f'    {Lk:>7.1f}:  powyżej {po_c:6.1%}   poniżej {1 - po_c:6.1%}')
         hs = [float(x) for x in a[a.index('--handicap') + 1].split(',')] if '--handicap' in a else \
             [np.floor(-mu_m) + 0.5 + k * max(st, 1) for k in range(-3, 4)]
         print('  HANDICAP gospodarza (np. -5,5 = gosp. musi wygrać 6+):')
         for H in hs:
             ph = 1 - norm.cdf(-H, mu_m, sg[1])
-            print(f'    gosp. {H:+6.1f}: {cal_apply(sport, "handicap", ph):6.1%}   gość {-H:+6.1f}: {cal_apply(sport, "handicap", 1 - ph):6.1%}')
+            ph_c = obie_strony(sport, "handicap", "handicap", ph)   # strony sumuja sie do 100%
+            print(f'    gosp. {H:+6.1f}: {ph_c:6.1%}   gość {-H:+6.1f}: {1 - ph_c:6.1%}')
         for nm, mu in ((h, mh), (g, ma)):
             ls = np.floor(mu) + 0.5
             print(f'  suma drużyny {nm}: oczekiwane {mu:.1f}; powyżej {ls:.1f}: {1 - norm.cdf(ls, mu, sg[0] / np.sqrt(2)):.1%} (nieskalibrowane)')
@@ -274,11 +303,7 @@ def main(a):
         p, pA = T.p_skalibr(st, A, B, surf, bo5)
         print(f'{A} – {B} ({surf}{", bo5" if bo5 else ""}): P({A} wygra) = {pA:.1%}'
               + ('  (rynki setowe bo5 nieskalibrowane — szacunek)' if bo5 else ''))
-        mk, mk_sur = tennis_markets(pA, bo5), tennis_markets(p, bo5)
-        for k, v in mk.items():
-            fam = None if bo5 else 'sety O/U' if 'seta' in k and 'handicap' not in k else 'handicap setowy' if 'handicap' in k else None
-            # rodzina z tabela: surowe P -> tabela linii (raz); reszta (dokladne wyniki, brak tabeli): ze skalibrowanego P meczu
-            vv = cal_apply('tenis', fam, mk_sur[k]) if ma_tabele('tenis', fam) else v
+        for k, vv in rynki_setowe(p, pA, bo5).items():
             print(f'  {k.replace("A ", A.split()[-1] + " ").replace("B ", B.split()[-1] + " "):<32} {vv:6.1%}')
 
 
