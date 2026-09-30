@@ -137,6 +137,9 @@ def _scal_nazwy_rozgrywek(d):
     return d.drop(columns='_wez')
 
 
+SERIE = {'basketball', 'volleyball', 'ice-hockey', 'handball'}   # sporty z seriami dzien po dniu
+
+
 def czytaj(wzor, bez=None):
     fs = sorted(glob.glob(os.path.join(ZD, wzor)) + glob.glob(os.path.join(ZD, wzor + '.gz')))
     if bez: fs = [f for f in fs if not re.search(bez, os.path.basename(f))]
@@ -150,7 +153,11 @@ def czytaj(wzor, bez=None):
         except Exception as e:
             print(f'  BLAD ODCZYTU zewn/{os.path.basename(f)} ({type(e).__name__}: {e}) — plik POMINIETY; pobierz go ponownie z Dysku.')
     if not czesci: return pd.DataFrame()
-    d = pd.concat(czesci, ignore_index=True).drop_duplicates()
+    d = pd.concat(czesci, ignore_index=True)
+    # 30.09.2026 (przeglad): od ok. 1.09 plik 365 zapisuje KHL, Ligaen itd. dwa razy — jako 'hockey' i 'ice-hockey';
+    # jedna nazwa sportu PRZED odsiewaniem dubli (dotad odsiew widzial dwa rozne sporty)
+    if 'sport' in d.columns: d['sport'] = d.sport.map(lambda x: ALIAS_SPORT.get(x, x))
+    d = d.drop_duplicates()
 
     # 22.09.2026. Pliki z Apps Script zawieraja pojedyncze wiersze uszkodzone przy zapisie,
     # np. "\t\t\t\t   (W): 2" w kolumnie daty. To nie jest mecz — to smiec z parsowania.
@@ -205,16 +212,29 @@ def czytaj(wzor, bez=None):
         # 29.09.2026: transform('nunique') zamiast lambdy wolanej dla kazdej grupy (ok. 20 s na przebieg)
         rozne = d.groupby(wynik_kl, dropna=False)[[g1, g2]].transform('nunique').max(axis=1) > 1
         if rozne.any():
-            zostaw, sprzeczne = [], 0
+            zostaw, sprzeczne, serie = [], 0, 0
             for _, gr in d[rozne].groupby(wynik_kl, dropna=False):
                 if gr[['_v1', '_v2']].isna().any().any():
                     zostaw.append(gr.index[-1]); continue            # wynik nieliczbowy (np. boks KO/TKO)
                 dom = gr[(gr._v1 >= gr._v1.max()) & (gr._v2 >= gr._v2.max())]
-                if len(dom): zostaw.append(dom.index[-1])
+                if len(dom): zostaw.append(dom.index[-1]); continue
+                # 30.09.2026 (przeglad): koszykowka/siatkowka/hokej/reczna graja serie dzien po dniu, a zrodlo bywa o dzien
+                # przesuniete — 118:94 i 117:122 tej samej pary jednego dnia to DWA mecze, nie sprzecznosc (90 meczow
+                # gubionych). Zostaja wyniki niezdominowane, chyba ze sa lustrzane (1:2 i 2:1 = sprzecznosc).
+                sp_ = str(gr.sport.iloc[0]).lower() if 'sport' in gr.columns else ''
+                pk = list(dict.fromkeys(zip(gr._v1, gr._v2)))
+                front = [(a, b) for a, b in pk if not any(c >= a and e >= b and (c, e) != (a, b) for c, e in pk)]
+                lustro = any((b, a) in front for a, b in front if a != b)
+                if sp_ in SERIE and len(front) > 1 and not lustro:
+                    for a, b in front:
+                        i_ = gr[(gr._v1 == a) & (gr._v2 == b)].index[-1]; zostaw.append(i_); d.loc[i_, '_wyn'] = f'{a}:{b}'
+                    serie += 1
                 else: sprzeczne += 1
             d = pd.concat([d[~rozne], d.loc[zostaw]])
             if sprzeczne:
                 print(f'  zewn: odrzucono {sprzeczne} meczow ze SPRZECZNYM wynikiem w zrodle (np. 1:2 i 2:1) — nie da sie ustalic koncowego.')
+            if serie:
+                print(f'  zewn: {serie} par z DWOMA meczami tego samego dnia (seria, data przesunieta w zrodle) — oba zostaja.')
         if 'sport' in d.columns:   # baseball: wynik w kluczu, wiec migawka w trakcie meczu nie jest odsiewana — ostrzegamy
             b = d[d.sport.astype(str).str.lower() == 'baseball']
             if len(b):
@@ -258,6 +278,12 @@ def pilka():
         s = s[~_puchar & ~s.kraj.str.contains(r'^(?:international|world|europe|south america|africa|asia|oceania|north america|north (?:and|&) central america|club.*)$', case=False)]
         div = [sofa_div(k, t) or f'{k} | {t}' for k, t in zip(s.kraj, s.turniej)]
         s = s.assign(Division=div)
+        # 30.09.2026 (przeglad): 365 podaje czesc sezonu pod „Regionalliga” i drugi raz pod „Regional League North/
+        # Southwest” — sklejanie nazw odmawia (jedna nazwa z kilkoma), wiec ten sam mecz wchodzil dwa razy (221).
+        # Ta sama para, dzien i wynik pod dwiema ligami = jeden mecz; zostaje pod liga z wieksza liczba meczow.
+        _c = s.groupby('Division').Division.transform('size')
+        s = s.assign(_c=_c).sort_values('_c', ascending=False, kind='stable').drop_duplicates(
+            ['data', 'gosp', 'gosc', 'wg', 'wa']).drop(columns='_c').sort_index()
         n = s.groupby('Division').Division.transform('size')
         s = s[(n >= 60) | s.Division.isin(set(ESPN_DIV.values()) | {kod for _, _, kod in SOFA_DIV})]   # nieznane ligi: tylko z historią ≥60 meczów
         out.append(pd.DataFrame(dict(Division=s.Division, MatchDate=pd.to_datetime(s.data), HomeTeam=s.gosp, AwayTeam=s.gosc,
@@ -641,6 +667,7 @@ def inne():
     s = _fsx_bez_dubli(s)
     rows = []
     s = s.assign(sport=s.sport.map(lambda x: ALIAS_SPORT.get(x, x)))
+    s = s[~s.sport.astype(str).str.fullmatch(r's\d+')]   # 30.09.2026: nierozpoznany sport 365 („s10”) — nie wiemy, co to
     kt = s.kraj + ' ' + s.turniej
     s = s[~kt.str.contains(r'friendl|\bu-?1\d\b|\bu-?2[0-3]\b|youth|junior|juvenil|\bu\d\d\b|3x3', case=False)]   # 3x3 to inna dyscyplina
     kob = (s.kraj + ' ' + s.turniej).str.contains(r'women|\(w\)|female|femen|feminin|damen|frauen|ladies|wnba|wta', case=False)
@@ -722,8 +749,9 @@ def tenis(max_tcl=None, glowne=None):
     if not len(s): return pd.DataFrame()
     s = s[(s.sport == 'tennis') & ~s.gosp.str.contains('/') & ~s.gosc.str.contains('/') & s.zwyciezca.isin(['1', '2'])]
     k = (s.kraj + ' ' + s.turniej).map(_n)
-    tour = np.select([k.str.contains('challenger'), k.str.contains('itf') & k.str.contains('women'), k.str.contains('itf'),
-                      k.str.contains('wta'), k.str.contains('atp')], ['CH', 'ITF-W', 'ITF', 'WTA', 'ATP'], 'INNE')
+    # 30.09.2026 (przeglad): „WTA 125K / Limoges Challenger” (35 meczow kobiet) trafialo do CH -> ATP; WTA sprawdzamy pierwsze
+    tour = np.select([k.str.contains(r'\bwta\b'), k.str.contains('challenger'), k.str.contains('itf') & k.str.contains('women'),
+                      k.str.contains('itf'), k.str.contains('atp')], ['WTA', 'CH', 'ITF-W', 'ITF', 'ATP'], 'INNE')
     poziom = np.select([k.str.contains('125'), k.str.contains('davis|billie jean|united cup'), k.str.contains('challenger')],
                        ['WTA125', 'DC', 'CH'], tour)
     s = s.assign(tour=tour, poz=poziom)
