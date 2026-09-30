@@ -419,6 +419,7 @@ def _skrot_albo_nic(name, wyn, pula, osoba=True):
             print(f'  UWAGA: "{name}" -> "{wyn}" (samo nazwisko, jeden kandydat w bazie)')
             return wyn
         print(f'  ODRZUCONO: "{name}" -> "{wyn}": w bazie dodatkowe czlony {" ".join(dod)} — to moze byc INNA druzyna, noga MNIEJ.')
+        _KANDYDAT[str(name)] = wyn
         return None
     if tn[:len(tk)] == tk: odp = tn[len(tk):]
     elif tn[-len(tk):] == tk: odp = tn[:-len(tk)]
@@ -439,7 +440,33 @@ def _skrot_albo_nic(name, wyn, pula, osoba=True):
     # zabezpieczenia skrot gubiacy czlon rozrozniajacy jest niedopuszczalny: noga MNIEJ.
     print(f'  ODRZUCONO: "{name}" -> "{wyn}" gubi czlon rozrozniajacy, a w tym sporcie nie ma kontroli '
           f'kraju, ktora by potwierdzila, ze to ten sam klub — noga MNIEJ.')
+    _KANDYDAT[str(name)] = wyn
     return None
+
+
+# 30.09.2026 (Raport 15:00): „Karpat Oulu”, „SaiPa Lappeenranta”, „Ferencvaros TC”, „Black Wings Linz”, „PAOK Saloniki”,
+# „Union Neuchatel” odpadaly jako „gubi czlon” / „dodatkowe czlony”, choc to jedyne takie kluby w bazie. W sporty.py nie ma
+# kontroli kraju (jak w typuj.py), ale jest inna: RYWAL. Odrzucona nazwa ma jednego kandydata (_KANDYDAT); jesli ten kandydat
+# i rywal z oferty (dopasowany albo tez kandydat) grali ze soba w lidze KRAJOWEJ w ostatnich 2 latach, to jest ten sam klub
+# („Independiente Yumbo” -> argentynskie Independiente nie gralo ligowo z kolumbijskim rywalem). Puchary miedzynarodowe
+# nic nie potwierdzaja. Kandydaci „z kilku klubow o tym rdzeniu” nie trafiaja do _KANDYDAT — tam nadal noga MNIEJ.
+_KANDYDAT = {}
+_MIEDZYNAR_LIGA = re.compile(r'^(europe|world|international|asia|africa|america|south america|north america|oceania|'
+                             r'concacaf|conmebol|uefa|fiba|ehf|iihf|cev)\b', re.I)
+
+
+def potwierdz_rywalem(d, sport, nazwy, wyniki, dni=730):
+    kand = [w if w else _KANDYDAT.get(str(n)) for n, w in zip(nazwy, wyniki)]
+    if None in kand or list(kand) == list(wyniki) or kand[0] == kand[1]: return wyniki
+    x = d[(d.sport == sport) & (d.data >= d.data.max() - pd.Timedelta(days=dni))]
+    x = x[(((x.gosp == kand[0]) & (x.gosc == kand[1])) | ((x.gosp == kand[1]) & (x.gosc == kand[0])))
+          & ~x.liga.astype(str).str.match(_MIEDZYNAR_LIGA)]
+    if not len(x): return wyniki
+    for n, w, k in zip(nazwy, wyniki, kand):
+        if w is None:
+            print(f'  UWAGA: "{n}" -> "{k}" potwierdzone rywalem: {len(x)} mecz(e) ligowe z nim w bazie '
+                  f'({x.liga.iloc[-1]}, ostatni {str(x.data.max())[:10]}) — ten sam klub.')
+    return kand
 
 
 # 23.09.2026 (wyd. 24): STS pisze "Panathinaikos Ateny [K]" i "Emlak Konut SK [K]", baza 365scores ma
@@ -997,7 +1024,8 @@ def main(a):
             print(biezacy_sezon(d).to_string())
     elif a[0] == 'typuj':
         sport = a[1].lower(); d = load(); inf = {}; R, N, hfa, draws, pdraw = elo(d, sport, info=inf); L_ = inf['last']
-        pool = set(R); h, g = resolve(a[2], pool, sport), resolve(a[3], pool, sport)
+        pool = set(R); _KANDYDAT.clear(); h, g = resolve(a[2], pool, sport), resolve(a[3], pool, sport)
+        h, g = potwierdz_rywalem(d, sport, (a[2], a[3]), (h, g))
         # 21.09.2026 (POPRAWKA 11): dawniej bylo "resolve(...) or a[2]" — przy nieznanej nazwie
         # skrypt podstawial surowa nazwe z oferty, nadawal jej domyslne Elo 1500 i mimo ostrzezenia
         # DRUKOWAL PELNA TABELE P. To ten sam typ usterki co joker w resolve(): zamiast bledu

@@ -49,3 +49,41 @@ def test_wyniki_czeste_bez_zmian():
              ('2026-09-24', 'koszykówka', 'L', 'A', 'B', 20, 0, 0),   # walkower — za malo punktow, by rozstrzygac
              ('2026-09-24', 'koszykówka', 'L', 'A', 'C', 20, 0, 0)])
     assert len(zewn._przemianowane_dubli(d)) == 6
+
+
+def _hist(rows):
+    d = pd.DataFrame(rows, columns=['data', 'sport', 'liga', 'gosp', 'gosc'])
+    return d.assign(data=pd.to_datetime(d.data))
+
+
+def test_potwierdzenie_rywalem():
+    """Raport 15:00: „Karpat Oulu” / „SaiPa Lappeenranta” — jedyni kandydaci, grali ze soba w Liidze."""
+    d = _hist([('2026-01-14', 'hokej', 'Finland | Liiga', 'Karpat', 'Saipa'),
+               ('2026-09-20', 'hokej', 'Finland | Liiga', 'Tappara', 'Ilves')])
+    pula = {'Karpat', 'Saipa', 'Tappara', 'Ilves'}
+    sporty._KANDYDAT.clear()
+    h, g = sporty.resolve('Karpat Oulu', pula, 'hokej'), sporty.resolve('SaiPa Lappeenranta', pula, 'hokej')
+    assert (h, g) == (None, None)
+    assert sporty.potwierdz_rywalem(d, 'hokej', ('Karpat Oulu', 'SaiPa Lappeenranta'), (h, g)) == ['Karpat', 'Saipa']
+
+
+def test_bez_meczu_ligowego_nadal_mniej():
+    """„Independiente Yumbo”: mecz z rywalem tylko w pucharze miedzynarodowym albo dawno — nic nie potwierdza."""
+    d = _hist([('2026-05-01', 'koszykówka', 'South America | Liga Sudamericana', 'Independiente', 'Rival'),
+               ('2022-01-01', 'koszykówka', 'Colombia | Liga', 'Independiente', 'Rival'),
+               ('2026-09-01', 'koszykówka', 'Colombia | Liga', 'Rival', 'Other')])
+    pula = {'Independiente', 'Rival', 'Other'}
+    sporty._KANDYDAT.clear()
+    h, g = sporty.resolve('Independiente Yumbo', pula, 'koszykówka'), sporty.resolve('Rival', pula, 'koszykówka')
+    assert h is None and g == 'Rival'
+    assert sporty.potwierdz_rywalem(d, 'koszykówka', ('Independiente Yumbo', 'Rival'), (h, g)) == (None, 'Rival')
+
+
+def test_niejednoznaczny_rdzen_bez_kandydata():
+    """Rdzen wspolny dla kilku klubow („Slovan”, „Slovan Bratislava”) — brak kandydata, rywal nic nie zmienia."""
+    d = _hist([('2026-09-01', 'piłka ręczna', 'Slovenia | 1. NLB', 'Slovan', 'Celje')])
+    pula = {'Slovan', 'Slovan Bratislava', 'Celje'}
+    sporty._KANDYDAT.clear()
+    h = sporty.resolve('Slovan Lublana', pula, 'piłka ręczna')
+    assert h is None and 'Slovan Lublana' not in sporty._KANDYDAT
+    assert sporty.potwierdz_rywalem(d, 'piłka ręczna', ('Slovan Lublana', 'Celje'), (h, 'Celje')) == (None, 'Celje')
