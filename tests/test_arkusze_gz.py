@@ -57,3 +57,27 @@ def test_arkusze_gs():
     r = subprocess.run(['node', '-e', js], capture_output=True, text=True)
     ok, pusty, bez_kol, abs_, nic = __import__('json').loads(r.stdout)
     assert ok == '' and abs_ == '' and 'pusty' in pusty and 'data_aktualizacji' in bez_kol and 'pusty' in nic
+
+
+def test_godzina_bez_zera(tmp_path, monkeypatch):
+    """Arkusze pisza „2026-09-30 8:45” — napisowo „8:45” > „16:46”. Porownujemy daty."""
+    f = tmp_path / 'x.csv'
+    pd.DataFrame({'data_aktualizacji': ['2026-09-30 8:45']}).to_csv(f, index=False)
+    assert przebieg._aktualizacja(f).hour == 8                                 # bez zera tez czytelne
+    pd.DataFrame({'data_aktualizacji': ['2026-09-30 8:45', '2026-09-30 16:46']}).to_csv(f, index=False)
+    assert przebieg._aktualizacja(f).hour == 16
+    monkeypatch.setattr(przebieg, 'HERE', str(tmp_path))
+    (tmp_path / 'statystyki_tenis.csv').write_text(_csv('2026-09-30 8:45', 3))
+    (tmp_path / 'statystyki_tenis.csv.gz').write_bytes(gzip.compress(_csv('2026-09-30 16:46', 9).encode()))
+    przebieg.rozpakuj_arkusze()
+    assert len(pd.read_csv(tmp_path / 'statystyki_tenis.csv')) == 9          # gz nowszy (16:46) wygrywa
+
+
+def test_wiek_arkusza_z_godzina_bez_zera(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(przebieg, 'HERE', str(tmp_path))
+    t = przebieg.teraz_pl() - pd.Timedelta(hours=2)
+    s = f'{t:%Y-%m-%d} {t.hour}:{t:%M}'                                        # godzina bez zera wiodacego
+    for a in przebieg.ARKUSZE:
+        pd.DataFrame({'data_aktualizacji': [s]}).to_csv(tmp_path / f'{a}.csv', index=False)
+    assert przebieg.kontrola_arkuszy() == []
+    assert '(2 h)' in capsys.readouterr().out

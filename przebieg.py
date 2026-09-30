@@ -82,10 +82,15 @@ def mecze_w_terminarzu(sport, dzien=None):
 
 
 def _aktualizacja(f):
+    """Najnowsza data_aktualizacji arkusza jako datetime (None, gdy nieczytelna).
+    30.09.2026 (audyt tenisa): arkusze pisza godzine BEZ zera („2026-09-30 8:45”), a max() na napisach dawal
+    „8:45” > „16:46” — porownujemy daty, nie napisy."""
     try:
-        return str(pd.read_csv(f, usecols=['data_aktualizacji'], low_memory=False).data_aktualizacji.astype(str).max())[:16]
+        v = pd.read_csv(f, usecols=['data_aktualizacji'], low_memory=False).data_aktualizacji.astype(str).str[:16]
+        t = pd.to_datetime(v, format='%Y-%m-%d %H:%M', errors='coerce').max()
+        return None if pd.isna(t) else t.to_pydatetime()
     except Exception:
-        return ''
+        return None
 
 
 def rozpakuj_arkusze():
@@ -111,8 +116,10 @@ def rozpakuj_arkusze():
         except Exception as e:
             print(f'  BLAD: {os.path.basename(f)} nie jest poprawnym gzip ({e}) — pobierz ponownie'); continue
         tmp = cel + '.nowy'; open(tmp, 'wb').write(raw)
-        if os.path.exists(cel) and _aktualizacja(cel) > _aktualizacja(tmp):
-            print(f'  {os.path.basename(f)}: starszy niz {os.path.basename(cel)} ({_aktualizacja(tmp)} < {_aktualizacja(cel)}) — zostaje CSV')
+        stary, nowy = (_aktualizacja(cel) if os.path.exists(cel) else None), _aktualizacja(tmp)
+        if stary and (nowy is None or stary > nowy):
+            print(f'  {os.path.basename(f)}: starszy niz {os.path.basename(cel)} ({nowy:%Y-%m-%d %H:%M} < {stary:%Y-%m-%d %H:%M}) — zostaje CSV'
+                  if nowy else f'  {os.path.basename(f)}: bez czytelnej data_aktualizacji — zostaje {os.path.basename(cel)}')
             os.remove(tmp)
         else:
             os.replace(tmp, cel); n = raw.count(b'\n')
@@ -133,10 +140,10 @@ def kontrola_arkuszy():
                          f'arkusz Google „{a}” (download_file_content, exportMimeType text/csv) jako kb/{a}.csv')
             continue
         try:
-            d = pd.read_csv(f, usecols=['data_aktualizacji'], low_memory=False).data_aktualizacji.astype(str).max()
-            t = dt.datetime.strptime(d[:16], '%Y-%m-%d %H:%M')
+            t = _aktualizacja(f)
+            if t is None: raise ValueError('brak czytelnej data_aktualizacji')
             h = (teraz_pl() - t).total_seconds() / 3600
-            print(f'  {a}.csv: aktualizacja {d[:16]} ({h:.0f} h)'
+            print(f'  {a}.csv: aktualizacja {t:%Y-%m-%d %H:%M} ({h:.0f} h)'
                   + ('' if h <= MAKS_WIEK_ARKUSZA_H else '  UWAGA: starszy niz 24 h — sezon.py tego sportu tylko informacyjnie')
                   + ('  UWAGA: data z PRZYSZLOSCI — sprawdz strefe czasowa arkusza (oczekiwany czas polski)'
                      if h < -0.5 else ''))
@@ -165,9 +172,10 @@ def kontrola_arkuszy():
                       f'pobierz jako CSV, gdy ten sport jest w ofercie')
             continue
         try:
-            d = pd.read_csv(f, usecols=['data_aktualizacji'], low_memory=False).data_aktualizacji.astype(str).max()
-            h = (teraz_pl() - dt.datetime.strptime(d[:16], '%Y-%m-%d %H:%M')).total_seconds() / 3600
-            print(f'  {a}.csv: aktualizacja {d[:16]} ({h:.0f} h)' + ('' if h <= MAKS_WIEK_ARKUSZA_OPCJ_H else
+            t = _aktualizacja(f)
+            if t is None: raise ValueError('brak czytelnej data_aktualizacji')
+            h = (teraz_pl() - t).total_seconds() / 3600
+            print(f'  {a}.csv: aktualizacja {t:%Y-%m-%d %H:%M} ({h:.0f} h)' + ('' if h <= MAKS_WIEK_ARKUSZA_OPCJ_H else
                   f'  UWAGA: starszy niz {MAKS_WIEK_ARKUSZA_OPCJ_H} h — sezon.py tego sportu tylko informacyjnie'))
         except Exception as e:
             print(f'  UWAGA: {a}.csv nieczytelny ({e}) — pobierz ponownie jako CSV')
