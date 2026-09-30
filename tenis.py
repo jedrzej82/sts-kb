@@ -447,6 +447,15 @@ def resolve(name, players):
     "Imie Nazwisko". W przebiegu 19:30 wszystkie cztery mecze tenisa zwrocily "Brak zawodnika
     w bazie" wlasnie z tego powodu. Dlatego przy braku trafienia probujemy tez odwroconej
     kolejnosci czlonow. Dolozone tez ostrzezenia tam, gdzie kod wczesniej po cichu zgadywal."""
+    # 30.09.2026 (audyt oferty 01.10): STS podwaja czlon („Nakashima Bryce Nakashima”) — trzy czlony nie pasowaly do nikogo.
+    # Dokladnie powtorzony czlon usuwamy raz i szukamy dalej jak zwykle (wszystkie zabezpieczenia resolve() dzialaja).
+    _cz = str(name).split()
+    if len(_cz) >= 3 and len({c.lower() for c in _cz}) < len(_cz):
+        _bez = []
+        for c in _cz:
+            if c.lower() not in {x.lower() for x in _bez}: _bez.append(c)
+        print(f'  UWAGA: "{name}" ma powtorzony czlon — szukam jako "{" ".join(_bez)}".')
+        return resolve(' '.join(_bez), players)
     # Poprawka 43 (24.09.2026): literowki w ofercie STS — tylko gdy cel jest w bazie
     _l = _LITEROWKI_STS.get(norm(name))
     if _l and _l in players:
