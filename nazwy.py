@@ -32,7 +32,9 @@ def znaczniki(s):
         t0 = t0.strip('[](){}<>.,;:')
         # 30.09.2026 (przeglad): „Zenit-2”, „CSKA-2 Moscow” — znacznik po lacznika nie byl widziany i pierwsza druzyna
         # („Zenit”) trafiala w rezerwy. Ostatni czlon po '-' sprawdzamy osobno (bez rozbijania „U-19”, „Sub-21”).
-        cz = [t0] + ([t0.rsplit('-', 1)[1]] if '-' in t0 and not re.match(r'^(u|sub)-?\d+$', t0, re.I) else [])
+        # tylko cyfra albo cyfra rzymska po laczniku (Zenit-2, CSKA-2, Dinamo-II) — nie „Kyong-Jun”, „Y.-B.”, „J.-K.”
+        _po = t0.rsplit('-', 1)[1] if '-' in t0 else ''
+        cz = [t0] + ([_po] if re.fullmatch(r'\d+|[ivxIVX]+', _po) and not re.match(r'^(u|sub)-?\d+$', t0, re.I) else [])
         t = next((c for c in cz if ZNACZNIK.match(c)), None)
         if t is None: continue
         t = t.lower().rstrip('.')

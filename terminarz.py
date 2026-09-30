@@ -33,6 +33,11 @@ def _czlony(s):
         if x in _FORMY or znaczniki(x): continue   # znaczniki (II/2/B, W/K, U20) porownuje pasuje() osobno
         out.add(x)
         out.update(_MIASTA_PL.get(x, ()))   # "monachium" pasuje tez do "munich"
+    # 30.09.2026 (proba generalna): „Junior FC” (Barranquilla) — „junior” to znacznik mlodziezy, „fc” forma prawna;
+    # nie zostawal ZADEN czlon i kontrola terminarza nigdy nie dzialala (po cichu). Gdy nic nie zostaje — znaczniki
+    # sa nazwa klubu, nie znacznikiem.
+    if not out:
+        out = {x for x in t if x not in _FORMY}
     return out
 
 
