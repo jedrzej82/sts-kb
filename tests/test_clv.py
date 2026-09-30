@@ -51,3 +51,17 @@ def test_archiwum_arkuszy(tmp_path, monkeypatch):
     assert przebieg.archiwum_arkuszy() == 0
     f = next(tmp_path.glob('arkusze_*.tar.gz'))
     assert tarfile.open(f).getnames() == ['statystyki_druzyn.csv']
+
+
+def test_pieniadze_zapisane_jako_float_to_nadal_pieniadze(tmp_path, capsys):
+    # 30.09.2026 (przeglad): dopisz_typ do starego logu bez kolumny `pieniadze` — pandas zapisuje „1.0”,
+    # a _tak porownywal tekst i liczyl zaklady za pieniadze jako papierowe
+    f = tmp_path / 'typy_log.csv'
+    pd.DataFrame([{'data': '2026-09-28', 'mecz': 'x', 'kurs_zamkniecia': 1.5}]).to_csv(f, index=False)
+    clv.dopisz_typ(str(f), {'data': '2026-09-29', 'mecz': 'a', 'kurs_zamkniecia': 1.30}, ['1,35', 'tak'])
+    clv.dopisz_typ(str(f), {'data': '2026-09-29', 'mecz': 'b', 'kurs_zamkniecia': 1.90}, ['2,00', 'nie'])
+    assert '1.0' in open(f).read()
+    assert clv._tak('1.0') and clv._tak(1) and clv._tak('tak') and not clv._tak('0.0') and not clv._tak('nan')
+    clv.main([str(f)])
+    out = capsys.readouterr().out
+    assert 'za pieniadze n=1' in out and 'papierowe    n=1' in out

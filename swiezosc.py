@@ -31,13 +31,19 @@ def kompletnosc(daty, etykieta):
     if d.empty: return []
     ile = d.value_counts().sort_index()
     out = []
-    for dzien in [x for x in ile.index if x < DZIS][-2:]:          # dwa ostatnie ZAMKNIETE dni
+    # 30.09.2026: dni KALENDARZOWE (wczoraj, przedwczoraj), nie dwa ostatnie dni obecne w danych — dzien bez
+    # ani jednego wyniku (28.09 brak, 29.09 jest) byl dotad pomijany. Dni po ostatniej danej zostawiamy
+    # kontroli wieku (przebieg.py wymaga wynikow z wczoraj), zeby nie dublowac alarmu.
+    ost = max(ile.index)
+    for dzien in [DZIS - dt.timedelta(days=k) for k in (2, 1)]:
+        if dzien > ost: continue
+        ile_d = int(ile.get(dzien, 0))
         wzor = [ile.get(dzien - dt.timedelta(days=7 * k), 0) for k in range(1, 5)]
         wzor = [x for x in wzor if x > 0]
         if len(wzor) < 2: continue                                  # za malo historii na werdykt
         ocz = sorted(wzor)[len(wzor) // 2]
-        if ocz and ile[dzien] < 0.55 * ocz:
-            out.append((dzien, int(ile[dzien]), int(ocz), ile[dzien] / ocz, etykieta))
+        if ocz and ile_d < 0.55 * ocz:
+            out.append((dzien, ile_d, int(ocz), ile_d / ocz, etykieta))
     return out
 
 
@@ -199,17 +205,22 @@ def main():
         # Teraz liczy sie NAJPOZNIEJSZA DATA MECZU w plikach biezacego miesiaca (wyniki_*_RRRR-MM).
         pl = sorted(os.listdir(zd))
         mies = DZIS.strftime('%Y-%m')
-        biez = [p for p in pl if mies in p and 'archiwum' not in p]
-        naj = None
+        # 30.09.2026: 1. dnia miesiaca plik nowego miesiaca nie ma jeszcze wczoraj (jak w przebieg.kontrola_zewn) —
+        # wtedy licza sie tez pliki poprzedniego miesiaca; dla kazdego zrodla najnowsza data z obu
+        miesiace = [mies] + ([(DZIS - dt.timedelta(days=1)).strftime('%Y-%m')] if DZIS.day == 1 else [])
+        biez = [p for p in pl if any(m in p for m in miesiace) and 'archiwum' not in p and p.startswith('wyniki_')]
+        per_zrodlo = {}
         for p in biez:
             try:
                 d = pd.read_csv(os.path.join(zd, p), usecols=['data'], low_memory=False).data.astype(str).str[:10].max()
                 d = dt.date.fromisoformat(d)
                 print(f'  zewn/{p}: ostatni mecz {d}')
                 if 'lol' not in p:
-                    naj = d if naj is None else min(naj, d)      # najstarszy z plikow = waskie gardlo
+                    z = p.rsplit('_', 1)[0]                                  # wyniki_365_pilka
+                    per_zrodlo[z] = max(per_zrodlo.get(z, d), d)
             except Exception as e:
                 print(f'  zewn/{p}: NIE DA SIE ODCZYTAC ({e})')
+        naj = min(per_zrodlo.values()) if per_zrodlo else None            # najstarsze zrodlo = waskie gardlo
         uw = '' if biez else f'brak plikow z biezacego miesiaca ({mies}) — pobierz z Dysku'
         w.append((f'pliki zewn/ biezacy miesiac ({len(biez)} szt.)', naj or 'BRAK', wiek(naj) if naj else None, PROG['zewn'], uw))
     else:
@@ -220,7 +231,9 @@ def main():
     zle = 0
     for nazwa, d, a, prog, uw in w:
         st = ''
-        if a is not None and prog is not None:
+        if str(d) == 'BRAK':          # 30.09.2026: brak bazy/plikow to blad, nie pusty wiersz tabeli
+            st = 'BRAK DANYCH'; zle += 1
+        elif a is not None and prog is not None:
             if a > prog: st = 'PRZETERMINOWANE'; zle += 1
             else: st = 'ok'
         print(f"{nazwa:<30} {str(d):<14} {('' if a is None else str(a)+' d'):>6}  {('' if prog is None else str(prog)+' d'):>5}  {st} {uw}")
@@ -254,7 +267,7 @@ def main():
     # Kod wyjscia bez zmian (1 przy dowolnym problemie); zmienia sie tylko opis.
     print()
     czesci = []
-    if zle: czesci.append(f"{zle} zrodel PRZETERMINOWANYCH (tabela wyzej)")
+    if zle: czesci.append(f"{zle} zrodel PRZETERMINOWANYCH albo BRAK DANYCH (tabela wyzej)")
     if niepelne: czesci.append(f"{len(niepelne)} dni NIEPELNYCH")
     if nm: czesci.append(f"{nm} problemow spojnosci nazw")
     zle += len(niepelne) + nm

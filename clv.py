@@ -34,7 +34,13 @@ def dopisz_typ(plik, row, argv_kurs):
 
 
 def _tak(x):
-    return str(x).strip().lower() in ('1', 'tak', 'true', 'yes', 't', 'p', 'pieniadze')
+    # 30.09.2026: dopisz_typ scala nowy wiersz ze starym logiem bez kolumny `pieniadze` — pandas robi z niej
+    # float i w pliku laduje „1.0”; tekstowe porownanie liczylo wtedy kazdy zaklad za pieniadze jako papierowy
+    try:
+        v = float(str(x).strip().replace(',', '.'))
+        return v == 1
+    except ValueError:
+        return str(x).strip().lower() in ('tak', 'true', 'yes', 't', 'p', 'pieniadze')
 
 
 def przygotuj(df):
