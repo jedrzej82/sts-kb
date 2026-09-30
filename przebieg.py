@@ -3,6 +3,7 @@
   python3 przebieg.py            — kontrola plikow zewn/ → build_kb → uzupelnij_ligi → build_kb → hist_import → swiezosc
   python3 przebieg.py --kontrola — tylko kontrola plikow zewn/ (sekundy), bez budowy
   python3 przebieg.py --archiwum-arkuszy — spakuj statystyki_*.csv do arkusze_RRRR-MM-DD.tar.gz (historia arkuszy)
+  python3 przebieg.py --dzienniki — rozpakuj kb/dzienniki.zip (Apps Script dzienniki.gs) do kb/dzienniki/ i scal dzienniki
   Pliki zwrocone przez Dysk W TRESCI (base64): zapisz tekst jako zewn/NAZWA.csv.gz.b64 — przebieg sam je zdekoduje.
 
 Ostatnia linia wyniku to WERDYKT:
@@ -125,6 +126,55 @@ def rozpakuj_arkusze():
             os.replace(tmp, cel); n = raw.count(b'\n')
             print(f'  rozpakowano {os.path.basename(f)} -> {os.path.basename(cel)} ({n} wierszy)')
         os.remove(f)
+
+
+def rozpakuj_dzienniki(zrodlo=HERE, cel=None):
+    """30.09.2026 (Raport 18:00, usterka 1): 62 pliki dziennikow (typy_log, sporty_typy, ako_log) pobierane z Dysku
+    po jednym zajely 88 min z budzetu przebiegu — przy 436 KB danych. Apps Script dzienniki.gs pakuje je co 30 min
+    w JEDEN plik dzienniki.zip (z manifestem: nazwa pliku, czas utworzenia na Dysku). Zapisz go do kb/ jako
+    dzienniki.zip (jq -r .content | base64 -d) albo tekst base64 jako dzienniki.zip.b64. Ten krok sprawdza zip,
+    rozpakowuje do kb/dzienniki/ i ustawia czas pliku = czas utworzenia na Dysku (dzienniki.scal: pozniejszy wygrywa).
+    Zwraca liczbe rozpakowanych plikow albo None, gdy zipa nie ma."""
+    import base64, json, zipfile, io, csv
+    cel = cel or os.path.join(zrodlo, 'dzienniki')
+    b64, zp = os.path.join(zrodlo, 'dzienniki.zip.b64'), os.path.join(zrodlo, 'dzienniki.zip')
+    if os.path.exists(b64):
+        t = open(b64, encoding='utf-8', errors='replace').read().strip()
+        try:
+            if t.startswith('{'): t = json.loads(t)['content']
+            raw = base64.b64decode(''.join(t.split()))
+            zipfile.ZipFile(io.BytesIO(raw)).testzip()
+        except Exception as e:
+            print(f'  BLAD: dzienniki.zip.b64 nie jest poprawnym base64 pliku zip ({e}) — pobierz ponownie')
+            return None
+        open(zp, 'wb').write(raw); os.remove(b64)
+    if not os.path.exists(zp): return None
+    try:
+        z = zipfile.ZipFile(zp)
+        zly = z.testzip()
+        if zly: raise ValueError(f'uszkodzony wpis {zly}')
+    except Exception as e:
+        print(f'  BLAD: dzienniki.zip nie jest poprawnym plikiem zip ({e}) — pobierz ponownie'); return None
+    nazwy = [n for n in z.namelist() if not n.endswith('/')]
+    if 'dzienniki_manifest.csv' not in nazwy:
+        print('  BLAD: dzienniki.zip bez dzienniki_manifest.csv — nie wiadomo, ktory plik jest pozniejszy; pobierz ponownie')
+        return None
+    man = {r['plik']: r['utworzony'] for r in csv.DictReader(io.StringIO(z.read('dzienniki_manifest.csv').decode('utf-8')))}
+    brak = [n for n in man if n not in nazwy]
+    if brak:
+        print(f'  BLAD: dzienniki.zip niepelny — w manifescie, a nie w zipie: {brak[:3]} — pobierz ponownie'); return None
+    os.makedirs(cel, exist_ok=True)
+    n = 0
+    for nazwa, kiedy in man.items():
+        base = os.path.basename(nazwa)
+        if not base or base.startswith('.'): continue
+        f = os.path.join(cel, base)
+        open(f, 'wb').write(z.read(nazwa))
+        t = pd.Timestamp(kiedy)
+        t = (t.tz_localize('UTC') if t.tzinfo is None else t).timestamp()
+        os.utime(f, (t, t)); n += 1
+    print(f'  rozpakowano dzienniki.zip -> {os.path.relpath(cel, zrodlo)}/ ({n} plikow dziennikow)')
+    return n
 
 
 def kontrola_arkuszy():
@@ -330,6 +380,14 @@ def archiwum_arkuszy():
 def main():
     if '--archiwum-arkuszy' in sys.argv:
         return archiwum_arkuszy()
+    if '--dzienniki' in sys.argv:
+        n = rozpakuj_dzienniki()
+        if not n:
+            print('BRAK dzienniki.zip w kb/ (albo zip bledny) — pobierz z Dysku plik dzienniki.zip (Apps Script dzienniki.gs)')
+            return 2
+        import dzienniki
+        dzienniki.scal(os.path.join(HERE, 'dzienniki'))
+        return 0
     print(f'PRZEBIEG {teraz_pl():%Y-%m-%d %H:%M} (czas polski)\n1) Pliki zewn/:')
     bledy = kontrola_zewn()
     print('   Arkusze statystyk (drugie zrodlo):')
