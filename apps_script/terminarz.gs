@@ -38,7 +38,7 @@ function terminarzPracuj() {
   try { terminarzFs(); } catch (e) { Logger.log('terminarzFs: ' + e); }   // błąd Flashscore nie blokuje 365scores
   var dzis = Utilities.formatDate(new Date(), 'UTC', 'yyyy-MM-dd');
   var jutro = Utilities.formatDate(new Date(Date.now() + 86400000), 'UTC', 'yyyy-MM-dd');
-  var wiersze = [], nazwySportow = {};
+  var wiersze = [], nazwySportow = {}, brakPilki = [];
   [dzis, jutro].forEach(function (d) {
     var dm = d.substr(8, 2) + '/' + d.substr(5, 2) + '/' + d.substr(0, 4), ids = [];
     for (var i = 1; i <= TERMINARZ_MAX_SPORT; i++) ids.push(i);
@@ -46,13 +46,13 @@ function terminarzPracuj() {
       return 'https://webws.365scores.com/web/games/allscores/?appTypeId=5&langId=1&timezoneName=UTC&userCountryId=1&sports=' + id +
         '&startDate=' + dm + '&endDate=' + dm + '&showOdds=false&onlyMajorGames=false&withTop=false';
     })).forEach(function (r, i) {
-      if (r.getResponseCode() !== 200) return;
-      var j; try { j = JSON.parse(r.getContentText()); } catch (e) { return; }
+      if (r.getResponseCode() !== 200) { if (ids[i] === 1) brakPilki.push(d); return; }
+      var j; try { j = JSON.parse(r.getContentText()); } catch (e) { if (ids[i] === 1) brakPilki.push(d); return; }
       var id = ids[i], strony = [j];
       for (var p = 0; p < 30 && j.paging && j.paging.nextPage; p++) {
         var r2 = terminarzPobierz(['https://webws.365scores.com' + j.paging.nextPage])[0];
-        if (r2.getResponseCode() !== 200) break;
-        try { j = JSON.parse(r2.getContentText()); } catch (e) { break; }
+        if (r2.getResponseCode() !== 200) { if (id === 1) brakPilki.push(d); break; }
+        try { j = JSON.parse(r2.getContentText()); } catch (e) { if (id === 1) brakPilki.push(d); break; }
         strony.push(j);
       }
       var kraje = {}, komp = {};
@@ -73,6 +73,9 @@ function terminarzPracuj() {
     });
   });
   if (!wiersze.length) return;
+  // 30.09.2026 (przegląd): jeden błąd HTTP przy piłce nadpisywał plik terminarzem BEZ piłki na całą godzinę —
+  // typuj.py pomijał wtedy po cichu kontrolę kraju/ligi. Niepełna piłka = zostaje poprzedni plik.
+  if (brakPilki.length) { Logger.log('terminarz365: piłka niepobrana (' + brakPilki.join(', ') + ') — zostaje poprzedni plik'); return; }
   var tresc = 'data,godzina_utc,sport,kraj,turniej,runda,gosp,gosc,status\n' + wiersze.join('\n');
   var folder = DriveApp.getFolderById(TERMINARZ_FOLDER_ID), stare = folder.getFilesByName('terminarz_365.csv.gz'), doKosza = [];
   while (stare.hasNext()) doKosza.push(stare.next());
@@ -90,7 +93,7 @@ var TERMINARZ_FS_HOSTY = ['https://global.flashscore.ninja/2/x/feed/', 'https://
 function terminarzFs() {
   var ids = [];   // wszystkie 1..45: numery spoza mapy trafiają do pliku jako „fsNN” (log pokazuje ich rozgrywki)
   for (var q = 1; q <= 45; q++) ids.push(String(q));
-  var wiersze = [], byly = {}, log = ['terminarzFs ' + new Date().toISOString()];
+  var wiersze = [], byly = {}, log = ['terminarzFs ' + new Date().toISOString()], brakPilki = [];
   [0, 1].forEach(function (dzien) {   // 0 = dziś, 1 = jutro (strefa 0 = UTC)
     var odp = null, host = '';
     for (var h = 0; h < TERMINARZ_FS_HOSTY.length && !odp; h++) {
@@ -102,10 +105,10 @@ function terminarzFs() {
       if (proba.some(function (r) { return r.getResponseCode() === 200 && r.getContentText().indexOf('AA÷') >= 0; })) odp = proba;
       else log.push('dzien ' + dzien + ' host ' + host + ': brak danych (' + proba.map(function (r) { return r.getResponseCode(); }).join(',') + ')');
     }
-    if (!odp) return;
+    if (!odp) { brakPilki.push(dzien); return; }
     odp.forEach(function (r, i) {
       var sport = TERMINARZ_FS_SPORTY[ids[i]] || ('fs' + ids[i]), n = 0, kraj = '', turniej = '', pierwsza = '';
-      if (r.getResponseCode() !== 200) { log.push('dzien ' + dzien + ' ' + sport + ': HTTP ' + r.getResponseCode()); return; }
+      if (r.getResponseCode() !== 200) { log.push('dzien ' + dzien + ' ' + sport + ': HTTP ' + r.getResponseCode()); if (ids[i] === '1') brakPilki.push(dzien); return; }
       r.getContentText().split('~').forEach(function (rek) {
         var f = {};
         rek.split('¬').forEach(function (p) { var k = p.indexOf('÷'); if (k > 0) f[p.substr(0, k)] = p.substr(k + 1); });
@@ -127,7 +130,9 @@ function terminarzFs() {
     });
   });
   var folder = DriveApp.getFolderById(TERMINARZ_FOLDER_ID);
-  if (wiersze.length) {
+  // 30.09.2026 (przegląd): jak w terminarz365 — bez kompletnej piłki nie nadpisujemy pliku
+  if (brakPilki.length) log.push('piłka niepobrana (dzien ' + brakPilki.join(', ') + ') — zostaje poprzedni terminarz_fs.csv.gz');
+  if (wiersze.length && !brakPilki.length) {
     var tresc = 'data,godzina_utc,sport,kraj,turniej,runda,gosp,gosc,status\n' + wiersze.join('\n');
     var stare = folder.getFilesByName('terminarz_fs.csv.gz'), doKosza = [];
     while (stare.hasNext()) doKosza.push(stare.next());
@@ -197,6 +202,10 @@ function terminarzCsv(a) {
 // Wyzwalacz: codziennie ok. 06:00 (ustaw raz: wynikiFsUstaw).
 var WYNIKI_FS_SPORTY = {3: 'basketball', 7: 'handball', 12: 'volleyball'};
 
+// 30.09.2026 (przegląd): klucz scalania = 7 pierwszych PÓL CSV (data..gosc). Dotąd split(',') na surowym wierszu —
+// przecinek w cudzysłowie („EHF, Group A”) przesuwał pola i dwa mecze tego samego gospodarza jednego dnia się nadpisywały.
+function _klucz7_(w) { return Utilities.parseCsv(w)[0].slice(0, 7).join('\u0001'); }
+
 function wynikiFsDruzynowe(dni) {
   var ids = Object.keys(WYNIKI_FS_SPORTY), nowe = {}, log = ['wynikiFsDruzynowe ' + new Date().toISOString()];
   (Array.isArray(dni) ? dni : [-1, -2]).forEach(function (dzien) {
@@ -241,10 +250,10 @@ function wynikiFsDruzynowe(dni) {
     while (stare.hasNext()) {
       var plik = stare.next(); doKosza.push(plik);
       Utilities.ungzip(plik.getBlob()).getDataAsString().split('\n').slice(1).forEach(function (w) {
-        if (w) wiersze[w.split(',').slice(0, 7).join(',')] = w;   // klucz: data..gosc
+        if (w) wiersze[_klucz7_(w)] = w;   // klucz: data..gosc
       });
     }
-    Object.keys(miesiace[m]).forEach(function (id) { var w = miesiace[m][id]; wiersze[w.split(',').slice(0, 7).join(',')] = w; });
+    Object.keys(miesiace[m]).forEach(function (id) { var w = miesiace[m][id]; wiersze[_klucz7_(w)] = w; });
     var tresc = naglowek + '\n' + Object.keys(wiersze).map(function (k) { return wiersze[k]; }).join('\n');
     folder.createFile(Utilities.gzip(Utilities.newBlob(tresc, 'text/csv', nazwa.replace('.gz', ''))).setName(nazwa));
     doKosza.forEach(function (f) { f.setTrashed(true); });   // stary plik dopiero PO zapisie nowego
@@ -308,7 +317,7 @@ function wyniki365Historia() {
   while (stare.hasNext()) {
     var plik = stare.next(); doKosza.push(plik);
     Utilities.ungzip(plik.getBlob()).getDataAsString().split('\n').slice(1).forEach(function (w) {
-      if (w) wiersze[w.split(',').slice(0, 7).join(',')] = w;
+      if (w) wiersze[_klucz7_(w)] = w;
     });
   }
   var nowe = 0, zrobione = 0;
@@ -322,11 +331,11 @@ function wyniki365Historia() {
       var d = paczka[k];
       if (r.getResponseCode() !== 200) { log.push(d + ': HTTP ' + r.getResponseCode()); return; }
       var j; try { j = JSON.parse(r.getContentText()); } catch (e) { log.push(d + ': zly JSON'); return; }
-      var strony = [j];
+      var strony = [j], niepelny = false;
       for (var p = 0; p < 30 && j.paging && j.paging.nextPage; p++) {
         var r2 = terminarzPobierz(['https://webws.365scores.com' + j.paging.nextPage])[0];
-        if (r2.getResponseCode() !== 200) break;
-        try { j = JSON.parse(r2.getContentText()); } catch (e) { break; }
+        if (r2.getResponseCode() !== 200) { niepelny = true; break; }
+        try { j = JSON.parse(r2.getContentText()); } catch (e) { niepelny = true; break; }
         strony.push(j);
       }
       var kraje = {}, komp = {};
@@ -343,11 +352,13 @@ function wyniki365Historia() {
           if (!(sg >= 0) || !(sa >= 0)) return;
           var w = terminarzCsv([d, HIST365_SPORT, kraje[kp.countryId] || '', kp.name || g.competitionDisplayName || '',
             g.roundName || g.stageName || '', h.name, a.name, sg, sa, '', '', sg > sa ? 1 : sa > sg ? 2 : 0, '']);
-          var klucz = w.split(',').slice(0, 7).join(',');
+          var klucz = _klucz7_(w);
           if (!wiersze[klucz]) nowe++;
           wiersze[klucz] = w;
         });
       });
+      // 30.09.2026 (przegląd): nieudana dalsza strona — mecze z pierwszych stron zostają, ale dzień NIE jest gotowy
+      if (niepelny) { log.push(d + ': niepełne (błąd dalszej strony) — ponowię'); return; }
       gotowe[d] = 1; zrobione++;
     });
   }

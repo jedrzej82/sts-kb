@@ -38,11 +38,13 @@ function ligaproPracuj() {
   while (ok && dol > granica && Date.now() - start < LIGAPRO_LIMIT_MS * 0.6) {   // historia: dzień po dniu wstecz
     if (!ligaproOkres(dol - 86400000, dol, nowe, log)) break;   // błąd API — ten dzień zostaje na następny raz
     dol -= 86400000;
-    P.setProperty('ligapro_hist', String(dol));
   }
   log.push('historia do ' + new Date(dol).toISOString().substr(0, 10) + (dol <= granica ? ' (komplet)' : ' (ciąg dalszy w następnym uruchomieniu)'));
   var zapisane = ligaproZapisz(nowe);
   log.push('zapisano: ' + JSON.stringify(zapisane));
+  // 30.09.2026 (przegląd): postęp historii zapisujemy DOPIERO po zapisie plików — przerwanie (limit 6 min, błąd Dysku)
+  // między nimi oznaczało dni jako pobrane, choć ich mecze nigdzie nie trafiły.
+  P.setProperty('ligapro_hist', String(dol));
   var folder = DriveApp.getFolderById(TERMINARZ_FOLDER_ID), sl = folder.getFilesByName('ligapro_log.txt');
   while (sl.hasNext()) sl.next().setTrashed(true);
   folder.createFile('ligapro_log.txt', log.join('\n'), 'text/plain');
