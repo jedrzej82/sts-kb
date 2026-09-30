@@ -149,3 +149,16 @@ def test_rozliczenie_skroty_krajow_i_zwyciezca_bez_strony():
     assert typuj.resolve('Korea Pd.', pula) == 'South Korea' and typuj.resolve('Korea Pn.', pula) == 'North Korea'
     assert dzienniki._bez_strony('zwyciezca') and dzienniki._bez_strony('Zwycięzca meczu (z dogrywką)')
     assert not dzienniki._bez_strony('Zwyciezca 1') and not dzienniki._bez_strony('zwyciezca Hapoel')
+
+
+def test_sporty_kraj_z_terminarza():
+    d = _hist([('2026-09-20', 'hokej', 'Kazakhstan | Championship', 'Torpedo', 'Beibarys Atyrau'),
+               ('2026-09-21', 'hokej', 'Russia | KHL', 'Torpedo Nizhny Novgorod', 'CSKA'),
+               ('2026-09-22', 'hokej', 'Russia | VHL', 'Torpedo-Gorkiy', 'Dynamo'),
+               ('2026-09-23', 'hokej', 'Europe | Champions Hockey League', 'Torpedo Nizhny Novgorod', 'Tappara')])
+    mt = dict(kraj='KAZAKHSTAN', turniej='Championship', gosp='Beibarys Atyrau', gosc='Torpedo')
+    wyn = (sporty.resolve('Beibarys Atyrau', set(d.gosp) | set(d.gosc), 'hokej'), None)
+    assert sporty.kraj_z_terminarza(d, 'hokej', ('Beibarys Atyrau', 'Torpedo Ust-Kamenogorsk'), wyn, mt) == ('Beibarys Atyrau', 'Torpedo')
+    # kraj ogolny albo brak meczu — bez zmian
+    assert sporty.kraj_z_terminarza(d, 'hokej', ('A', 'Torpedo Ust-Kamenogorsk'), (None, None), dict(mt, kraj='World')) == (None, None)
+    assert sporty.kraj_z_terminarza(d, 'tenis stołowy', ('A', 'B'), (None, None), mt) == (None, None)

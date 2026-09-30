@@ -460,6 +460,53 @@ _MIEDZYNAR_LIGA = re.compile(r'^(europe|world|international|asia|africa|america|
                              r'concacaf|conmebol|uefa|fiba|ehf|iihf|cev)\b', re.I)
 
 
+# 30.09.2026 (audyt oferty 01.10): „Torpedo Ust-Kamenogorsk” — w bazie trzy kluby Torpedo (KHL, VHL, Kazachstan), wiec
+# nazwa byla nierozstrzygalna. Terminarz (Flashscore/365) zna mecz i KRAJ; nazwe szukamy wylacznie wsrod druzyn, ktore
+# graly w lidze krajowej tego kraju (jak typuj._kraj_z_terminarza). Tylko wynik jednoznaczny; inaczej noga MNIEJ.
+_SPORT_TERMINARZ = {'hokej': 'hockey', 'koszykówka': 'basketball', 'piłka ręczna': 'handball', 'siatkówka': 'volleyball',
+                    'baseball': 'baseball', 'futsal': 'futsal'}
+
+
+def _kraj_klucz(k):
+    from zewn import _kraj_365
+    return re.sub(r'[^a-z]', '', unicodedata.normalize('NFKD', _kraj_365(k)).encode('ascii', 'ignore').decode().lower())
+
+
+def kraj_z_terminarza(d, sport, nazwy, wyniki, mt=None):
+    kod = _SPORT_TERMINARZ.get(sport)
+    if not kod: return wyniki
+    if mt is None:
+        try:
+            import terminarz as _tm
+            mt = _tm.znajdz(nazwy[0], nazwy[1], sport=kod) or _tm.znajdz(nazwy[0], nazwy[1], sport=kod, luzno=True)
+        except Exception:
+            return wyniki
+    if not mt: return wyniki
+    kt = _kraj_klucz(mt['kraj'])
+    if not kt or kt in ('world', 'international', 'europe', 'asia', 'africa', 'america', 'southamerica', 'northamerica',
+                        'oceania'):
+        return wyniki
+    x = d[d.sport == sport]
+    kraj = x.liga.astype(str).str.split('|').str[0].map(_kraj_klucz)
+    x = x[(kraj == kt).values]
+    pula = set(x.gosp) | set(x.gosc)
+    if not pula: return wyniki
+    nowe = list(wyniki)
+    for i, (n, zt) in enumerate(((nazwy[0], mt['gosp']), (nazwy[1], mt['gosc']))):
+        if nowe[i] is not None: continue
+        import io, contextlib
+        wyn = set()
+        for q in (zt, n):
+            with contextlib.redirect_stdout(io.StringIO()):
+                r = resolve(q, pula, sport)
+            if r: wyn.add(r)
+        if len(wyn) != 1: return wyniki
+        nowe[i] = next(iter(wyn))
+        print(f'  UWAGA: "{n}" dopasowane w kraju meczu z terminarza ({mt["kraj"]}, {mt["turniej"]}: {mt["gosp"]} – {mt["gosc"]}) '
+              f'-> {nowe[i]}.')
+    return tuple(nowe)
+
+
 def potwierdz_rywalem(d, sport, nazwy, wyniki, dni=730):
     kand = [w if w else _KANDYDAT.get(str(n)) for n, w in zip(nazwy, wyniki)]
     if None in kand or list(kand) == list(wyniki) or kand[0] == kand[1]: return wyniki
@@ -1065,6 +1112,8 @@ def main(a):
         sport = a[1].lower(); d = load(); inf = {}; R, N, hfa, draws, pdraw = elo(d, sport, info=inf); L_ = inf['last']
         pool = set(R); _KANDYDAT.clear(); h, g = resolve(a[2], pool, sport), resolve(a[3], pool, sport)
         h, g = potwierdz_rywalem(d, sport, (a[2], a[3]), (h, g))
+        if h is None or g is None:
+            h, g = kraj_z_terminarza(d, sport, (a[2], a[3]), (h, g))
         # 21.09.2026 (POPRAWKA 11): dawniej bylo "resolve(...) or a[2]" — przy nieznanej nazwie
         # skrypt podstawial surowa nazwe z oferty, nadawal jej domyslne Elo 1500 i mimo ostrzezenia
         # DRUKOWAL PELNA TABELE P. To ten sam typ usterki co joker w resolve(): zamiast bledu
