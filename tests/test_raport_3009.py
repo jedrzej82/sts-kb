@@ -103,3 +103,10 @@ def test_aliasy_pilka_audyt_0110():
     assert typuj.resolve('Atletico Nacional Medellin', pula) == 'Atletico Nacional'
     assert typuj.resolve('Cerro Porteno Asuncion', pula) == 'Cerro Porteño'
     assert typuj.resolve('CD Platense Zacatecoluca', pula) == 'Platense Municipal'
+
+
+def test_tenis_powtorzony_czlon():
+    import tenis
+    pula = {'Bryce Nakashima', 'Brandon Nakashima'}
+    assert tenis.resolve('Nakashima Bryce Nakashima', pula) == 'Bryce Nakashima'
+    assert tenis.resolve('Nakashima Nakashima', pula) is None          # dwa czlony — bez zgadywania
