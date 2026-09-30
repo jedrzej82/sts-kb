@@ -228,11 +228,11 @@ def main():
 
     print(f"KONTROLA SWIEZOSCI BAZ — dzien zapytania {DZIS}\n")
     print(f"{'zrodlo':<30} {'ostatnia dana':<14} {'wiek':>6}  {'prog':>5}  uwaga")
-    zle = 0
+    zle = brak = 0
     for nazwa, d, a, prog, uw in w:
         st = ''
         if str(d) == 'BRAK':          # 30.09.2026: brak bazy/plikow to blad, nie pusty wiersz tabeli
-            st = 'BRAK DANYCH'; zle += 1
+            st = 'BRAK DANYCH'; zle += 1; brak += 1
         elif a is not None and prog is not None:
             if a > prog: st = 'PRZETERMINOWANE'; zle += 1
             else: st = 'ok'
@@ -276,7 +276,9 @@ def main():
         print("Jesli przeterminowane sa 'pliki zewn/' — dociagnij biezacy miesiac z Dysku i powtorz hist_import.py.")
     else:
         print("Wszystkie bazy w normie — mozesz analizowac.")
-    return 1 if zle else 0
+    # 30.09.2026 (przeglad): kod 2 = BRAK DANYCH (brak bazy / plikow — przebieg.py traktuje to jak blad kroku),
+    # kod 1 = ostrzezenia (przeterminowane, dni niepelne, spojnosc nazw — do raportu, przebieg idzie dalej)
+    return 2 if brak else 1 if zle else 0
 
 
 if __name__ == '__main__':
