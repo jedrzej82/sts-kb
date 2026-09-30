@@ -296,7 +296,8 @@ def main():
     print('2) Budowa (5 krokow, razem ok. 4–6 min):')
     for skrypt, tag in KROKI:
         kod, tb = uruchom(skrypt, tag)
-        if tb or (kod != 0 and skrypt != 'swiezosc.py'):     # swiezosc zwraca 1 przy ostrzezeniach — to nie awaria
+        # swiezosc: 1 = ostrzezenia (to nie awaria), 2 = BRAK DANYCH (brak bazy albo plikow) — blad (30.09.2026)
+        if tb or (kod != 0 and (skrypt != 'swiezosc.py' or kod == 2)):
             print(f'\nPRZEBIEG BLAD: {skrypt} zakonczyl sie bledem (log przebieg_{tag}.txt) — ZADNEGO kuponu za pieniadze')
             return 3
     print('3) Kontrola bazy:')

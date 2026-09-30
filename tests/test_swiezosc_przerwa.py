@@ -40,7 +40,7 @@ def test_brak_bazy_to_blad_a_1_dnia_miesiaca_licza_sie_pliki_poprzedniego(tmp_pa
         _wyniki(zd, f'wyniki_{z}_2026-09.csv.gz', ['2026-09-29', '2026-09-30'])
     monkeypatch.setattr(swiezosc, 'HERE', str(tmp_path))
     monkeypatch.setattr(swiezosc, 'DZIS', dt.date(2026, 10, 1))
-    assert swiezosc.main() == 1                                 # brak kb.sqlite i sporty_hist.csv
+    assert swiezosc.main() == 2                                 # brak kb.sqlite i sporty_hist.csv = BRAK DANYCH
     out = capsys.readouterr().out
     wiersz = [l for l in out.splitlines() if l.startswith('pliki zewn/')][0]
     assert '2026-09-30' in wiersz and ' ok' in wiersz          # wrzesniowe pliki licza sie 1.10

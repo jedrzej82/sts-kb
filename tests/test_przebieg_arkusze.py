@@ -58,3 +58,16 @@ def test_arkusz_opcjonalny_bez_terminarza_do_pobrania(tmp_path, monkeypatch, cap
     out = capsys.readouterr().out
     assert 'terminarza nie ma' in out and 'statystyki_baseball' in przebieg.DO_POBRANIA
     assert 'statystyki_hokej' not in przebieg.DO_POBRANIA           # jest na miejscu
+
+
+def test_swiezosc_brak_danych_zatrzymuje_przebieg(tmp_path, monkeypatch, capsys):
+    # 30.09.2026 (przeglad): przebieg akceptowal kazdy kod swiezosc.py — „BRAK DANYCH” (kod 2) konczyl sie „PRZEBIEG OK”
+    monkeypatch.setattr(przebieg, 'kontrola_zewn', lambda: [])
+    monkeypatch.setattr(przebieg, 'kontrola_arkuszy', lambda: [])
+    monkeypatch.setattr(przebieg, 'uruchom', lambda s, t: (2 if s == 'swiezosc.py' else 0, False))
+    monkeypatch.setattr(przebieg.sys, 'argv', ['przebieg.py'])
+    assert przebieg.main() == 3 and 'swiezosc.py zakonczyl sie bledem' in capsys.readouterr().out
+    monkeypatch.setattr(przebieg, 'uruchom', lambda s, t: (1 if s == 'swiezosc.py' else 0, False))
+    monkeypatch.setattr(przebieg, 'kontrola_bazy', lambda: [])
+    monkeypatch.setattr(przebieg, 'kontrola_kalibracji', lambda: None)
+    assert przebieg.main() != 3                                  # ostrzezenia (kod 1) nie zatrzymuja
