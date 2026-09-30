@@ -57,14 +57,28 @@ def _hist(rows):
 
 
 def test_potwierdzenie_rywalem():
-    """Raport 15:00: „Karpat Oulu” / „SaiPa Lappeenranta” — jedyni kandydaci, grali ze soba w Liidze."""
-    d = _hist([('2026-01-14', 'hokej', 'Finland | Liiga', 'Karpat', 'Saipa'),
+    """Raport 15:00: „Karpat Oulu” / „SaiPa Lappeenranta” — jedyni kandydaci, grali ze soba w Liidze.
+    Ta para ma od 30.09 alias w aliasy.csv, wiec mechanizm sprawdzamy na nazwach bez aliasu."""
+    d = _hist([('2026-01-14', 'hokej', 'Finland | Liiga', 'Jokerit', 'Pelicans'),
                ('2026-09-20', 'hokej', 'Finland | Liiga', 'Tappara', 'Ilves')])
-    pula = {'Karpat', 'Saipa', 'Tappara', 'Ilves'}
+    pula = {'Jokerit', 'Pelicans', 'Tappara', 'Ilves'}
     sporty._KANDYDAT.clear()
-    h, g = sporty.resolve('Karpat Oulu', pula, 'hokej'), sporty.resolve('SaiPa Lappeenranta', pula, 'hokej')
+    h, g = sporty.resolve('Jokerit Helsinki', pula, 'hokej'), sporty.resolve('Pelicans Lahti', pula, 'hokej')
     assert (h, g) == (None, None)
-    assert sporty.potwierdz_rywalem(d, 'hokej', ('Karpat Oulu', 'SaiPa Lappeenranta'), (h, g)) == ['Karpat', 'Saipa']
+    assert sporty.potwierdz_rywalem(d, 'hokej', ('Jokerit Helsinki', 'Pelicans Lahti'), (h, g)) == ['Jokerit', 'Pelicans']
+
+
+def test_aliasy_raport_3009_1500():
+    """Raport 30.09 15:00: nazwy STS z doklejonym miastem/przedrostkiem — alias trafia w jedyny klub ligi."""
+    pula = {'Karpat', 'Saipa', 'TPS', 'Nybro', "HC TWK Innsbruck 'Die Haie'", 'Tappara'}
+    for n, cel in (('Karpat Oulu', 'Karpat'), ('SaiPa Lappeenranta', 'Saipa'), ('TPS Turku', 'TPS'),
+                   ('Nybro Vikings', 'Nybro'), ('TWK Innsbruck', "HC TWK Innsbruck 'Die Haie'")):
+        assert sporty.resolve(n, pula, 'hokej') == cel
+    pula = {'Kauhajoen Karhu', 'Karhu Basket', 'Handlova', 'BK Svit', 'Levice', 'Neuchâtel', 'PAOK'}
+    for n, cel in (('Kauhajoki Karhu', 'Kauhajoen Karhu'), ('MBK Handlova', 'Handlova'), ('Iskra Svit', 'BK Svit'),
+                   ('Patrioti Levice', 'Levice'), ('Union Neuchatel', 'Neuchâtel'), ('PAOK Saloniki', 'PAOK')):
+        assert sporty.resolve(n, pula, 'koszykówka') == cel
+    assert sporty.resolve('TPS Turku', {'Tappara'}, 'hokej') is None   # alias tylko, gdy cel jest w puli
 
 
 def test_bez_meczu_ligowego_nadal_mniej():
