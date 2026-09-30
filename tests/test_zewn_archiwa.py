@@ -15,3 +15,13 @@ def test_archiwa_sezonu_w_repo():
         assert f, rodzaj
         d = pd.read_csv(f[0], usecols=['data'], dtype=str)
         assert len(d) > 90000 and d.data.min() <= '2025-07-02' and d.data.max() >= '2026-06-29'
+
+
+def test_przebieg_brak_archiwum_inne_to_blad(tmp_path, monkeypatch):
+    # dotad kontrola_zewn sprawdzala tylko archiwum pilkarskie — brak „inne” przechodzil po cichu
+    import przebieg
+    monkeypatch.setattr(przebieg, 'ZD', str(tmp_path))
+    (tmp_path / 'wyniki_365_pilka_archiwum_2025-07_2026-06.csv.gz').write_bytes(b'')
+    bledy = przebieg.kontrola_zewn()
+    assert any('wyniki_365_inne_archiwum' in b for b in bledy)
+    assert not any('wyniki_365_pilka_archiwum' in b for b in bledy)
