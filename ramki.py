@@ -91,7 +91,8 @@ def _iso(p, y, nb=12):
     o = np.argsort(p); p, y = np.asarray(p)[o], np.asarray(y, float)[o]
     q = np.array_split(np.arange(len(p)), max(1, min(nb, len(p) // 60)))
     pm = np.array([p[i].mean() for i in q]); ym = np.array([y[i].mean() for i in q]); n = np.array([len(i) for i in q])
-    ym = np.maximum.accumulate(ym)
+    from kalib import pav
+    ym = pav(ym, n)   # 30.09.2026: PAV zamiast biezacego maksimum
     return [(a, b, c) for a, b, c in zip(pm, ym, n)]
 
 
