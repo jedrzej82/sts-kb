@@ -1,12 +1,22 @@
 # sts-kb — zasady pracy (dla każdej sesji)
 
 ## Zasada nadrzędna użytkownika (29.09.2026)
-**Wszystko ma działać poprawnie.** Usterkę znalezioną w raporcie przebiegu, w danych albo w kodzie naprawiamy
-od razu — nie odkładamy „do najbliższego wydania”, nie zostawiamy obejść. Każda poprawka:
+**Wszystko ma działać poprawnie** — ale bez pętli „przebieg → usterka → poprawka → przebieg” (decyzja użytkownika
+01.10.2026). Raport przebiegu to OBSERWACJE, nie lista poprawek. Każda poprawka:
 1. jest sprawdzona na prawdziwych danych (albo wprost napisane, czego nie dało się sprawdzić i dlaczego),
 2. ma test w `tests/` i przechodzi CI (`python -m pytest -q tests`, pyflakes),
 3. trafia do `main` PR-em, a zmiana zachowania przebiegu — do POPRAWEK na Dysku dopiero PO scaleniu kodu
    (reguły nigdy nie wyprzedzają kodu), publikacja tylko między przebiegami (12/15/18/21 PL), z odczytem kontrolnym.
+
+### Tryb pracy z raportami (od 01.10.2026)
+- Po przebiegu: ZBIERZ wszystkie obserwacje i SKLASYFIKUJ — nie poprawiaj pierwszej z brzegu. Kategorie:
+  regresja (dzialalo, przestalo) | blad z reprodukcja | brak danych (zrodlo) | nowy format | zla identyfikacja
+  zdarzenia | prawidlowe UNKNOWN | poza oknem dorozliczenia (historia zamrozona — nie ruszac Rozliczen/Bilansu).
+- BLAD = reprodukcja: wejscie + wynik + oczekiwany wynik. Bez reprodukcji to obserwacja, nie PR.
+- Od razu (miedzy przebiegami) tylko: regresja albo ryzyko dla zakladu ZA PIENIADZE. Reszta — JEDNA paczka dziennie
+  (okno po przebiegu 21:00, przed 12:00 nastepnego dnia), jeden PR „hardening batch”.
+- Kazdy nowy przypadek parsera rozliczen: najpierw wiersz w `tests/fixtures/zloty_rynki.csv` (stan ZNANA_ANOMALIA),
+  potem poprawka zmienia stan na OK. Zloty zbior musi przejsc w CALOSCI (`tests/test_zloty_zbior.py`).
 
 ## Czego nie wolno
 - Wpisywać do repo danych osobistych i historii zakładów: logów, Bilansu, kursów, Dziennika, Raportu, PDF, e-maili,
