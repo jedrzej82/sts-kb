@@ -215,7 +215,8 @@ def rynek_pilka(r):
     if m: return _SLOWA[m.group(1).lower().replace('ż', 'z')] + m.group(2).replace(',', '.')
     if re.match(r'^obie\s+strzel\w*\s+tak$', s, re.I): return 'BTTS_tak'
     if re.match(r'^obie\s+strzel\w*\s+nie$', s, re.I): return 'BTTS_nie'
-    return s
+    # 01.10.2026: przebieg pisze „gosc_O0.5” (ASCII), a ucz.hit zna tylko „gość_O0.5” — noga konczyla BRAK WYNIKU
+    return re.sub(r'(?i)^go[sś][cć]_', 'gość_', s)
 
 
 def _para(zdarzenie):
@@ -400,12 +401,18 @@ def _rozlicz_noge(r, W):
     if x is None: return 'BRAK WYNIKU', '', odw
     pg, pa = (x.pa, x.pg) if odw else (x.pg, x.pa)
     wyn = f'{int(pg)}:{int(pa)}' + (' (dogr.)' if x.ot == 1 else '')
+    zakres = _zakres_rynku(rynek, sp)
+    if _remis_rynek(rynek):
+        # 01.10.2026: „X” = remis po czasie regulaminowym (dogrywka oznacza remis po 60 min)
+        if zakres != 'regulamin': return 'BRAK WYNIKU', wyn, f'rynek „{rynek}” bez remisu w tym sporcie'
+        if x.ot == -1 and pg != pa: return 'BRAK WYNIKU', wyn, 'brak informacji o dogrywce'
+        return ('TRAFIONY' if x.ot == 1 or pg == pa else 'PRZEGRANY'), wyn, ''
     typ = _typ_zwyciezcy(rynek, gosp, gosc, gosp, gosc)
     if typ is None and _bez_strony(rynek):
         # 30.09.2026 (Rozliczenie 29.09, Hapoel Jerozolima – Rostock): w ako_log samo „zwyciezca” — nie wiadomo, na kogo
         return 'BRAK WYNIKU', wyn, 'rynek „zwyciezca” BEZ STRONY w ako_log — nie zgadujemy (zapisuj „Zwyciezca 1/2” albo nazwe druzyny)'
     if typ is None: return 'BRAK WYNIKU', wyn, f'rynek „{rynek}” nieobslugiwany'
-    regulamin = not re.search(r'dogryw|z OT|incl', rynek, re.I) and sp in sporty.DRAW_PRIOR
+    regulamin = zakres == 'regulamin'
     if regulamin and x.ot == 1: return 'PRZEGRANY', wyn, 'rozstrzygniety w dogrywce, a rynek w czasie regulaminowym'
     if regulamin and x.ot == -1: return 'BRAK WYNIKU', wyn, 'brak informacji o dogrywce'
     # 29.09.2026 (przeglad): remis byl liczony jako wygrana goscia („2” TRAFIONY przy 3:3 w futsalu)
@@ -416,14 +423,37 @@ def _rozlicz_noge(r, W):
     return ('TRAFIONY' if typ == zw else 'PRZEGRANY'), wyn, ''
 
 
+_60MIN = r'\(?\s*(60\s*min\w*|czas\w*\s+regulaminow\w*|regulaminow\w*\s+czas\w*)[^)]*\)?'
+
+
+def _zakres_rynku(rynek, sport):
+    """01.10.2026 (Rogle - Timra, K5b): CO rozlicza rynek — 'mecz' (wynik koncowy, z dogrywka/karnymi) albo
+    'regulamin' (wynik po czasie regulaminowym). „Zwyciezca …” to rynek dwudrogowy = caly mecz; 1 / X / 2 i
+    „… (60 min)” = czas regulaminowy, ale tylko w sportach z remisem (sporty.DRAW_PRIOR); w pozostalych
+    czas regulaminowy nie konczy sie remisem, wiec zawsze 'mecz'."""
+    import sporty
+    s = str(rynek).replace('_', ' ')
+    if sport not in sporty.DRAW_PRIOR: return 'mecz'
+    if re.search(_60MIN, s, re.I): return 'regulamin'
+    if re.search(r'dogryw|\bz OT\b|incl', s, re.I): return 'mecz'
+    if re.match(r'(?i)\s*zwyci[eę]zca', s): return 'mecz'
+    return 'regulamin'
+
+
+def _remis_rynek(rynek):
+    return bool(re.fullmatch(r'(?i)\s*(remis|x)\s*(' + _60MIN + r')?\s*', str(rynek).replace('_', ' ')))
+
+
 def _bez_strony(rynek):
     return not re.sub(r'(?i)^zwyci[eę]zca(\s+meczu)?|\(?z?\s*dogryw\w*\)?', '', str(rynek)).strip()
 
 
 def _typ_zwyciezcy(rynek, gosp, gosc, h, g):
     """'1' / '2' / 'Zwyciezca 1' / 'Zwyciezca Nazwisko' -> h albo g (ta sama strona co w zdarzeniu)."""
-    s = re.sub(r'(?i)^zwyci[eę]zca(\s+meczu)?\s*[:\-]?\s*', '', str(rynek)).strip()
+    # 01.10.2026: „zwyciezca_1” (podkreslnik) i „1 (60 min)” / „1_60min” — ta sama strona, zakres rozstrzyga _zakres_rynku
+    s = re.sub(r'(?i)^zwyci[eę]zca(\s+meczu)?\s*[:\-]?\s*', '', str(rynek).replace('_', ' ')).strip()
     s = re.sub(r'(?i)\s*\(?z?\s*dogryw\w*\)?$', '', s).strip()
+    s = re.sub(r'(?i)\s*' + _60MIN + r'$', '', s).strip()
     if s in ('1', 'gosp'): return h
     if s in ('2', 'gosc', 'gość'): return g
     import sporty
