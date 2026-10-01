@@ -11,7 +11,7 @@ rynek_pilka,pilka,Podwojna szansa X2,,,X2,OK,
 rynek_pilka,pilka,U3.5,,,U3.5,OK,
 rynek_pilka,pilka,U4.5,,,U4.5,OK,
 rynek_pilka,pilka,X2,,,X2,OK,
-rynek_pilka,pilka,gosc_O0.5,,,gosc_O0.5,ZNANA_ANOMALIA,kod gosc_O0.5 bez ć — ucz.hit zna tylko gość_O0.5 (01.10)
+rynek_pilka,pilka,gosc_O0.5,,,gość_O0.5,OK,"naprawione 01.10: kod gosc_O0.5 bez ć -> gość_O0.5 (ucz.hit); bylo ZNANA_ANOMALIA"
 rynek_pilka,pilka,gosp_O0.5,,,gosp_O0.5,OK,
 rynek_pilka,pilka,ponizej 3.5 gola,,,U3.5,OK,
 rynek_pilka,pilka,ponizej 4.5 gola,,,U4.5,OK,
@@ -28,7 +28,7 @@ zwyciezca,koszykowka,Zwyciezca meczu - 1,SE Melbourne Phoenix,Melbourne United,1
 zwyciezca,koszykowka,Zwyciezca meczu - Washington Mystics,Washington Mystics [K],Chicago Sky [K],1,OK,
 zwyciezca,koszykowka,Zwyciezca meczu 1,Maccabi Ramat Gan [K],Hapoel Lev Jerusalem [K],1,OK,
 zwyciezca,koszykowka,zwyciezca,Hapoel Jerozolima,Rostock Seawolves,,OK,"bez strony — prawidlowe UNKNOWN, nie zgadujemy"
-zwyciezca,reczna,1 (60 min),SC Magdeburg,HSG Wetzlar,1,ZNANA_ANOMALIA,rynek 60 min w recznej (czas regulaminowy) — osobna sciezka (01.10)
+zwyciezca,reczna,1 (60 min),SC Magdeburg,HSG Wetzlar,1,OK,"naprawione 01.10: strona 1, zakres regulamin (_zakres_rynku); bylo ZNANA_ANOMALIA"
 zwyciezca,tenis,Zwyciezca Cerundolo,Cerundolo Juan Manuel,Zhou Yi,1,OK,
 zwyciezca,tenis,Zwyciezca Cizek,Cizek Jiri,Tsitsipas Petros,1,OK,
 zwyciezca,tenis,Zwyciezca Sakkari,Sakkari Maria,Hibino Nao,1,OK,
@@ -49,4 +49,8 @@ zwyciezca,tenis,zwyciezca: Montgomery,Park Sohyun,Montgomery Robin,2,OK,
 zwyciezca,tenis,zwyciezca: Prizmic,Prizmic Dino,Rincon Daniel,1,OK,
 zwyciezca,tenis,zwyciezca: Timofeeva,Timofeeva Maria,Rinaldo Persson Kajsa,1,OK,
 zwyciezca,tenis,zwyciezca: Vukic,Vukic Aleksandar,Jacquet Kyrian,1,OK,
-zwyciezca,tenis,zwyciezca_1,Borges Nuno,Ugo Carabelli Camilo,1,ZNANA_ANOMALIA,podkreslnik zamiast spacji (01.10)
+zwyciezca,tenis,zwyciezca_1,Borges Nuno,Ugo Carabelli Camilo,1,OK,"naprawione 01.10: podkreslnik = spacja; bylo ZNANA_ANOMALIA"
+zwyciezca,hokej,Zwyciezca 1,Rogle BK,Timra IK,1,OK,"01.10 K5b: strona 1; zakres caly mecz z dogrywka — tests/test_rynek_hokej.py"
+zwyciezca,hokej,Zwyciezca 2,Rogle BK,Timra IK,2,OK,
+zwyciezca,hokej,1_60min,Rogle BK,Timra IK,1,OK,zapis sporty.py; zakres regulamin
+zwyciezca,hokej,Zwyciezca meczu - Timra IK,Rogle BK,Timra IK,2,OK,
