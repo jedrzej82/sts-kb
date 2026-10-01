@@ -9,8 +9,9 @@
       Wszystkie kursy jednego meczu (do typuj.py --kurs ...) — bez przepisywania liczb z PDF recznie.
   python3 oferta.py zamkniecia PDF [PDF ...] [--ako kb/ako_log.csv] --wyjscie "ako_log zamkniecia RRRR-MM-DD GG-MM.csv"
       kurs_zamkniecia (P56.3) dla nog ako_log, ktorych mecz jeszcze sie nie zaczal w chwili wygenerowania PDF:
-      plik to wiersze ako_log z wpisanym kursem — zapis do folderu baza-wiedzy jak kazda delta ako_log;
-      dzienniki.py scal bierze NAJPOZNIEJSZY niepusty kurs_zamkniecia, wiec ostatni PDF przed meczem wygrywa.
+      plik: klucz nogi ako_log (data, godzina_uruchomienia, tag, nr_kuponu, noga_nr) + zdarzenie, rynek, kurs,
+      kurs_zamkniecia — zapis do folderu baza-wiedzy; dzienniki.py scal bierze z plikow „… zamkniecia …” TYLKO
+      kurs_zamkniecia (NAJPOZNIEJSZY niepusty, wiec ostatni PDF przed meczem wygrywa) i nie nadpisuje nimi nog.
 
 PO CO: przebiegi 29-30.09 zapisywaly kursy kazdy w innym formacie (raz rynek 1/X/2, raz k1..k6, raz kilka kursow
 w jednej komorce), plik 30.09 18:00 mial uszkodzona sume kontrolna gzip, a kurs_zamkniecia w ako_log zostal pusty.
@@ -247,6 +248,7 @@ def _klucz_nazwy(s):
     return ''.join(c for c in s if not unicodedata.combining(c)).lower()
 
 
+KLUCZ_AKO = ['data', 'godzina_uruchomienia', 'tag', 'nr_kuponu', 'noga_nr']   # jak dzienniki.RODZAJE['ako_log']
 _PILKA = re.compile(r'(?i)^(pi[lł]ka|pi[lł]ka no[zż]na|football|soccer)$')
 
 
@@ -290,8 +292,10 @@ def zamkniecia(kursy, ako):
         wynik.append(w)
         info.append(f"{r.get('tag', '')} {r.get('zdarzenie', '')} {kod}: kurs {r.get('kurs', '')} -> zamkniecie {x.kurs} "
                     f"(PDF {x.godzina_pobrania}, mecz {x.data_meczu} {x.godzina_meczu})")
-    return (pd.DataFrame(wynik, columns=ako.columns.union(['kurs_zamkniecia'], sort=False)) if wynik
-            else ako.iloc[0:0].copy()), info
+    # tylko klucz nogi + kontekst do czytania: dzienniki.scal bierze z takiego pliku WYLACZNIE kurs_zamkniecia
+    # (nie nadpisze wiersza nogi), a maly plik przebieg zapisze na Dysk bez trudu
+    kol = [c for c in KLUCZ_AKO + ['zdarzenie', 'rynek', 'kurs', 'kurs_zamkniecia'] if c in ako.columns or c == 'kurs_zamkniecia']
+    return pd.DataFrame(wynik).reindex(columns=kol, fill_value='') if wynik else pd.DataFrame(columns=kol), info
 
 
 def main(a):

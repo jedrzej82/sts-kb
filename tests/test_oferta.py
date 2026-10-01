@@ -212,3 +212,30 @@ def test_zamkniecia_mecz_przed_zapisem_nogi_odpada():
     a = _ako(('2026-09-25', '21:00', 'AKOP', '1', '1', 'pilka', 'Australia - Brazylia', 'U3.5', '1.54', '', '', ''))
     z, _ = oferta.zamkniecia(k, a)
     assert list(z.kurs_zamkniecia) == ['1.55']          # mecz z 26.09, nie rozegrany 25.09 12:00
+
+
+def test_plik_zamkniecia_nie_nadpisuje_nogi(tmp_path):
+    """Noga bez wyniku + plik zamkniec z samym kluczem i kursem: zostaje wiersz nogi (status, uwaga), dochodzi kurs."""
+    kol = 'data,godzina_uruchomienia,tag,nr_kuponu,noga_nr,zdarzenie,rynek,kurs,status,trafiona,uwaga\n'
+    (tmp_path / 'ako_log DELTA 2026-10-01 12:00.csv').write_text(
+        kol + '2026-10-01,12:00,K5,1,1,Walia - Norwegia,U3.5,1.62,DO GRY,,stawka 2 zl\n', encoding='utf-8')
+    (tmp_path / 'ako_log zamkniecia 2026-10-01 20-30.csv').write_text(
+        'data,godzina_uruchomienia,tag,nr_kuponu,noga_nr,zdarzenie,rynek,kurs,kurs_zamkniecia\n'
+        '2026-10-01,12:00,K5,1,1,Walia - Norwegia,U3.5,1.62,1.58\n'
+        '2026-10-01,12:00,K9,1,1,Nie ma - Takiej nogi,1,1.50,1.40\n', encoding='utf-8')
+    os.utime(tmp_path / 'ako_log DELTA 2026-10-01 12:00.csv', (1_000_000, 1_000_000))
+    dzienniki.scal(str(tmp_path), cel=str(tmp_path))
+    d = dzienniki._czytaj(tmp_path / 'ako_log.csv')
+    assert len(d) == 1                                   # klucz tylko z pliku zamkniec nie tworzy nogi
+    r = d.iloc[0]
+    assert (r.status, r.uwaga, r.kurs_zamkniecia) == ('DO GRY', 'stawka 2 zl', '1.58')
+
+
+def test_zamkniecia_kolumny_wyniku():
+    k = _kursy(('2026-09-30', '18:00', 'PIŁKA NOŻNA', 'Litwa', 'Andora', '12', '1.27', '2026-09-30 17:30'))
+    a = _ako(('2026-09-30', '15:00', 'K5c', '1', '1', 'pilka', 'Litwa - Andora', '12', '1.26', '', '', ''))
+    z, _ = oferta.zamkniecia(k, a)
+    assert list(z.columns) == oferta.KLUCZ_AKO + ['zdarzenie', 'rynek', 'kurs', 'kurs_zamkniecia']
+    assert list(oferta.KLUCZ_AKO) == dzienniki.RODZAJE['ako_log'][0]
+    z, _ = oferta.zamkniecia(k, a.assign(zdarzenie='Inny - Mecz'))
+    assert len(z) == 0 and 'kurs_zamkniecia' in z.columns
