@@ -26,3 +26,27 @@ def test_skrot_po_zamianie_nazwy_miasta_pod_nazwa_z_oferty():
     typuj._SKROTY.clear()
     r = typuj._przez_egzonim('Atletico Turyn', {'Torino', 'Bari'})
     assert r == 'Torino' and typuj._SKROTY.get('Atletico Turyn') == 'Torino'
+
+
+def test_puchar_krajowy_skroty_z_czlonami_ogolnymi():
+    """01.10.2026 (Raport 12:00, USTERKA 4): QSL Cup (Katar) — kluby z dwoch poziomow ligi nie maja wspolnej ligi."""
+    typuj._SKROTY.clear(); typuj._SKROTY_OGOLNE.clear()
+    pula = {'Al Gharafa', 'Mesaimeer SC', 'Independiente', 'Qatar SC'}
+    assert typuj._skrot_albo_nic('Al-Gharafa SC', 'Al Gharafa', pula) == 'Al Gharafa'
+    assert typuj._skrot_albo_nic('Al-Mesaimeer SC', 'Mesaimeer SC', pula) == 'Mesaimeer SC'    # „Al-” odpada, rdzen jednoznaczny
+    assert typuj._skrot_albo_nic('Independiente Yumbo', 'Independiente', pula) == 'Independiente'  # przypadek (c)
+    assert typuj._SKROTY_OGOLNE == {'Al-Gharafa SC', 'Al-Mesaimeer SC'}
+    # „Al-” przy rdzeniu, ktory maja tez inne kluby — dalej ODRZUCONE (przypadek (b)), nie skrot
+    assert typuj._skrot_albo_nic('Al Hilal', 'Hilal', {'Hilal', 'Hilal Omdurman'}) is None
+    puchar = {'kraj': 'QATAR', 'turniej': 'QSL Cup'}
+    ok = [('Al-Gharafa SC', 'Al Gharafa'), ('Al-Mesaimeer SC', 'Mesaimeer SC')]
+    assert typuj.skrot_w_pucharze_ok(ok, puchar, ('qatar', 'qatar'))
+    # liga, nie puchar — wspolna liga dalej wymagana
+    assert not typuj.skrot_w_pucharze_ok(ok, {'kraj': 'QATAR', 'turniej': 'Stars League'}, ('qatar', 'qatar'))
+    # brak meczu w terminarzu albo kraj inny niz lig klubow — dalej noga MNIEJ
+    assert not typuj.skrot_w_pucharze_ok(ok, None, ('qatar', 'qatar'))
+    assert not typuj.skrot_w_pucharze_ok(ok, puchar, ('qatar', 'saudi arabia'))
+    assert not typuj.skrot_w_pucharze_ok(ok, puchar, ('qatar', None))
+    # zgubiony czlon rozrozniajacy — w pucharze tez stop
+    assert not typuj.skrot_w_pucharze_ok([('Independiente Yumbo', 'Independiente')],
+                                         {'kraj': 'COLOMBIA', 'turniej': 'Copa Colombia'}, ('colombia', 'colombia'))
