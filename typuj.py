@@ -291,6 +291,20 @@ _OGOLNE = frozenset('fc cf sc ac as ss sv fk nk sk bk hk hc mhk vk kk rk ok ks c
 
 
 _SKROTY = {}   # nazwa z oferty -> klub, dopasowane przez przypadek (c) ponizej; sprawdza club()
+_SKROTY_OGOLNE = set()   # z tego: nazwy, w ktorych odpadly WYLACZNIE czlony ogolne (przypadek (a))
+_PUCHAR = re.compile(r'(?i)\b(cup|puchar|copa|coupe|coppa|pokal|beker|ta[cç]a|kupa|kupasi|trophy|super ?cup)\b')
+
+
+def skrot_w_pucharze_ok(skroty, mt, kraje):
+    """01.10.2026 (Raport 12:00, USTERKA 4): Katar, QSL Cup — „Al-Gharafa SC” -> Al Gharafa, „Al-Mesaimeer SC” ->
+    Mesaimeer SC; kluby z dwoch poziomow ligi nie maja wspolnej ligi, wiec kontrola LACZNA zawsze przerywala mecze
+    pucharu krajowego. Para jest przyjmowana bez wspolnej ligi TYLKO gdy: terminarz znalazl ten mecz i to PUCHAR,
+    kraj terminarza zgadza sie z krajem lig obu klubow, a w kazdej skroconej nazwie odpadly wylacznie czlony
+    ogolne (SC, FC, Al…). Czlon rozrozniajacy („Independiente Yumbo”) albo brak terminarza = dalej noga MNIEJ."""
+    if not mt or not _PUCHAR.search(str(mt.get('turniej', ''))): return False
+    kt = norm(mt.get('kraj', ''))
+    if not kt or kt in _KRAJE_OGOLNE or not all(k and _ten_sam_kraj(k, kt) for k in kraje): return False
+    return all(n in _SKROTY_OGOLNE for n, _ in skroty)
 
 
 def _skrot_albo_nic(name, wyn, pula):
@@ -316,6 +330,7 @@ def _skrot_albo_nic(name, wyn, pula):
     else: odp = tuple(t for t in tn if t not in tk)
     if odp and all(t in _OGOLNE for t in odp):
         _SKROTY[name] = wyn
+        _SKROTY_OGOLNE.add(name)
         return wyn
     inne = sorted(p for p in pula if p != wyn and len(_tokeny(p)) > len(tk)
                   and (_tokeny(p)[:len(tk)] == tk or _tokeny(p)[-len(tk):] == tk))
@@ -327,6 +342,8 @@ def _skrot_albo_nic(name, wyn, pula):
     print(f'  UWAGA: "{name}" dopasowane do KROTSZEJ nazwy "{wyn}" — pominieto czlon '
           f'rozrozniajacy. Rdzen jest w bazie jednoznaczny, ale sprawdz, czy to ten sam klub.')
     _SKROTY[name] = wyn
+    if all(t in _OGOLNE or t == 'al' for t in odp):   # arabskie „Al-” (Al-Mesaimeer SC -> Mesaimeer SC), rdzen jednoznaczny
+        _SKROTY_OGOLNE.add(name)
     return wyn
 
 
@@ -724,7 +741,9 @@ def _przez_egzonim(name, pool):
     if r: print(f'  UWAGA: "{name}" dopasowane po zamianie polskiej nazwy miasta -> "{alt}" -> {r}.')
     # 30.09.2026 (przeglad): resolve() zapisal skrot pod nazwa PO zamianie — club() szuka nazwy z oferty,
     # wiec „Atletico Turyn” -> Torino omijalo kontrole wspolnej ligi, a „Atletico Torino” ja przechodzilo
-    if r and _SKROTY.get(alt) == r: _SKROTY[name] = r
+    if r and _SKROTY.get(alt) == r:
+        _SKROTY[name] = r
+        if alt in _SKROTY_OGOLNE: _SKROTY_OGOLNE.add(name)
     return r
 
 
@@ -793,6 +812,7 @@ def club(home, away, kursy, live=None):
     # 29.09.2026 (faza 3b, TERMINARZ): mecz z oferty szukany w terminarzu 365scores po OBU druzynach naraz
     # (zewn/terminarz_365.csv.gz, Apps Script). Terminarz podaje kraj rozgrywek — klub dopasowany do ligi
     # z innego kraju to pomylony klub. Brak pliku / meczu / kraj ogolny (World, Europe…) = bez kontroli.
+    mt = None
     if '--kontynentalny' not in sys.argv:
         try:
             import terminarz as _tm
@@ -822,7 +842,10 @@ def club(home, away, kursy, live=None):
     # tego samego kraju ani pucharu. Brak wspolnej ligi w 2 latach = noga MNIEJ (bezpieczny kierunek bledu).
     from nazwy import wspolna_liga
     skroty = [(n, t) for n, t in ((home, h), (away, a)) if _SKROTY.get(n) == t]
-    if skroty and not wspolna_liga(m, h, a):
+    if skroty and not wspolna_liga(m, h, a) and skrot_w_pucharze_ok(skroty, mt, (kh, ka)):
+        print(f'  PUCHAR KRAJOWY ({mt["kraj"]}, {mt["turniej"]}): {h} i {a} bez wspolnej ligi — w pucharze to normalne; '
+              'skrocone nazwy zgubily tylko czlony ogolne, kraj zgodny z terminarzem — dopasowanie przyjete.')
+    elif skroty and not wspolna_liga(m, h, a):
         sys.exit('NIEPEWNE DOPASOWANIE: ' + '; '.join(f'"{n}" -> {t} (zgubiony czlon rozrozniajacy)' for n, t in skroty)
                  + f', a {h} i {a} nie graly w jednej lidze w ostatnich 2 latach — to prawdopodobnie INNY klub. '
                  f'Analiza przerwana, noga MNIEJ. Jesli to ten sam klub, dopisz pare do ALIASES (typuj.py).')

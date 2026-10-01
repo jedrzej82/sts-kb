@@ -32,9 +32,66 @@ RODZAJE = {  # rodzaj -> klucz wiersza (bez duplikatow) i kolumna wyniku (wypeln
 
 
 def _czytaj(plik):
-    d = pd.read_csv(plik, dtype=str, keep_default_na=False, skipinitialspace=True)
+    try:
+        d = pd.read_csv(plik, dtype=str, keep_default_na=False, skipinitialspace=True)
+    except pd.errors.ParserError:
+        # 01.10.2026: „typy_log 2026-09-20 21_00 …” ma w ostatniej (opisowej) kolumnie przecinek bez cudzyslowu
+        # („bez kontroli modelu hist. (jutro, -2pp)”) — caly plik wypadal ze scalania. Nadmiarowe pola wracaja
+        # do ostatniej kolumny; krotszy wiersz dostaje puste pola.
+        import csv
+        with open(plik, newline='', encoding='utf-8') as f:
+            w = list(csv.reader(f, skipinitialspace=True))
+        nag, n = w[0], len(w[0])
+        d = pd.DataFrame([r[:n - 1] + [','.join(r[n - 1:])] if len(r) > n else r + [''] * (n - len(r))
+                          for r in w[1:] if r], columns=nag)
     d.columns = [str(c).strip() for c in d.columns]
     return d.apply(lambda s: s.str.strip())
+
+
+KOLUMNY_LOGU = {'typy_log': ['data', 'gosp', 'gość', 'rynek', 'p', 'trafiony', 'kurs_typu', 'pieniadze'],
+                'sporty_typy': ['data', 'sport', 'gosp', 'gosc', 'rynek', 'p', 'trafiony', 'kurs_typu', 'pieniadze']}
+
+
+def _p_ulamek(v):
+    """P jako ulamek: 24-25.09 przebiegi pisaly procenty („37.8”) — w ucz.py/sporty.py wypadaly z przedzialow."""
+    x = _liczba(v)
+    if x is None: return v
+    return f'{x / 100:.4f}'.rstrip('0').rstrip('.') if x > 1 else v
+
+
+def _ujednolic(rodzaj, x):
+    """Stare uklady kolumn (przebiegi 20-24.09) -> obecny uklad typy_log / sporty_typy. Tylko zmiana nazw i rozbicie
+    „A - B”; nic nie jest zgadywane (pieniadze/trafiony zostaja puste, gdy plik ich nie mial)."""
+    if rodzaj not in KOLUMNY_LOGU: return x
+    x = x.copy()
+    gosc = 'gość' if rodzaj == 'typy_log' else 'gosc'
+    zamiana = {'gospodarz': 'gosp', 'zawodnik_a': 'gosp', 'zawodnik_b': gosc, 'P': 'p', 'P_model': 'p', 'kurs': 'kurs_typu'}
+    zamiana['gosc' if rodzaj == 'typy_log' else 'gość'] = gosc
+    if 'data_meczu' in x: zamiana['data_meczu'] = 'data'
+    x = x.rename(columns={k: v for k, v in zamiana.items() if k in x and v not in x})
+    if 'zdarzenie' in x and ('gosp' not in x or gosc not in x):
+        pary = x.zdarzenie.map(_para)
+        x['gosp'], x[gosc] = pary.str[0], pary.str[1]
+    if 'godzina_meczu' in x:      # „jutro 02:30” — mecz nastepnego dnia
+        jutro = x.godzina_meczu.str.contains('jutro', case=False, na=False)
+        x.loc[jutro, 'data'] = (pd.to_datetime(x.loc[jutro, 'data'], errors='coerce') + pd.Timedelta(days=1)).dt.strftime('%Y-%m-%d')
+    if rodzaj == 'typy_log' and 'sport' in x:      # typy_log to tylko pilka (inne sporty: sporty_typy)
+        x = x[x.sport.str.lower().str.replace('ł', 'l').str.startswith('pilka')]
+    if rodzaj == 'sporty_typy' and 'rynek' in x:   # „zwyciezca: Valentin Royer” -> 1/2, gdy imie i nazwisko = jedna ze stron
+        def kod(r):
+            m = re.match(r'(?i)^zwyci[eę]zca(?: meczu)?\s*[:-]\s*(.+)$', str(r.rynek))
+            if not m: return r.rynek
+            t = set(m.group(1).lower().split())
+            strony = [k for k, s in (('1', r.get('gosp', '')), ('2', r.get(gosc, ''))) if set(str(s).lower().split()) == t]
+            return strony[0] if len(strony) == 1 else r.rynek
+        x['rynek'] = x.apply(kod, axis=1) if len(x) else x.rynek
+    if 'p' in x:
+        x['p'] = x.p.map(_p_ulamek)
+        bez = x.p.map(_liczba).isna()
+        if bez.any():         # „-”, „ok. 79”, puste — prognoza bez P nie nadaje sie do kalibracji, a psula typ kolumny
+            print(f'  {rodzaj}: {int(bez.sum())} wierszy bez liczbowego P pominietych')
+            x = x[~bez]
+    return x
 
 
 def scal(katalog, cel=HERE):
@@ -51,6 +108,7 @@ def scal(katalog, cel=HERE):
             except Exception as e:
                 print(f'  UWAGA: {os.path.basename(f)} nieczytelny ({e}) — pominiety')
                 continue
+            x = _ujednolic(rodzaj, x)
             if not set(klucz) <= set(x.columns):
                 print(f'  UWAGA: {os.path.basename(f)} bez kolumn {sorted(set(klucz) - set(x.columns))} — pominiety')
                 continue
@@ -72,6 +130,8 @@ def scal(katalog, cel=HERE):
             k = pd.MultiIndex.from_frame(d[klucz])
             nowe = zamk.reindex(k)
             d['kurs_zamkniecia'] = [n if isinstance(n, str) and n else s for n, s in zip(nowe, d.kurs_zamkniecia)]
+        if rodzaj in KOLUMNY_LOGU:      # stare uklady wnosily wlasne kolumny (liga, status, tag…) — zostaje uklad logu
+            d = d.reindex(columns=KOLUMNY_LOGU[rodzaj], fill_value='')
         d = d.sort_values([c for c in ('data', 'godzina_uruchomienia', 'tag', 'nr_kuponu', 'noga_nr') if c in d], kind='stable')
         d.to_csv(os.path.join(cel, f'{rodzaj}.csv'), index=False)
         wynik[rodzaj] = (len(pliki), n0, len(d))
@@ -374,7 +434,8 @@ def _typ_zwyciezcy(rynek, gosp, gosc, h, g):
 
 def _liczba(s):
     try:
-        return float(str(s).replace(',', '.'))
+        v = float(str(s).replace(',', '.'))
+        return None if math.isnan(v) else v
     except ValueError:
         return None
 
