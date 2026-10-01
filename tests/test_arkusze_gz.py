@@ -81,3 +81,19 @@ def test_wiek_arkusza_z_godzina_bez_zera(tmp_path, monkeypatch, capsys):
         pd.DataFrame({'data_aktualizacji': [s]}).to_csv(tmp_path / f'{a}.csv', index=False)
     assert przebieg.kontrola_arkuszy() == []
     assert '(2 h)' in capsys.readouterr().out
+
+
+def test_archiwum_dnia_w_arkusze_gs():
+    """01.10.2026: archiwum arkuszy dnia robi Apps Script (konektor nie przyjal 388 KB z przebiegu)."""
+    t = open(os.path.join(AS, 'arkusze.gs'), encoding='utf-8').read()
+    c = t[t.index('function arkuszePracuj('):]
+    assert c.index('arkuszeArchiwum_(folder, log)') < c.index("getFilesByName('arkusze_log.txt')")
+    if not shutil.which('node'):
+        pytest.skip('brak node')
+    i = t.index('function arkuszeArchiwumNazwa_('); j = t.index('\nfunction ', i + 1)
+    js = t[i:j] + r'''
+    var jest = function (n) { return n === 'arkusze_2026-10-01.zip'; };
+    console.log(JSON.stringify([arkuszeArchiwumNazwa_('2026-10-02', '11', jest), arkuszeArchiwumNazwa_('2026-10-02', '12', jest),
+      arkuszeArchiwumNazwa_('2026-10-01', '13', jest), arkuszeArchiwumNazwa_('2026-10-02', '23', jest)]));'''
+    r = subprocess.run(['node', '-e', js], capture_output=True, text=True)
+    assert __import__('json').loads(r.stdout) == ['', 'arkusze_2026-10-02.zip', '', 'arkusze_2026-10-02.zip']
