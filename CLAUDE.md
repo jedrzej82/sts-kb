@@ -15,8 +15,14 @@
 - BLAD = reprodukcja: wejscie + wynik + oczekiwany wynik. Bez reprodukcji to obserwacja, nie PR.
 - Od razu (miedzy przebiegami) tylko: regresja albo ryzyko dla zakladu ZA PIENIADZE. Reszta — JEDNA paczka dziennie
   (okno po przebiegu 21:00, przed 12:00 nastepnego dnia), jeden PR „hardening batch”.
-- Kazdy nowy przypadek parsera rozliczen: najpierw wiersz w `tests/fixtures/zloty_rynki.csv` (stan ZNANA_ANOMALIA),
-  potem poprawka zmienia stan na OK. Zloty zbior musi przejsc w CALOSCI (`tests/test_zloty_zbior.py`).
+- Zloty zbior (`tests/fixtures/zloty_rynki.csv`, test `tests/test_zloty_zbior.py`) — stany:
+  OBSERVATION (nowy zapis z raportu, bez oczekiwanego wyniku — tylko zapisany, CI go nie ocenia) →
+  ZNANA_ANOMALIA (potwierdzona reprodukcja: wejscie + wynik + oczekiwany; xfail strict, CI zielone) →
+  OK (po poprawce w wieczornej paczce). Dopisanie przypadku NIGDY nie robi CI czerwonego i nie wymusza poprawki.
+  Wierszy NIE usuwamy — naprawiony przypadek zostaje jako OK, zeby cofniecie obslugi dalo czerwone CI.
+- Nie naprawiaj objawu rozszerzeniem parsera (kolejny `if` na kolejny napis), dopoki nie ustalono WARSTWY bledu
+  (zapis przebiegu / normalizacja / interpretacja / dopasowanie zdarzenia / zrodlo wynikow). Kazda poprawka
+  rozliczen = reprodukcja + test regresji w zlotym zbiorze.
 
 ## Czego nie wolno
 - Wpisywać do repo danych osobistych i historii zakładów: logów, Bilansu, kursów, Dziennika, Raportu, PDF, e-maili,

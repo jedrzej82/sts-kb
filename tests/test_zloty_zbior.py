@@ -1,10 +1,10 @@
 """ZLOTY ZBIOR (01.10.2026): wszystkie rozne zapisy rynkow z dziennikow 20.09-01.10 (bez dat, kursow, stawek) z
 oczekiwanym odczytem — staly test regresji parsera rozliczen. Kazda poprawka parsera musi przejsc CALY zbior.
 
-stan=OK              — tak dziala dzis i ma tak zostac (regresja = blad CI).
-stan=ZNANA_ANOMALIA  — dzis dziala zle; test oczekuje porazki (xfail strict). Gdy poprawka zacznie dzialac,
-                       test ZGLOSI to jako XPASS — wtedy zmien stan na OK (inaczej poprawka moglaby zniknac po cichu).
-Nowy przypadek z raportu: dopisz wiersz (rynek, strony, oczekiwane, stan) — najpierw jako ZNANA_ANOMALIA."""
+stan=OBSERVATION     — nowy zapis z raportu, oczekiwany wynik jeszcze nieustalony: tylko zapisany, CI go nie ocenia.
+stan=ZNANA_ANOMALIA  — potwierdzona reprodukcja, dzis dziala zle; test oczekuje porazki (xfail strict). Gdy poprawka
+                       zacznie dzialac, test zglosi XPASS — wtedy zmien stan na OK.
+stan=OK              — tak dziala i ma tak zostac (regresja = czerwone CI). Naprawionych wierszy NIE usuwamy."""
 import os
 import sys
 
@@ -28,12 +28,14 @@ def _odczyt(w):
 
 
 @pytest.mark.parametrize('w', [pytest.param(w, id=f'{w.rodzaj}:{w.rynek}:{w.gosp}',
-                                            marks=[pytest.mark.xfail(strict=True, reason=w.uwaga)] if w.stan != 'OK' else [])
-                               for w in ZBIOR.itertuples()])
+                                            marks=[pytest.mark.xfail(strict=True, reason=w.uwaga)] if w.stan == 'ZNANA_ANOMALIA' else [])
+                               for w in ZBIOR[ZBIOR.stan != 'OBSERVATION'].itertuples()])
 def test_zloty_zbior(w):
     assert _odczyt(w) == w.oczekiwane
 
 
 def test_zbior_kompletny():
-    assert len(ZBIOR) >= 50 and set(ZBIOR.stan) <= {'OK', 'ZNANA_ANOMALIA'}
+    assert len(ZBIOR) >= 50 and set(ZBIOR.stan) <= {'OK', 'ZNANA_ANOMALIA', 'OBSERVATION'}
+    # ZNANA_ANOMALIA = potwierdzona reprodukcja: musi miec opis (uwaga); OBSERVATION — jeszcze nie
+    assert not ((ZBIOR.stan == 'ZNANA_ANOMALIA') & (ZBIOR.uwaga == '')).any()
     assert not ZBIOR.duplicated(['rodzaj', 'rynek', 'gosp', 'gosc']).any()
