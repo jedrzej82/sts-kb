@@ -112,7 +112,8 @@ def scal(katalog, cel=HERE):
             if not set(klucz) <= set(x.columns):
                 print(f'  UWAGA: {os.path.basename(f)} bez kolumn {sorted(set(klucz) - set(x.columns))} — pominiety')
                 continue
-            czesci.append(x.assign(_kol=i))
+            # pliki „… zamkniecia …” (oferta.py) niosa TYLKO kurs_zamkniecia — nie sa kandydatem na caly wiersz nogi
+            czesci.append(x.assign(_kol=i, _zamk=int('zamkniecia' in os.path.basename(f).lower())))
         if not czesci: continue
         d = pd.concat(czesci, ignore_index=True)
         n0 = len(d)
@@ -124,8 +125,8 @@ def scal(katalog, cel=HERE):
             # meczem; wygrywa NAJPOZNIEJSZY niepusty, nawet gdy reszte wiersza bierzemy z pliku z wynikiem
             z = d[d.kurs_zamkniecia != ''].sort_values('_kol', kind='stable').drop_duplicates(klucz, keep='last')
             zamk = z.set_index(klucz).kurs_zamkniecia
-        d = (d.assign(_ma=(d[kol_wyn] != '').astype(int)).sort_values(['_ma', '_kol'], kind='stable')
-             .drop_duplicates(klucz, keep='last').drop(columns=['_ma', '_kol']))
+        d = (d[d._zamk == 0].assign(_ma=(d[kol_wyn] != '').astype(int)).sort_values(['_ma', '_kol'], kind='stable')
+             .drop_duplicates(klucz, keep='last').drop(columns=['_ma', '_kol', '_zamk']))
         if zamk is not None and len(zamk):
             k = pd.MultiIndex.from_frame(d[klucz])
             nowe = zamk.reindex(k)
