@@ -309,6 +309,19 @@ def kontrola_zewn():
         if wiek > MAKS_WIEK_DNI:
             bledy.append(f'zewn/{os.path.basename(f)} konczy sie {d} ({wiek} dni temu) — to stara kopia '
                          f'(np. z repo); pobierz aktualny plik z Dysku i nadpisz')
+    # 01.10.2026: plik POPRZEDNIEGO miesiaca musi siegac jego konca. Repo ma kopie z dnia commita (wrzesien: do 20.09),
+    # a paczka.zip niesie poprzedni miesiac tylko w dniach 1-3 — od 4. dnia baza tracilaby cicho koniec miesiaca.
+    pop = DZIS.replace(day=1) - dt.timedelta(days=1)
+    if DZIS.day > 1:
+        for rodzaj in ('365_pilka', '365_inne', 'fs_inne', 'fs_pilka'):
+            f = os.path.join(ZD, f'wyniki_{rodzaj}_{pop:%Y-%m}.csv.gz')
+            try:
+                d = dt.date.fromisoformat(pd.read_csv(f, usecols=['data'], low_memory=False).data.astype(str).str[:10].max())
+            except Exception:
+                d = None
+            if d is None or (pop - d).days > 1:
+                bledy.append(f'zewn/wyniki_{rodzaj}_{pop:%Y-%m}.csv.gz ' + (f'konczy sie {d}' if d else 'brak/nieczytelny')
+                             + f' — miesiac {pop:%Y-%m} niepelny; pobierz ten plik z Dysku (folder baza-wiedzy) i nadpisz')
     f = os.path.join(ZD, f'wyniki_lol_inne_{mies}.csv.gz')
     if os.path.exists(f):
         try:
