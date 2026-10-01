@@ -14,6 +14,12 @@
  *
  * Arkusz jest eksportowany tylko wtedy, gdy zmienił się od poprzedniego zapisu (data modyfikacji pliku), więc
  * wyzwalacz co 30 minut nie zużywa limitów. Pusty eksport (sam nagłówek albo nic) NIE nadpisuje poprzedniego pliku.
+ *
+ * ARCHIWUM (01.10.2026, P57.7/P111.2): raz dziennie, w pierwszym przebiegu po 12:00 czasu polskiego, gdy nie ma jeszcze
+ * pliku arkusze_RRRR-MM-DD.zip — pakuje bieżące statystyki_*.csv.gz i absencje.csv.gz (+ arkusze_manifest.csv z datą
+ * zmiany każdego arkusza) do arkusze_RRRR-MM-DD.zip w tym samym folderze. PO CO: przebieg 01.10 12:00 zbudował archiwum
+ * (388 KB), ale konektor Dysku nie przyjmuje tak dużego pliku binarnego z przebiegu — archiwum dnia nie trafiło na Dysk.
+ * Po aktualizacji: wklej CAŁY plik ponownie i uruchom „arkuszeUstaw” (archiwum dnia powstanie samo).
  */
 var ARKUSZE_FOLDER_ID = 'WKLEJ_ID_FOLDERU_BAZA_WIEDZY';   // ID folderu baza-wiedzy (z adresu folderu na Dysku)
 var ARKUSZE_NAZWY = ['statystyki_druzyn', 'statystyki_tenis', 'statystyki_koszykowka', 'statystyki_siatkowka',
@@ -76,7 +82,40 @@ function arkuszePracuj(wszystkie) {
       log.push(nazwa + ': BŁĄD ' + e + ' — zostaje poprzedni plik');
     }
   });
+  try {
+    arkuszeArchiwum_(folder, log);
+  } catch (e) {
+    log.push('archiwum: BŁĄD ' + e);
+  }
   var sl = folder.getFilesByName('arkusze_log.txt');
   while (sl.hasNext()) sl.next().setTrashed(true);
   folder.createFile('arkusze_log.txt', log.join('\n'), 'text/plain');
+}
+
+/** Nazwa archiwum do zapisania teraz albo '' — dzień i godzina w czasie polskim; archiwum od 12:00, raz dziennie. */
+function arkuszeArchiwumNazwa_(dzien, godzina, jest) {
+  if (+godzina < 12) return '';
+  var nazwa = 'arkusze_' + dzien + '.zip';
+  return jest(nazwa) ? '' : nazwa;
+}
+
+function arkuszeArchiwum_(folder, log) {
+  var teraz = new Date();
+  var nazwa = arkuszeArchiwumNazwa_(Utilities.formatDate(teraz, 'Europe/Warsaw', 'yyyy-MM-dd'),
+    Utilities.formatDate(teraz, 'Europe/Warsaw', 'H'), function (n) { return folder.getFilesByName(n).hasNext(); });
+  if (!nazwa) return;
+  var blobs = [], man = ['plik,zmieniony,bajty'];
+  ARKUSZE_NAZWY.forEach(function (n) {
+    var it = folder.getFilesByName(n + '.csv.gz'), f = null;
+    while (it.hasNext()) { var x = it.next(); if (!f || x.getLastUpdated() > f.getLastUpdated()) f = x; }
+    if (!f) return;
+    var b = f.getBlob().setName(n + '.csv.gz');
+    blobs.push(b);
+    man.push(n + '.csv.gz,' + f.getLastUpdated().toISOString() + ',' + b.getBytes().length);
+  });
+  if (!blobs.length) { log.push('archiwum: brak plikow .csv.gz — nie zapisano ' + nazwa); return; }
+  blobs.push(Utilities.newBlob(man.join('\n') + '\n', 'text/csv', 'arkusze_manifest.csv'));
+  var zip = Utilities.zip(blobs, nazwa);
+  folder.createFile(zip);
+  log.push('archiwum: zapisano ' + nazwa + ' (' + (blobs.length - 1) + ' arkuszy, ' + zip.getBytes().length + ' B)');
 }
