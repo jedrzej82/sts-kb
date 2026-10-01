@@ -238,6 +238,15 @@ def pobrano_z_nazwy(pdf):
     return f'{m.group(1)} {m.group(2)}:{m.group(3)}' if m else ''
 
 
+def _klucz_nazwy(s):
+    """Ta sama nazwa z polskimi znakami i bez nich („Węgry” = „Wegry”), bez wielkosci liter i podwojnych spacji.
+    To NIE jest dopasowanie rozmyte: kazda litera musi sie zgadzac."""
+    import unicodedata
+    from nazwy import LITERY
+    s = unicodedata.normalize('NFKD', _bialy(s).translate(LITERY))
+    return ''.join(c for c in s if not unicodedata.combining(c)).lower()
+
+
 _PILKA = re.compile(r'(?i)^(pi[lł]ka|pi[lł]ka no[zż]na|football|soccer)$')
 
 
@@ -255,19 +264,20 @@ def zamkniecia(kursy, ako):
     k = k.sort_values('_pobr').drop_duplicates(['data_meczu', 'gospodarz', 'gosc', 'rynek'], keep='last')
     idx = {}
     for r in k.itertuples():
-        idx.setdefault((_bialy(r.gospodarz).lower(), _bialy(r.gosc).lower(), r.rynek), []).append(r)
+        idx.setdefault((_klucz_nazwy(r.gospodarz), _klucz_nazwy(r.gosc), r.rynek), []).append(r)
     wynik, info = [], []
     nogi = ako[(ako.get('noga_nr', '') != 'RAZEM') & ako.get('sport', pd.Series('', index=ako.index)).map(
         lambda s: bool(_PILKA.match(str(s).strip())))]
     for _, r in nogi.iterrows():
-        h, g = _para(r.get('zdarzenie', ''))
+        # dzienniki pisza czasem godzine w nazwie: „Juventus - Atalanta (18:00)”
+        h, g = _para(re.sub(r'\s*\(\d{1,2}:\d{2}\)\s*$', '', str(r.get('zdarzenie', ''))))
         if not h: continue
         kod = rynek_pilka(r.get('rynek', ''))
         m = re.search(r'mecz\s+(\d{4}-\d{2}-\d{2})', str(r.get('uwaga', '')))
         dni = {m.group(1)} if m else {str(r.get('data', ''))[:10],
                                       str((pd.Timestamp(str(r.get('data', ''))[:10]) + pd.Timedelta(days=1)).date())
                                       if re.match(r'\d{4}-\d{2}-\d{2}', str(r.get('data', ''))) else ''}
-        kand = [x for x in idx.get((_bialy(h).lower(), _bialy(g).lower(), kod), []) if x.data_meczu in dni]
+        kand = [x for x in idx.get((_klucz_nazwy(h), _klucz_nazwy(g), kod), []) if x.data_meczu in dni]
         if len(kand) != 1: continue
         x = kand[0]
         if str(r.get('kurs_zamkniecia', '')).strip() == x.kurs: continue

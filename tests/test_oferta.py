@@ -194,3 +194,13 @@ def test_mecz_podglad(monkeypatch, capsys):
     out = capsys.readouterr().out
     assert 'pasujacych' not in out                       # jedno zdarzenie
     assert '1.17' in out and 'O1.5' in out and 'Portugalia' not in out
+
+
+def test_zamkniecia_polskie_znaki_i_godzina_w_nazwie():
+    k = _kursy(('2026-09-25', '20:45', 'PIŁKA NOŻNA', 'Węgry', 'Ukraina', '12', '1.30', '2026-09-25 20:25'),
+               ('2026-09-25', '20:45', 'PIŁKA NOŻNA', 'Irlandia Północna', 'Gruzja', '12', '1.33', '2026-09-25 17:25'))
+    a = _ako(('2026-09-25', '18:00', 'K5', '1', '1', 'pilka', 'Wegry - Ukraina (20:45)', '12', '1.28', '', '', ''),
+             ('2026-09-25', '18:00', 'K5', '1', '2', 'pilka', 'Irlandia Polnocna - Gruzja', '12', '1.35', '', '', ''),
+             ('2026-09-25', '18:00', 'K5', '1', '3', 'pilka', 'Wegry B - Ukraina', '12', '1.28', '', '', ''))   # inny klub
+    z, _ = oferta.zamkniecia(k, a)
+    assert list(z.noga_nr) == ['1', '2'] and list(z.kurs_zamkniecia) == ['1.30', '1.33']
