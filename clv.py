@@ -95,6 +95,12 @@ def main(a):
     if not a:
         sys.exit(__doc__)
     df = pd.read_csv(a[0])
+    # 01.10.2026: ako_log zapisuje kurs nogi jako „kurs”, a wiersze RAZEM to kupony, nie nogi — clv.py konczyl sie
+    # „BRAK KOLUMN: kurs_typu” i nogi kuponow nigdy nie mialy CLV
+    if 'kurs_typu' not in df.columns and 'kurs' in df.columns:
+        df = df.rename(columns={'kurs': 'kurs_typu'})
+    if 'noga_nr' in df.columns:
+        df = df[df.noga_nr.astype(str).str.upper() != 'RAZEM']
     brak = {'kurs_typu', 'kurs_zamkniecia'} - set(df.columns)
     if brak:
         sys.exit(f'BRAK KOLUMN: {", ".join(sorted(brak))} — zapisuj je wg Poprawki 56.3')
