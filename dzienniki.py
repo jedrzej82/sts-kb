@@ -422,7 +422,7 @@ def _bez_strony(rynek):
 
 def _typ_zwyciezcy(rynek, gosp, gosc, h, g):
     """'1' / '2' / 'Zwyciezca 1' / 'Zwyciezca Nazwisko' -> h albo g (ta sama strona co w zdarzeniu)."""
-    s = re.sub(r'(?i)^zwyci[eę]zca(\s+meczu)?\s*', '', str(rynek)).strip()
+    s = re.sub(r'(?i)^zwyci[eę]zca(\s+meczu)?\s*[:\-]?\s*', '', str(rynek)).strip()
     s = re.sub(r'(?i)\s*\(?z?\s*dogryw\w*\)?$', '', s).strip()
     if s in ('1', 'gosp'): return h
     if s in ('2', 'gosc', 'gość'): return g
@@ -430,6 +430,12 @@ def _typ_zwyciezcy(rynek, gosp, gosc, h, g):
     k = sporty.norm(s)
     if k and k in sporty.norm(gosp) and k not in sporty.norm(gosc): return h
     if k and k in sporty.norm(gosc) and k not in sporty.norm(gosp): return g
+    # 01.10.2026: tenis/dart — zdarzenie „Woodhouse Luke - Aspinall Nathan”, rynek „zwyciezca meczu: Luke Woodhouse”
+    # (imie i nazwisko w odwrotnej kolejnosci) dawalo BEZ STRONY. Te same SLOWA (kazde w calosci) = ta sama strona.
+    slowa = lambda t: {sporty.norm(w) for w in re.split(r'[\s\-]+', str(t)) if sporty.norm(w)}
+    ks = slowa(s)
+    w_h, w_g = bool(ks) and ks <= slowa(gosp), bool(ks) and ks <= slowa(gosc)
+    if w_h != w_g: return h if w_h else g
     return None
 
 
