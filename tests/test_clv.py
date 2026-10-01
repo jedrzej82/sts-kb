@@ -65,3 +65,13 @@ def test_pieniadze_zapisane_jako_float_to_nadal_pieniadze(tmp_path, capsys):
     clv.main([str(f)])
     out = capsys.readouterr().out
     assert 'za pieniadze n=1' in out and 'papierowe    n=1' in out
+
+
+def test_main_ako_log_kurs_i_bez_razem(tmp_path, capsys):
+    """01.10.2026: ako_log ma kolumne „kurs” i wiersze RAZEM (kupony) — liczymy CLV samych nog."""
+    f = tmp_path / 'ako_log.csv'
+    pd.DataFrame(dict(data=['2026-09-30'] * 3, tag=['K5'] * 3, noga_nr=['1', '2', 'RAZEM'],
+                      kurs=['2.10', '1,50', '3.15'], kurs_zamkniecia=['2.00', '1.50', '2.80'])).to_csv(f, index=False)
+    clv.main([str(f)])
+    out = capsys.readouterr().out
+    assert 'CLV — 2 nog z kursem zamkniecia (z 2 wierszy)' in out
