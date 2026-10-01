@@ -159,7 +159,8 @@ def _data_meczu(r):
 def _szukaj(w, d0, gosp, gosc, rozwiaz, kol_h='h', kol_a='a'):
     """Mecz z okna +-1 dnia, obie nazwy dopasowane jednoznacznie. Zwraca (wiersz, odwrocone) albo (None, powod)."""
     okno = w[(w.d >= d0 - pd.Timedelta(days=1)) & (w.d <= d0 + pd.Timedelta(days=1))]
-    if okno.empty: return None, 'brak wynikow z tych dni'
+    if okno.empty:   # 01.10.2026: z data konca zrodla (dart z walker95sam/darts potrafi miec 2-3 dni opoznienia)
+        return None, 'brak wynikow z tych dni' + (f' (zrodlo konczy sie {w.d.max():%Y-%m-%d})' if len(w) else '')
     pula = set(okno[kol_h]) | set(okno[kol_a])
     h, g = rozwiaz(gosp, pula), rozwiaz(gosc, pula)
     if h and g:
@@ -260,11 +261,20 @@ def _kandydaci_tenis(nazwa, pula):
     return {p for p in pula if (lambda z: z[0] >= n and z[1] >= 1)(tenis._zgodnosc(nazwa, p))}
 
 
+def _dzis():
+    from zoneinfo import ZoneInfo
+    return pd.Timestamp.now(tz=ZoneInfo('Europe/Warsaw')).tz_localize(None).normalize()
+
+
 def rozlicz_noge(r, W):
     """(TRAFIONY/PRZEGRANY/BRAK WYNIKU, wynik, uwaga). W = dict z tabelami wynikow. Dopasowanie rozmyte
     nazwy nie blokuje rozliczenia (mecz musi i tak zgadzac sie obiema druzynami i data), ale trafia do uwagi."""
     _OSTRZEZENIA.clear()
     stan, wyn, uw = _rozlicz_noge(r, W)
+    # 01.10.2026: noga kuponu z 30.09 na mecz 01.10 (AKOP do 12:00 jutra) dawala „nie dopasowano: Panama” — meczu po
+    # prostu jeszcze nie bylo w wynikach. Mecz z dzis lub pozniej bez wyniku = do rozliczenia w kolejnym przebiegu.
+    if stan == 'BRAK WYNIKU' and _data_meczu(r).normalize() >= _dzis():
+        uw = f'mecz {_data_meczu(r):%Y-%m-%d} jeszcze bez wyniku — rozliczy kolejny przebieg ({uw})'
     uw = '; '.join([x for x in [uw] + sorted(set(_OSTRZEZENIA)) if x])
     return stan, wyn, uw
 
@@ -277,7 +287,12 @@ def _rozlicz_noge(r, W):
     d0 = _data_meczu(r)
     rynek = str(r['rynek']).strip()
     if sport in ('pilka', 'piłka', 'piłka nożna', 'football', ''):
-        x, odw = _szukaj(W['pilka'], d0, gosp, gosc, _rozwiaz_pilka)
+        # 01.10.2026: przebieg zapisuje w uwadze „dopasowanie po terminarzu -> X” (typuj._kraj_z_terminarza) — ta sama
+        # nazwa z bazy rozlicza noge, ale tylko gdy X jest w puli meczow okna (nic nie zgadujemy)
+        m = re.search(r'dopasowanie po terminarzu\s*->\s*([^;]+)', str(r.get('uwaga', '')))
+        wsk = m.group(1).strip() if m else None
+        roz = (lambda n, p: _rozwiaz_pilka(n, p) or (wsk if wsk in p else None)) if wsk else _rozwiaz_pilka
+        x, odw = _szukaj(W['pilka'], d0, gosp, gosc, roz)
         if x is None: return 'BRAK WYNIKU', '', odw
         g, a = (x.ga, x.g) if odw else (x.g, x.ga)
         hg, ha = (x.ha, x.hg) if odw else (x.hg, x.ha)
