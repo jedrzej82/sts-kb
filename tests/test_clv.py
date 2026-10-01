@@ -75,3 +75,21 @@ def test_main_ako_log_kurs_i_bez_razem(tmp_path, capsys):
     clv.main([str(f)])
     out = capsys.readouterr().out
     assert 'CLV — 2 nog z kursem zamkniecia (z 2 wierszy)' in out
+
+
+def test_ako_log_pieniadze_rynek_i_jedna_noga_raz(capsys):
+    """01.10.2026: ako_log — pieniadze z wiersza RAZEM, rynek ujednolicony, ta sama noga w dwoch kuponach liczona raz."""
+    import io
+    import clv
+    csv = ('data,godzina_uruchomienia,tag,nr_kuponu,noga_nr,zdarzenie,rynek,kurs,kurs_zamkniecia,status,uwaga\n'
+           '2026-09-24,18:00,AKOP,AKOP1,4,Liechtenstein - Litwa,Liczba goli powyzej 1.5,1.48,1.52,,\n'
+           '2026-09-24,18:00,AKOP,AKOP1,RAZEM,,,2.10,,PAPIEROWY,\n'
+           '2026-09-24,18:00,K5c,K5c,2,Liechtenstein - Litwa,Liczba goli powyzej 1.5,1.48,1.52,,\n'
+           '2026-09-24,18:00,K5c,K5c,RAZEM,,,2.60,,,stawka 2 zl\n'
+           '2026-09-24,18:50,AKOP,1,2,Tunezja - Uganda,powyzej 1.5 gola,1.33,1.30,,\n'
+           '2026-09-24,18:50,AKOP,1,RAZEM,,,2.00,,PAPIEROWY,stawka 0\n')
+    d = pd.read_csv(io.StringIO(csv), dtype=str, keep_default_na=False).rename(columns={'kurs': 'kurs_typu'})
+    n = clv.przygotuj_ako(d)
+    assert len(n) == 2                                             # Liechtenstein raz, nie dwa
+    w = {r.zdarzenie: (r.rynek, r.pieniadze) for r in n.itertuples()}
+    assert w == {'Liechtenstein - Litwa': ('O1.5', 1), 'Tunezja - Uganda': ('O1.5', 0)}

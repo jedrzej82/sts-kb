@@ -441,6 +441,15 @@ def _liczba(s):
         return None
 
 
+def kupon_pieniezny(r0):
+    """Wiersz RAZEM kuponu -> (stawka, czy_za_pieniadze). Wspolne dla rozliczenia i clv.py."""
+    # „stawka: 5 zl”, „stawka 5 zl”, „stawka=5” — dawniej tylko „stawka 5 z…”, a reszta robila z kuponu papierowy
+    m = re.search(r'stawka\W*(\d+(?:[.,]\d+)?)', str(r0.get('uwaga', '')), re.I)
+    stawka = _liczba(m.group(1)) if m else 0.0
+    status = str(r0.get('status', '')).upper()
+    return stawka, bool(stawka > 0 and not any(x in status for x in ('PAPIER', 'ODWOL', 'NIE GRAC')))
+
+
 def rozlicz_dzien(data, ako, W):
     """Wiersze pliku Rozliczenie dla kuponow uruchomionych w dniu `data` + podsumowanie Bilansu."""
     a = ako[ako.data == data]
@@ -465,11 +474,8 @@ def rozlicz_dzien(data, ako, W):
         if not kurs:
             kn = [_liczba(v) for v in nogi.get('kurs', pd.Series(dtype=str))]
             kurs = float(math.prod(kn)) if kn and all(kn) else None
-        # „stawka: 5 zl”, „stawka 5 zl”, „stawka=5” — dawniej tylko „stawka 5 z…”, a reszta robila z kuponu papierowy
-        m = re.search(r'stawka\W*(\d+(?:[.,]\d+)?)', str(r0.get('uwaga', '')), re.I)
-        stawka = _liczba(m.group(1)) if m else 0.0
+        stawka, pien = kupon_pieniezny(r0)
         status = str(r0.get('status', '')).upper()
-        pien = stawka > 0 and not any(x in status for x in ('PAPIER', 'ODWOL', 'NIE GRAC'))
         n, traf = len(stany), stany.count('TRAFIONY')
         if 'PRZEGRANY' in stany: wynik = f'PRZEGRANY {traf}/{n}'
         elif 'BRAK WYNIKU' in stany: wynik = f'NIEROZLICZONY ({stany.count("BRAK WYNIKU")} bez wyniku)'

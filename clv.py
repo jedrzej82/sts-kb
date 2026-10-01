@@ -52,6 +52,27 @@ def przygotuj(df):
     return d
 
 
+def przygotuj_ako(df):
+    """01.10.2026: ako_log -> nogi do CLV. (1) pieniadze z wiersza RAZEM kuponu (ta sama regula co rozliczenie:
+    stawka > 0 i status nie PAPIER/ODWOL/NIE GRAC) — wczesniej ako_log nie mial podzialu na pieniadze i papier,
+    a FAZA 2/3 czyta CLV za pieniadze; (2) rynek ujednolicony („Liczba goli powyzej 1.5”, „powyzej 1.5 gola”,
+    „O1.5” to jeden rynek); (3) ta sama noga w kilku kuponach (AKOP i K5c) liczona RAZ — inaczej srednia waza
+    nogi, ktore przebieg wpisal do wiecej kuponow."""
+    import dzienniki
+    d = df.astype(str).replace('nan', '')
+    k = ['data', 'godzina_uruchomienia', 'tag', 'nr_kuponu']
+    razem = d[d.noga_nr.str.upper() == 'RAZEM']
+    pien = {tuple(r[c] for c in k if c in d): dzienniki.kupon_pieniezny(r)[1] for _, r in razem.iterrows()}
+    n = d[d.noga_nr.str.upper() != 'RAZEM'].copy()
+    n['pieniadze'] = [int(pien.get(tuple(r[c] for c in k if c in d), False)) for _, r in n.iterrows()]
+    if 'rynek' in n:
+        n['rynek'] = n.rynek.map(dzienniki.rynek_pilka)
+    kl = [c for c in ('zdarzenie', 'rynek', 'kurs_typu') if c in n]
+    if kl:   # najpierw kupony za pieniadze — gdy noga jest i tu, i w papierowym, liczy sie jako za pieniadze
+        n = n.sort_values('pieniadze', ascending=False, kind='stable').drop_duplicates(kl, keep='first')
+    return n
+
+
 def _p_jednostronne(t, df):
     """P(T > t) dla rozkladu t-Studenta; scipy jesli jest, inaczej przyblizenie normalne."""
     try:
@@ -94,13 +115,13 @@ def _linia(nazwa, s):
 def main(a):
     if not a:
         sys.exit(__doc__)
-    df = pd.read_csv(a[0])
+    df = pd.read_csv(a[0], dtype=str, keep_default_na=False)
     # 01.10.2026: ako_log zapisuje kurs nogi jako „kurs”, a wiersze RAZEM to kupony, nie nogi — clv.py konczyl sie
     # „BRAK KOLUMN: kurs_typu” i nogi kuponow nigdy nie mialy CLV
     if 'kurs_typu' not in df.columns and 'kurs' in df.columns:
         df = df.rename(columns={'kurs': 'kurs_typu'})
     if 'noga_nr' in df.columns:
-        df = df[df.noga_nr.astype(str).str.upper() != 'RAZEM']
+        df = przygotuj_ako(df)
     brak = {'kurs_typu', 'kurs_zamkniecia'} - set(df.columns)
     if brak:
         sys.exit(f'BRAK KOLUMN: {", ".join(sorted(brak))} — zapisuj je wg Poprawki 56.3')
