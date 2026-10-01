@@ -164,6 +164,11 @@ _KRAJE_PL = {
     'macedoniapn': ('North Macedonia',), 'irlandiapn': ('Northern Ireland',),
     'koreapd': ('South Korea', 'Korea Republic'), 'koreapn': ('North Korea', 'Korea DPR'),
     'brytyjskiewyspydziewicze': ('British Virgin Islands',), 'wyspydziewiczeusa': ('United States Virgin Islands',),
+    # 01.10.2026 (Raport 21:00, Kajmany - Portoryko -> „NIE ZNALEZIONO reprezentacji”): wszystkie reprezentacje meskie
+    # z oferty 24-30.09 bez polskiej nazwy w tabeli — kazda jest w bazie intl (54-333 meczow)
+    'kajmany': ('Cayman Islands',), 'gwadelupa': ('Guadeloupe',), 'martynika': ('Martinique',),
+    'malediwy': ('Maldives',), 'seszele': ('Seychelles',), 'saintkittsinevis': ('Saint Kitts and Nevis',),
+    'wyspycooka': ('Cook Islands',),
     'amerykanskiewyspydziewicze': ('United States Virgin Islands',), 'egipt': ('Egypt',),
     'ekwador': ('Ecuador',), 'estonia': ('Estonia',), 'filipiny': ('Philippines',),
     'finlandia': ('Finland',), 'francja': ('France',), 'ghana': ('Ghana',),

@@ -339,6 +339,35 @@ def _dzis():
     return pd.Timestamp.now(tz=ZoneInfo('Europe/Warsaw')).tz_localize(None).normalize()
 
 
+# 01.10.2026 SETTLEMENT v2 — kod anomalii (kolumna „kategoria” Rozliczenia) z WARSTWA, w ktorej noga utknela.
+# Stan, wynik i uwaga bez zmian (frazy „jeszcze bez wyniku” / „zrodlo konczy sie” czyta P119). Kolejnosc wzorcow
+# ma znaczenie (pierwszy pasujacy). Kod INNE = komunikat bez kodu — test pilnuje, ze zaden komunikat kodu go nie daje.
+ANOMALIE = (
+    ('MECZ_PRZYSZLY', 'czas', r'jeszcze bez wyniku'),
+    ('ZRODLO_OPOZNIONE', 'zrodlo wynikow', r'brak wynikow z tych dni'),
+    ('ZAPIS_BEZ_PARY', 'zapis przebiegu', r'zdarzenie bez „A - B”'),
+    ('RYNEK_BEZ_STRONY', 'zapis przebiegu', r'BEZ STRONY'),
+    ('ZWROT', 'decyzja', r'zwrot \(DNB przy remisie\)'),
+    ('RYNEK_NIEOBSLUGIWANY', 'interpretacja', r'nieobslugiwany'),
+    ('BRAK_REMISU_W_SPORCIE', 'interpretacja', r'bez remisu w tym sporcie'),
+    ('DOGRYWKA_NIEZNANA', 'zrodlo wynikow', r'brak informacji o dogrywce'),
+    ('REMIS_PRZY_ZWYCIEZCY', 'decyzja', r'remis przy rynku zwyciezcy'),
+    ('KILKA_MECZOW', 'dopasowanie zdarzenia', r'kilka (meczow|pasujacych)'),
+    ('NAZWA_NIEDOPASOWANA', 'dopasowanie zdarzenia', r'nie dopasowano'),
+    ('BRAK_MECZU', 'dopasowanie zdarzenia', r'brak meczu w oknie'),
+)
+
+
+def kod_anomalii(stan, uwaga):
+    """Kod anomalii nogi: BRAK WYNIKU -> kod warstwy; noga rozstrzygnieta z ostrzezeniem dopasowania ->
+    DOPASOWANIE_DO_SPRAWDZENIA; inaczej ''."""
+    u = str(uwaga)
+    if stan == 'BRAK WYNIKU':
+        return next((k for k, _, w in ANOMALIE if re.search(w, u)), 'INNE')
+    if re.search(r'sprawdz|po jednej druzynie', u): return 'DOPASOWANIE_DO_SPRAWDZENIA'
+    return ''
+
+
 def rozlicz_noge(r, W):
     """(TRAFIONY/PRZEGRANY/BRAK WYNIKU, wynik, uwaga). W = dict z tabelami wynikow. Dopasowanie rozmyte
     nazwy nie blokuje rozliczenia (mecz musi i tak zgadzac sie obiema druzynami i data), ale trafia do uwagi."""
@@ -369,9 +398,12 @@ def _rozlicz_noge(r, W):
         if x is None: return 'BRAK WYNIKU', '', odw
         g, a = (x.ga, x.g) if odw else (x.g, x.ga)
         hg, ha = (x.ha, x.hg) if odw else (x.hg, x.ha)
-        h = hit(rynek_pilka(rynek), int(g), int(a), hg, ha)
+        kod = rynek_pilka(rynek)
+        h = hit(kod, int(g), int(a), hg, ha)
         wyn = f'{int(g)}:{int(a)}'
-        if h is None: return 'BRAK WYNIKU', wyn, f'rynek „{rynek}” nieobslugiwany albo zwrot (DNB przy remisie)'
+        # 01.10.2026 (Settlement v2): zwrot DNB i rynek nieobslugiwany to rozne sytuacje — dawniej jeden komunikat
+        if h is None and str(kod).startswith('DNB_') and int(g) == int(a): return 'BRAK WYNIKU', wyn, 'zwrot (DNB przy remisie)'
+        if h is None: return 'BRAK WYNIKU', wyn, f'rynek „{rynek}” nieobslugiwany'
         return ('TRAFIONY' if h else 'PRZEGRANY'), wyn, ''
     if sport == 'tenis':
         t = W['tenis']
@@ -496,11 +528,12 @@ def rozlicz_dzien(data, ako, W):
         stany = []
         for _, r in nogi.iterrows():
             stan, wyn, uw = rozlicz_noge(r, W)
+            kat = kod_anomalii(stan, uw)
             kz, kt = _liczba(r.get('kurs_zamkniecia', '')), _liczba(r.get('kurs', ''))
             clv = f'{kt / kz - 1:+.1%}' if kz and kt else ''
             wiersze.append(dict(tag=tag, zdarzenie=r.zdarzenie, rynek=r.rynek, P=r.get('P', ''), kurs_typu=r.get('kurs', ''),
                                 kurs_zamkniecia=r.get('kurs_zamkniecia', ''), CLV=clv, wynik=wyn, TRAFIONY_PRZEGRANY=stan,
-                                kategoria='', uwaga=uw))
+                                kategoria=kat, uwaga=uw))
             stany.append(stan)
         if not stany: continue
         r0 = razem.iloc[0] if len(razem) else pd.Series(dtype=str)
@@ -572,7 +605,11 @@ def main(a):
     nogi = roz[~roz.tag.str.startswith('RAZEM_')]
     print(f'ROZLICZENIE {data}: {len(nogi)} nog | ' + ', '.join(f'{k} {v}' for k, v in nogi.TRAFIONY_PRZEGRANY.value_counts().items()))
     for r in nogi[nogi.TRAFIONY_PRZEGRANY == 'BRAK WYNIKU'].itertuples():
-        print(f'  BRAK WYNIKU: {r.tag} | {r.zdarzenie} | {r.rynek} | {r.uwaga}')
+        print(f'  BRAK WYNIKU [{r.kategoria}]: {r.tag} | {r.zdarzenie} | {r.rynek} | {r.uwaga}')
+    an = nogi.kategoria[nogi.kategoria != ''].value_counts()
+    if len(an):
+        warstwa = {k: w for k, w, _ in ANOMALIE}
+        print('SETTLEMENT_ANOMALY: ' + ', '.join(f'{k} {v} ({warstwa.get(k, "do sprawdzenia")})' for k, v in an.items()))
     print(roz[roz.tag.str.startswith('RAZEM_')][['tag', 'TRAFIONY_PRZEGRANY', 'uwaga']].to_string(index=False))
     sr = sum(bil['pap_P']) / len(bil['pap_P']) if bil['pap_P'] else float('nan')
     print(f'\nBILANS {data}: postawione_zl {bil["postawione"]:.2f} | wyplacone_zl {bil["wyplacone"]:.2f} | '
