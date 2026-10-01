@@ -141,3 +141,19 @@ def test_jako_aliasy_i_odczyt_przez_aliasy_z_pliku(tmp_path):
     assert nazwy.aliasy_z_pliku('sporty', str.lower, sl, str(p)) == 1 and sl == {'berani zlin': 'Zlin'}
     sl = {}
     assert nazwy.aliasy_z_pliku('typuj', str.lower, sl, str(p)) == 1 and sl == {'vasalunds if': 'Vasalund'}
+
+
+def test_skrot_z_kolizja_rdzenia_idzie_do_przegladu():
+    # nauka 01.10: „Torpedo Ust-Kamenogorsk” -> „Torpedo” poprawne dzis, ale w puli jest tez „Torpedo Nizhny Novgorod”
+    pule = {'hokej': {'Nomad Astana', 'Torpedo', 'Torpedo Nizhny Novgorod'}}
+    ev = _ev([('hokej', '2026-09-27', '15:00', 'Nomad Astana', 'Torpedo Ust-Kamenogorsk')])
+    z = _z([('hokej', '2026-09-27', None, 'Nomad Astana', 'Torpedo')])
+    a, _, st = _ucz(ev, z, {'Nomad Astana': 'Nomad Astana'}, pule)
+    assert a.empty and st['do przegladu: skrot z kolizja'] == 1
+    assert a.attrs['przeglad'][['nazwa', 'cel']].values.tolist() == [['Torpedo Ust-Kamenogorsk', 'Torpedo']]
+    # bez drugiego wpisu z tym rdzeniem — alias pewny; wpis rozniacy sie tylko znacznikiem (U20) to nie kolizja
+    pule = {'hokej': {'Nomad Astana', 'Torpedo', 'Torpedo U20'}}
+    a, _, _ = _ucz(ev, z, {'Nomad Astana': 'Nomad Astana'}, pule)
+    assert a[['nazwa', 'cel']].values.tolist() == [['Torpedo Ust-Kamenogorsk', 'Torpedo']]
+    # skrot bez zgubionego czlonu znaczacego (tylko forma prawna) — bez przegladu
+    assert dopasuj.kolizja('Lugi HF', 'Lugi', {'Lugi', 'Lugi Lund'}) == []

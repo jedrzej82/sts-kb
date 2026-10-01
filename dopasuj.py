@@ -11,10 +11,11 @@ Dwie metody, obie wymagaja JEDNOZNACZNOSCI:
   GODZINA — mecz w terminarzu o tej samej godzinie (+-5 min), obie nazwy podobne, para jedna.
 Alias jest PEWNY, gdy: jeden cel dla nazwy, cel jest nazwa z puli bazy, znaczniki (kobiety/rezerwy/U21) rowne, nazwa
 z oferty nie jest krajem (reprezentacje ma sciezka --intl), oraz nazwy sa podobne albo dowody sa >= 2 (rozne dni/mecze).
-Sporty osobowe (tenis, dart, snooker…) — tylko nazwy podobne. Sprzecznosci (resolver wskazal INNA druzyne niz dowod)
+Sporty osobowe (tenis, dart, snooker…) — tylko nazwy podobne. Alias skracajacy z kolizja rdzenia w puli -> przeglad. Sprzecznosci (resolver wskazal INNA druzyne niz dowod)
 NIE nadpisuja niczego — ida do raportu (konflikty) do recznej oceny.
 
 Uzycie:  python3 dopasuj.py ucz KURSY.csv.gz [--zewn KATALOG] [--wyjscie aliasy_nauczone.csv] [--konflikty PLIK.csv]
+                                    [--przeglad dopasuj_przeglad.csv]
 Wynik: aliasy_nauczone.csv w formacie aliasy.csv (modul,nazwa,cel,uzasadnienie,data) — do dopisania do aliasy.csv
 (dziala tylko, gdy cel jest w puli; aliasy w kodzie wygrywaja)."""
 import collections
@@ -47,7 +48,8 @@ TOLERANCJA_MIN = 5
 
 # czlony bez znaczenia przy porownaniu (formy prawne, nazwy sportu); znaczniki kobiet/rezerw porownuje nazwy.znaczniki
 OGOLNE = set('fc sc hc bk if ik kk sk ac as cd cf ud fk nk hk bc bm tsv sv vfl vfb ev ehc ec club cb hbc kh ks mks gks '
-             'basket basketball handball volley team the de la el del al and afc sd ad ca rc us w k women'.split())
+             'basket basketball handball volley team the de la el del al and afc sd ad ca rc us w k women '
+             'hf il ff hb asd bbk umf'.split())
 
 
 def _ascii(s):
@@ -179,7 +181,7 @@ def ucz(ev, z, rozwiaz, pule):
                         dowody[(r.S, n)][(cel, True)] += 1
                         przyklad.setdefault((r.S, n), f'{r.A} - {r.B} {r.d.date()} godz. ({x.zrodlo}: {x.gosp} - {x.gosc})')
                         stat['godzina'] += 1
-    out = []
+    out, przeglad = [], []
     for (S, n), c in sorted(dowody.items()):
         cele = {cel for cel, _ in c}
         if len(cele) != 1: stat['odrzucone: kilka celow'] += 1; continue
@@ -187,10 +189,26 @@ def ucz(ev, z, rozwiaz, pule):
         if jest_krajem(n): stat['odrzucone: kraj'] += 1; continue
         if nazwy.znaczniki(n) != nazwy.znaczniki(cel): stat['odrzucone: znaczniki'] += 1; continue
         if not (pod or (ile >= 2 and S not in OSOBOWE)): stat['odrzucone: niepodobne, 1 dowod'] += 1; continue
+        kol = kolizja(n, cel, pule.get(S, ()))
+        if kol:
+            przeglad.append((S, n, cel, ile, przyklad[(S, n)], '; '.join(kol[:5]))); stat['do przegladu: skrot z kolizja'] += 1; continue
         out.append((S, n, cel, ile, przyklad[(S, n)]))
     a = pd.DataFrame(out, columns=['S', 'nazwa', 'cel', 'dowody', 'przyklad'])
+    a.attrs['przeglad'] = pd.DataFrame(przeglad, columns=['S', 'nazwa', 'cel', 'dowody', 'przyklad', 'inne_z_rdzeniem'])
     k = pd.DataFrame(konflikty, columns=['S', 'data', 'A', 'B', 'nazwa', 'kod_dal', 'zrodlo_nazwa', 'zrodlo_cel', 'zrodlo'])
     return a, k.drop_duplicates(['S', 'nazwa', 'kod_dal', 'zrodlo_cel']), stat
+
+
+def kolizja(nazwa, cel, pula):
+    """Alias SKRACAJACY (cel zgubil czlon nazwy z oferty, np. miasto: „Torpedo Ust-Kamenogorsk” -> „Torpedo”) jest
+    poprawny dzis, ale nie musi byc jednoznaczny jutro. Gdy w puli jest INNY wpis z calym rdzeniem celu i tymi samymi
+    znacznikami („Torpedo Nizhny Novgorod”, „Racing Club Montevideo”), alias idzie do recznego przegladu, nie do
+    aliasy.csv. Zwraca liste takich wpisow (pusta = bez kolizji)."""
+    tn, tc = tokeny(nazwa), tokeny(cel)
+    zgub = {x for x in tn if not any(x.startswith(y) or y.startswith(x) for y in tc if min(len(x), len(y)) >= 3)}
+    if not zgub or not tc: return []
+    zn = nazwy.znaczniki(cel)
+    return sorted(p for p in pula if p != cel and tc <= tokeny(p) and nazwy.znaczniki(p) == zn)
 
 
 def jako_aliasy(a, dzis):
@@ -230,7 +248,9 @@ def main(a):
     al, kon, stat = ucz(ev, z, rozwiaz, pule)
     print(f'zdarzen STS {len(ev)}, meczow w zrodlach {len(z)}')
     for k, v in sorted(stat.items()): print(f'  {k}: {v}')
-    print(f'ALIASY PEWNE: {len(al)}   KONFLIKTY (do recznej oceny): {len(kon)}')
+    print(f'ALIASY PEWNE: {len(al)}   DO PRZEGLADU (skrot z kolizja): {len(al.attrs["przeglad"])}   '
+          f'KONFLIKTY (do recznej oceny): {len(kon)}')
+    al.attrs['przeglad'].to_csv(arg('--przeglad', 'dopasuj_przeglad.csv'), index=False)
     jako_aliasy(al, pd.Timestamp.today().strftime('%Y-%m-%d')).to_csv(arg('--wyjscie', 'aliasy_nauczone.csv'), index=False)
     kon.to_csv(arg('--konflikty', 'dopasuj_konflikty.csv'), index=False)
 
