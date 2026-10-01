@@ -204,3 +204,11 @@ def test_zamkniecia_polskie_znaki_i_godzina_w_nazwie():
              ('2026-09-25', '18:00', 'K5', '1', '3', 'pilka', 'Wegry B - Ukraina', '12', '1.28', '', '', ''))   # inny klub
     z, _ = oferta.zamkniecia(k, a)
     assert list(z.noga_nr) == ['1', '2'] and list(z.kurs_zamkniecia) == ['1.30', '1.33']
+
+
+def test_zamkniecia_mecz_przed_zapisem_nogi_odpada():
+    k = _kursy(('2026-09-25', '12:00', 'PIŁKA NOŻNA', 'Australia', 'Brazylia', 'U3.5', '1.67', '2026-09-25 11:25'),
+               ('2026-09-26', '12:00', 'PIŁKA NOŻNA', 'Australia', 'Brazylia', 'U3.5', '1.55', '2026-09-26 11:25'))
+    a = _ako(('2026-09-25', '21:00', 'AKOP', '1', '1', 'pilka', 'Australia - Brazylia', 'U3.5', '1.54', '', '', ''))
+    z, _ = oferta.zamkniecia(k, a)
+    assert list(z.kurs_zamkniecia) == ['1.55']          # mecz z 26.09, nie rozegrany 25.09 12:00

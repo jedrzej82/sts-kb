@@ -258,10 +258,10 @@ def zamkniecia(kursy, ako):
     from dzienniki import rynek_pilka, _para
     if not len(kursy) or not len(ako): return ako.iloc[0:0].copy(), []
     k = kursy.copy()
-    k['_start'] = pd.to_datetime(k.data_meczu + ' ' + k.godzina_meczu, errors='coerce')
-    k['_pobr'] = pd.to_datetime(k.godzina_pobrania, errors='coerce')
-    k = k[(k.sport == 'PIŁKA NOŻNA') & k._start.notna() & k._pobr.notna() & (k._pobr < k._start)]
-    k = k.sort_values('_pobr').drop_duplicates(['data_meczu', 'gospodarz', 'gosc', 'rynek'], keep='last')
+    k['t_start'] = pd.to_datetime(k.data_meczu + ' ' + k.godzina_meczu, errors='coerce')
+    k['t_pobr'] = pd.to_datetime(k.godzina_pobrania, errors='coerce')
+    k = k[(k.sport == 'PIŁKA NOŻNA') & k.t_start.notna() & k.t_pobr.notna() & (k.t_pobr < k.t_start)]
+    k = k.sort_values('t_pobr').drop_duplicates(['data_meczu', 'gospodarz', 'gosc', 'rynek'], keep='last')
     idx = {}
     for r in k.itertuples():
         idx.setdefault((_klucz_nazwy(r.gospodarz), _klucz_nazwy(r.gosc), r.rynek), []).append(r)
@@ -277,7 +277,11 @@ def zamkniecia(kursy, ako):
         dni = {m.group(1)} if m else {str(r.get('data', ''))[:10],
                                       str((pd.Timestamp(str(r.get('data', ''))[:10]) + pd.Timedelta(days=1)).date())
                                       if re.match(r'\d{4}-\d{2}-\d{2}', str(r.get('data', ''))) else ''}
-        kand = [x for x in idx.get((_klucz_nazwy(h), _klucz_nazwy(g), kod), []) if x.data_meczu in dni]
+        # mecz musi zaczynac sie PO przebiegu, ktory zapisal noge (25.09 21:00: „Australia - Brazylia” bez daty w uwadze
+        # trafilo na mecz z 25.09 12:00 — ten sam dzien, ale rozegrany, zanim noge w ogole wpisano)
+        uruch = pd.to_datetime(f"{str(r.get('data', ''))[:10]} {str(r.get('godzina_uruchomienia', '')).strip()}", errors='coerce')
+        kand = [x for x in idx.get((_klucz_nazwy(h), _klucz_nazwy(g), kod), [])
+                if x.data_meczu in dni and (pd.isna(uruch) or x.t_start > uruch)]
         if len(kand) != 1: continue
         x = kand[0]
         if str(r.get('kurs_zamkniecia', '')).strip() == x.kurs: continue
