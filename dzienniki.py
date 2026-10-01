@@ -59,8 +59,19 @@ def scal(katalog, cel=HERE):
         d = pd.concat(czesci, ignore_index=True)
         n0 = len(d)
         if kol_wyn not in d: d[kol_wyn] = ''
+        d = d.fillna('')
+        zamk = None
+        if 'kurs_zamkniecia' in d:
+            # 01.10.2026: kurs_zamkniecia dopisuja delty „ako_log zamkniecia …” (oferta.py) — kazda z kolejnego PDF przed
+            # meczem; wygrywa NAJPOZNIEJSZY niepusty, nawet gdy reszte wiersza bierzemy z pliku z wynikiem
+            z = d[d.kurs_zamkniecia != ''].sort_values('_kol', kind='stable').drop_duplicates(klucz, keep='last')
+            zamk = z.set_index(klucz).kurs_zamkniecia
         d = (d.assign(_ma=(d[kol_wyn] != '').astype(int)).sort_values(['_ma', '_kol'], kind='stable')
              .drop_duplicates(klucz, keep='last').drop(columns=['_ma', '_kol']))
+        if zamk is not None and len(zamk):
+            k = pd.MultiIndex.from_frame(d[klucz])
+            nowe = zamk.reindex(k)
+            d['kurs_zamkniecia'] = [n if isinstance(n, str) and n else s for n, s in zip(nowe, d.kurs_zamkniecia)]
         d = d.sort_values([c for c in ('data', 'godzina_uruchomienia', 'tag', 'nr_kuponu', 'noga_nr') if c in d], kind='stable')
         d.to_csv(os.path.join(cel, f'{rodzaj}.csv'), index=False)
         wynik[rodzaj] = (len(pliki), n0, len(d))
