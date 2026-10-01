@@ -11,8 +11,9 @@ def test_skroty_formy_prawnej():
     assert sporty.resolve('Besiktas JK', {'Besiktas', 'Besiktas (W)', 'Fenerbahce'}, 'koszykówka') == 'Besiktas'
     assert sporty.resolve('BM Logrono La Rioja', {'Logrono La Rioja', 'Barcelona'}, 'piłka ręczna') == 'Logrono La Rioja'
     assert sporty.resolve('Tatabanya KC', {'Tatabanya', 'Veszprem'}, 'piłka ręczna') == 'Tatabanya'
-    # miasto nadal nie jest czlonem ogolnym — bez aliasu nie zgadujemy
-    assert sporty.resolve('Slovan Lublana', {'Slovan', 'Celje'}, 'piłka ręczna') is None
+    # miasto nadal nie jest czlonem ogolnym — bez aliasu nie zgadujemy (01.10: „Slovan Lublana” ma juz alias
+    # z nauki dopasowan — mechanizm sprawdzamy na nazwie bez aliasu)
+    assert sporty.resolve('Olimpija Lublana', {'Olimpija', 'Celje'}, 'piłka ręczna') is None
 
 
 def test_aliasy_z_raportu():
@@ -58,14 +59,15 @@ def _hist(rows):
 
 def test_potwierdzenie_rywalem():
     """Raport 15:00: „Karpat Oulu” / „SaiPa Lappeenranta” — jedyni kandydaci, grali ze soba w Liidze.
-    Ta para ma od 30.09 alias w aliasy.csv, wiec mechanizm sprawdzamy na nazwach bez aliasu."""
-    d = _hist([('2026-01-14', 'hokej', 'Finland | Liiga', 'Jokerit', 'Pelicans'),
+    Ta para ma od 30.09 alias w aliasy.csv, wiec mechanizm sprawdzamy na nazwach bez aliasu
+    (01.10: „Jokerit Helsinki” tez ma juz alias z nauki dopasowan — zastapiony „Hermes Kokkola”)."""
+    d = _hist([('2026-01-14', 'hokej', 'Finland | Liiga', 'Hermes', 'Pelicans'),
                ('2026-09-20', 'hokej', 'Finland | Liiga', 'Tappara', 'Ilves')])
-    pula = {'Jokerit', 'Pelicans', 'Tappara', 'Ilves'}
+    pula = {'Hermes', 'Pelicans', 'Tappara', 'Ilves'}
     sporty._KANDYDAT.clear()
-    h, g = sporty.resolve('Jokerit Helsinki', pula, 'hokej'), sporty.resolve('Pelicans Lahti', pula, 'hokej')
+    h, g = sporty.resolve('Hermes Kokkola', pula, 'hokej'), sporty.resolve('Pelicans Lahti', pula, 'hokej')
     assert (h, g) == (None, None)
-    assert sporty.potwierdz_rywalem(d, 'hokej', ('Jokerit Helsinki', 'Pelicans Lahti'), (h, g)) == ['Jokerit', 'Pelicans']
+    assert sporty.potwierdz_rywalem(d, 'hokej', ('Hermes Kokkola', 'Pelicans Lahti'), (h, g)) == ['Hermes', 'Pelicans']
 
 
 def test_aliasy_raport_3009_1500():
@@ -94,13 +96,14 @@ def test_bez_meczu_ligowego_nadal_mniej():
 
 
 def test_niejednoznaczny_rdzen_bez_kandydata():
-    """Rdzen wspolny dla kilku klubow („Slovan”, „Slovan Bratislava”) — brak kandydata, rywal nic nie zmienia."""
-    d = _hist([('2026-09-01', 'piłka ręczna', 'Slovenia | 1. NLB', 'Slovan', 'Celje')])
-    pula = {'Slovan', 'Slovan Bratislava', 'Celje'}
+    """Rdzen wspolny dla kilku klubow („Olimpija”, „Olimpija Bratislava”) — brak kandydata, rywal nic nie zmienia.
+    01.10: dawniej na „Slovan Lublana”, ktory ma juz alias z nauki dopasowan (w bazie „Slovan” = tylko 1. NLB)."""
+    d = _hist([('2026-09-01', 'piłka ręczna', 'Slovenia | 1. NLB', 'Olimpija', 'Celje')])
+    pula = {'Olimpija', 'Olimpija Bratislava', 'Celje'}
     sporty._KANDYDAT.clear()
-    h = sporty.resolve('Slovan Lublana', pula, 'piłka ręczna')
-    assert h is None and 'Slovan Lublana' not in sporty._KANDYDAT
-    assert sporty.potwierdz_rywalem(d, 'piłka ręczna', ('Slovan Lublana', 'Celje'), (h, 'Celje')) == (None, 'Celje')
+    h = sporty.resolve('Olimpija Lublana', pula, 'piłka ręczna')
+    assert h is None and 'Olimpija Lublana' not in sporty._KANDYDAT
+    assert sporty.potwierdz_rywalem(d, 'piłka ręczna', ('Olimpija Lublana', 'Celje'), (h, 'Celje')) == (None, 'Celje')
 
 
 def test_aliasy_audyt_oferty_0110():
