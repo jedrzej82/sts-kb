@@ -10,7 +10,7 @@ Dwie metody, obie wymagaja JEDNOZNACZNOSCI:
             Rywal w zrodle = druga strona z oferty.
   GODZINA — mecz w terminarzu o tej samej godzinie (+-5 min), obie nazwy podobne, para jedna.
 Alias jest PEWNY, gdy: jeden cel dla nazwy, cel jest nazwa z puli bazy, znaczniki (kobiety/rezerwy/U21) rowne, nazwa
-z oferty nie jest krajem (reprezentacje ma sciezka --intl), oraz nazwy sa podobne albo dowody sa >= 2 (rozne dni/mecze).
+z oferty ani cel nie jest krajem (reprezentacje ma sciezka --intl), oraz nazwy sa podobne albo dowody sa >= 2 (rozne dni/mecze).
 Sporty osobowe (tenis, dart, snooker…) — tylko nazwy podobne. Alias skracajacy z kolizja rdzenia w puli -> przeglad. Sprzecznosci (resolver wskazal INNA druzyne niz dowod)
 NIE nadpisuja niczego — ida do raportu (konflikty) do recznej oceny.
 
@@ -186,7 +186,8 @@ def ucz(ev, z, rozwiaz, pule):
         cele = {cel for cel, _ in c}
         if len(cele) != 1: stat['odrzucone: kilka celow'] += 1; continue
         cel = cele.pop(); ile = sum(c.values()); pod = any(p for _, p in c)
-        if jest_krajem(n): stat['odrzucone: kraj'] += 1; continue
+        # kraj <-> klub w zadna strone: „Kuwejt” -> „Kuwait SC” i „Al-Kuwait SC” -> „Kuwait” (reprezentacja; nauka 01.10)
+        if jest_krajem(n) or jest_krajem(cel): stat['odrzucone: kraj'] += 1; continue
         if nazwy.znaczniki(n) != nazwy.znaczniki(cel): stat['odrzucone: znaczniki'] += 1; continue
         if not (pod or (ile >= 2 and S not in OSOBOWE)): stat['odrzucone: niepodobne, 1 dowod'] += 1; continue
         kol = kolizja(n, cel, pule.get(S, ()))

@@ -80,6 +80,11 @@ def test_kraj_nie_dostaje_klubu():
     z = _z([('pilka', '2026-09-27', None, 'Al-Arabi', 'Kuwait SC')])
     a, _, st = _ucz(ev, z, {'Al-Arabi SC': 'Al-Arabi'}, {'pilka': {'Al-Arabi', 'Kuwait SC'}})
     assert a.empty and st['odrzucone: kraj'] == 1
+    # i odwrotnie: klub „Al-Kuwait SC” (WASL) -> „Kuwait” (w bazie reprezentacja: Asia Cup, Asian Games)
+    ev = _ev([('koszykówka', '2026-09-27', '17:00', 'Al-Riyadi Beirut', 'Al-Kuwait SC')])
+    z = _z([('koszykówka', '2026-09-27', None, 'Al Riyadi', 'Kuwait')])
+    a, _, st = _ucz(ev, z, {'Al-Riyadi Beirut': 'Al Riyadi'}, {'koszykówka': {'Al Riyadi', 'Kuwait'}})
+    assert a.empty and st['odrzucone: kraj'] == 1
 
 
 def test_konflikt_nie_nadpisuje_tylko_raportuje():
