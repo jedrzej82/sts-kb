@@ -93,3 +93,18 @@ def test_k5_limit_8_zl_z_wczesniejszymi():
     o = dict(ev=0.1, polski=0, szacunki=0, marza_max=1.05, poziom='A', p=0.55, kurs=2.25)
     assert kupon.za_pieniadze(o, 'K5', _a(depozyt=2000.0, k5_dzis=5), 5, 1) == (3, None)
     assert kupon.za_pieniadze(o, 'K5', _a(depozyt=2000.0, k5_dzis=8), 5, 1)[0] == 0
+
+
+def test_najpewniejszy_mix():
+    """02.10.2026: najwyzsze laczne P przy kursie >= 1,50, rozne mecze, przy rownym P wiecej sportow; zawsze z EV."""
+    d = _d([dict(mecz='A-B', rynek='1', p=0.85, kurs=1.20, sport='hokej'),
+            dict(mecz='A-B', rynek='O1.5', p=0.90, kurs=1.10, sport='hokej'),        # ten sam mecz — nie razem
+            dict(mecz='C-D', rynek='O1.5', p=0.85, kurs=1.30, sport='pilka'),
+            dict(mecz='E-F', rynek='2', p=0.80, kurs=1.40, sport='koszykowka'),
+            dict(mecz='G-H', rynek='1', p=0.60, kurs=2.40, sport='pilka')])
+    o = kupon.najlepszy(d, 'MIX')
+    assert sorted(d.loc[o['nogi'], 'mecz']) == ['A-B', 'C-D'] and o['kurs'] >= 1.5   # 0,85*0,85 = 72,3% @ 1,56
+    assert d.loc[o['nogi'], 'rynek'].tolist().count('O1.5') == 1 and o['sporty'] == 2
+    linia = kupon.linia_mix(o, d)
+    assert linia.startswith('NAJPEWNIEJSZY MIX: ') and 'EV -' in linia and 'NIE zalecenie' in linia
+    assert kupon.linia_mix(None, d).startswith('NAJPEWNIEJSZY MIX: brak')
