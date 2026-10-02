@@ -159,3 +159,11 @@ def test_lvbet_sporty_i_rynek_trojdrogowy():
     assert kb.kod_rynku('Zwycięzca meczu', 'A', '', 'A', 'B', 'KOSZYKÓWKA') == 'Zwyciezca 1'
     assert kb.kod_rynku('Zwycięzca meczu', 'Remis', '', 'A', 'B', 'PIŁKA RĘCZNA', z_remisem=True) == 'X'
     assert kb.kod_rynku('Suma goli', 'Powyżej (55.5)', 55.5, 'A', 'B', 'PIŁKA RĘCZNA') == 'O55.5'
+
+
+def test_lvbet_reczna_zwyciezca_bez_remisu_bez_kodu():
+    """02.10 08:26 (plik z telefonu): LVBET reczna „Zwycięzca meczu” tylko 1 i 2 — kursy ~10% nizsze niz 1/2 STS
+    (inny rynek). Bez „Remis” w rynku = brak kodu; z „Remis” = 1/X/2."""
+    assert kb.kod_rynku('Zwycięzca meczu', 'A', '', 'A', 'B', 'PIŁKA RĘCZNA', z_remisem=False) == ''
+    assert kb.kod_rynku('Zwycięzca meczu', 'A', '', 'A', 'B', 'PIŁKA NOŻNA', z_remisem=True) == '1'
+    assert kb.kod_rynku('Mecz', '1', '', 'A', 'B', 'PIŁKA RĘCZNA') == '1'          # Superbet bez zmian

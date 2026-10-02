@@ -75,9 +75,11 @@ def _n(s):
     return re.sub(r'\s+', ' ', str(s)).strip().lower()
 
 
-def kod_rynku(rynek, wybor, linia, gosp, gosc, sport, z_remisem=False):
+def kod_rynku(rynek, wybor, linia, gosp, gosc, sport, z_remisem=None):
     """Rynek bukmachera -> kod jak w ako_log; '' gdy rynek spoza uzywanych (zostaje surowy).
-    z_remisem = rynek ma wybor „Remis” (trojdrogowy) — wtedy NIE jest to „Zwyciezca” z dogrywka."""
+    z_remisem = rynek ma wybor „Remis” (trojdrogowy) — wtedy NIE jest to „Zwyciezca” z dogrywka; False (LVBET: rynek
+    bez „Remis”) w pilce/recznej = dwudrogowy (02.10: reczna LVBET „Zwycięzca meczu” 1/2 bez X, kursy o ~10% nizsze
+    niz 1/2 STS) — bez kodu; None = nie wiadomo (Superbet)."""
     r, w = _n(rynek), _n(wybor)
     g, a = _n(gosp), _n(gosc)
     reg = r.endswith('(regulaminowy czas)')
@@ -87,6 +89,8 @@ def kod_rynku(rynek, wybor, linia, gosp, gosc, sport, z_remisem=False):
     # maja remis — tam „zwycięzca meczu” to 1/X/2 (nizej).
     if sport not in SPORTY_Z_REMISEM and r in ('zwycięzca meczu', 'zwycięzca') and not reg and not z_remisem:
         return {g: 'Zwyciezca 1', a: 'Zwyciezca 2', '1': 'Zwyciezca 1', '2': 'Zwyciezca 2'}.get(w, '')
+    if r == 'zwycięzca meczu' and sport in SPORTY_Z_REMISEM and z_remisem is False:
+        return ''
     if r in ('mecz', '1x2', 'wynik meczu', 'wynik meczu (1x2)', 'zwycięzca meczu (1x2)', 'zwycięzca meczu'):
         return {'1': '1', 'x': 'X', '2': '2', 'remis': 'X', g: '1', a: '2'}.get(w, '')
     if r == 'podwójna szansa':
