@@ -47,3 +47,8 @@ sporty_typy.csv
 ako_log.csv
 nogi.csv
 cache/
+# 02.10.2026 (Raport 15:00, usterka 11): faktyczne zaklady uzytkownika (P120) i pliki tworzone przez przebieg.py
+zaklady_faktyczne*.csv
+ligi_extra.csv
+ligi_extra_nazwy.json
+mma_metody.csv
