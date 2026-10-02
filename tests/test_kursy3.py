@@ -76,7 +76,9 @@ def test_graj_u_zawsze_jest():
     buk = _buk(('LVBET', P, '18:00', 'Walia', 'Norwegia', 'U3.5', '1.65'), ('LVBET', P, '20:45', 'Anglia', 'Łotwa', 'U3.5', '1.55'),
                ('SUPERBET', P, '18:00', 'Walia', 'Norwegia', 'U3.5', '1.90'))
     tab, _ = kursy3.tabela(sts, kursy3.wczytaj_bukmacherow_df(buk))
-    assert kursy3.gdzie_grac(*kursy3.kupon(tab, nogi)) == 'GRAJ U: LVBET @2.558 (STS 2.400 | SUPERBET brak nogi 2)'
+    assert kursy3.gdzie_grac(*kursy3.kupon(tab, nogi)) == ('GRAJ U: LVBET @2.558 (STS 2.400 | SUPERBET nie znaleziono nogi 2)'
+                                                     ' — POROWNANIE NIEPELNE, sprawdz w aplikacji: SUPERBET (lepszy o 15%'
+                                                     ' na nogach, ktore ma; noga 2 nieznaleziona w pliku)')
     # remis kursow -> STS
     buk = _buk(('LVBET', P, '18:00', 'Walia', 'Norwegia', 'U3.5', '1.60'), ('LVBET', P, '20:45', 'Anglia', 'Łotwa', 'U3.5', '1.50'))
     tab, _ = kursy3.tabela(sts, kursy3.wczytaj_bukmacherow_df(buk))
@@ -167,3 +169,26 @@ def test_lvbet_reczna_zwyciezca_bez_remisu_bez_kodu():
     assert kb.kod_rynku('Zwycięzca meczu', 'A', '', 'A', 'B', 'PIŁKA RĘCZNA', z_remisem=False) == ''
     assert kb.kod_rynku('Zwycięzca meczu', 'A', '', 'A', 'B', 'PIŁKA NOŻNA', z_remisem=True) == '1'
     assert kb.kod_rynku('Mecz', '1', '', 'A', 'B', 'PIŁKA RĘCZNA') == '1'          # Superbet bez zmian
+
+
+def test_raport_0210_1200_dr_kongo_i_porownanie_niepelne():
+    """Reprodukcja (Raport 02.10 12:00, uzupelnienie 3): K5 = DR Kongo - Uganda O1.5 (STS 1,44) + Deportivo - Porto X2
+    (STS 1,52). Superbet pisze „DR Konga” (15:00), LVBET „Demokratyczna Republika Konga” o 17:00 (zla godzina u LVBET)
+    i X2 po 1,60. Bylo: „GRAJ U: STS @2.189 (SUPERBET brak nogi 1 | LVBET brak nogi 1)” — wyglada jak odpowiedz,
+    a LVBET dawal 2,35. Oczekiwane: Superbet dopasowany (odmiana), LVBET bez nogi 1 = POROWNANIE NIEPELNE."""
+    sts = _sts((P, '15:00', 'DR Kongo', 'Uganda', 'O1.5', '1.44'), (P, '19:00', 'Deportivo A Coruna', 'FC Porto', 'X2', '1.52'))
+    buk = _buk(('SUPERBET', P, '15:00', 'DR Konga', 'Uganda', 'O1.5', '1.43'),
+               ('SUPERBET', P, '19:00', 'Deportivo de A Coruna', 'Porto', 'X2', '1.50'),
+               ('LVBET', P, '17:00', 'Demokratyczna Republika Konga', 'Uganda', 'O1.5', '1.47'),
+               ('LVBET', P, '19:00', 'Deportivo de A Coruna', 'Porto', 'X2', '1.60'))
+    tab, _ = kursy3.tabela(sts, kursy3.wczytaj_bukmacherow_df(buk))
+    linia = kursy3.gdzie_grac(*kursy3.kupon(tab, [('DR Kongo - Uganda', 'O1.5', '1.44', 'pilka'),
+                                                  ('Deportivo A Coruna - FC Porto', 'X2', '1.52', 'pilka')]))
+    assert linia.startswith('GRAJ U: STS @2.189 (SUPERBET 2.145 | LVBET nie znaleziono nogi 1)')
+    assert 'POROWNANIE NIEPELNE' in linia and 'LVBET (lepszy o 5%' in linia
+    # komplet u wszystkich -> bez ostrzezenia
+    pelne = [('A - B', 'U3.5', {'STS': 1.6, 'SUPERBET': 1.5, 'LVBET': 1.55})]
+    assert 'NIEPELNE' not in kursy3.gdzie_grac(pelne, {'STS': 1.6, 'SUPERBET': 1.5, 'LVBET': 1.55})
+    # bukmacher bez nogi, ale gorszy na pozostalych -> bez ostrzezenia
+    gorszy = [('A - B', 'U3.5', {'STS': 1.6, 'LVBET': 1.5}), ('C - D', 'O1.5', {'STS': 1.3})]
+    assert 'NIEPELNE' not in kursy3.gdzie_grac(gorszy, {'STS': 2.08})
