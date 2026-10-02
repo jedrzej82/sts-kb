@@ -9,8 +9,9 @@ Kontrola wiarygodnosci: kurs bukmachera rozny od STS o wiecej niz 35% = PODEJRZA
 
 Uzycie:
   python3 kursy3.py porownaj KURSY_STS.csv.gz KURSY_BUKMACHEROW.csv.gz [...]   — pokrycie i zgodnosc kursow
-  python3 kursy3.py kupon KURSY_STS.csv.gz KURSY_BUKMACHEROW.csv.gz --ako kb/ako_log.csv --data D [--tag K5]
-     — dla kazdej nogi kuponu kurs u STS / SUPERBET / LVBET i kurs laczny u kazdego bukmachera"""
+  python3 kursy3.py kupon KURSY_STS.csv.gz [KURSY_BUKMACHEROW.csv.gz ...] --ako ako_log.csv --data D [--godzina GG:MM] [--tag K5]
+     — dla KAZDEGO kuponu linia „GRAJ U: <bukmacher> @kurs” (do POWIADOMIENIA/Telegrama; bez pliku z telefonu = STS)
+       i kurs kazdej nogi u STS / SUPERBET / LVBET"""
 import glob
 import math
 import os
@@ -23,6 +24,7 @@ import nazwy
 
 TOLERANCJA_MIN = 5
 MAKS_ROZNICA = 0.35
+BUKMACHERZY = ('STS', 'SUPERBET', 'LVBET')
 
 
 def _zn(n):
@@ -111,24 +113,50 @@ def najlepszy(wiersz, bukmacherzy=('STS', 'SUPERBET', 'LVBET')):
 
 
 def kupon(tab, nogi):
-    """nogi: lista (zdarzenie „A - B”, rynek). Zwraca (wiersze nog, kursy laczne per bukmacher — tylko gdy kazda noga ma kurs)."""
+    """nogi: lista (zdarzenie „A - B”, rynek[, kurs STS z ako_log]). Zwraca (wiersze nog, kursy laczne per bukmacher —
+    tylko gdy KAZDA noga ma kurs u tego bukmachera). Kurs STS z ako_log uzupelnia brak w ofercie (kupon zawsze ma STS)."""
     out = []
-    for zd, ry in nogi:
-        g, a = [x.strip() for x in re.split(r'\s+-\s+', zd, maxsplit=1)]
-        x = tab[(tab.gospodarz == g) & (tab.gosc == a) & (tab.rynek == ry)]
-        out.append((zd, ry, x.iloc[0].to_dict() if len(x) else {}))
+    for n in nogi:
+        zd, ry = n[0], n[1]
+        g, a = ([x.strip() for x in re.split(r'\s+-\s+', zd, maxsplit=1)] + [''])[:2]
+        x = tab[(tab.gospodarz == g) & (tab.gosc == a) & (tab.rynek == ry)] if len(tab) else tab
+        w = x.iloc[0].to_dict() if len(x) else {}
+        if len(n) > 2 and pd.isna(w.get('STS', float('nan'))):
+            w['STS'] = pd.to_numeric(str(n[2]).replace(',', '.'), errors='coerce')
+        out.append((zd, ry, w))
     laczne = {}
-    for b in ('STS', 'SUPERBET', 'LVBET'):
+    for b in BUKMACHERZY:
         k = [w.get(b) for _, _, w in out]
         if k and all(v is not None and pd.notna(v) for v in k): laczne[b] = math.prod(k)
     return out, laczne
 
 
+def gdzie_grac(out, laczne):
+    """Linia „GRAJ U: …” do POWIADOMIENIA (Telegram) i AKO DNIA — ZAWSZE jest (02.10.2026, decyzja uzytkownika).
+    Najwyzszy kurs laczny u bukmachera, u ktorego jest KAZDA noga; remis -> kolejnosc STS, SUPERBET, LVBET.
+    Brak kursow innych bukmacherow -> STS z powodem."""
+    if not laczne:
+        return 'GRAJ U: STS (brak kursu lacznego u zadnego bukmachera — sprawdz kurs w aplikacji STS)'
+    b = max(BUKMACHERZY, key=lambda x: (laczne.get(x, 0), -BUKMACHERZY.index(x)))
+    inne = []
+    for x in BUKMACHERZY:
+        if x == b: continue
+        if x in laczne: inne.append(f'{x} {laczne[x]:.3f}')
+        else:
+            brak = [str(i + 1) for i, (_, _, w) in enumerate(out) if pd.isna(w.get(x, float('nan')))]
+            inne.append(f'{x} brak nogi {",".join(brak)}')
+    return f'GRAJ U: {b} @{laczne[b]:.3f} (' + ' | '.join(inne) + ')'
+
+
+def _arg(a, nazwa, dom=None):
+    return a[a.index(nazwa) + 1] if nazwa in a else dom
+
+
 def main(a):
     if not a or a[0] not in ('porownaj', 'kupon'): sys.exit(__doc__)
     sts = pd.read_csv(a[1], dtype=str, keep_default_na=False)
-    pliki = [p for x in a[2:] if not x.startswith('--') for p in sorted(glob.glob(x))]
-    pliki = [p for p in pliki if p not in (a[a.index('--ako') + 1] if '--ako' in a else '',)]
+    wartosci = {a[i + 1] for i, x in enumerate(a[:-1]) if x.startswith('--')}
+    pliki = [p for x in a[2:] if not x.startswith('--') and x not in wartosci for p in sorted(glob.glob(x))]
     tab, st = tabela(sts, wczytaj_bukmacherow(pliki))
     if a[0] == 'porownaj':
         for b, s in st.items(): print(f'{b}: mecze STS dopasowane {s["jednoznaczne"]}, brak {s["brak"]}, niejednoznaczne {s["kilka"]}')
@@ -138,17 +166,18 @@ def main(a):
                   f'podejrzane {int(tab[f"{b}_podejrzany"].sum())}')
         return
     from dzienniki import _czytaj
-    ako = _czytaj(a[a.index('--ako') + 1]); d = a[a.index('--data') + 1]
-    ako = ako[(ako.data == d) & (ako.noga_nr != 'RAZEM')]
-    if '--tag' in a: ako = ako[ako.tag == a[a.index('--tag') + 1]]
+    ako = _czytaj(_arg(a, '--ako'))
+    ako = ako[(ako.data == _arg(a, '--data')) & (ako.noga_nr != 'RAZEM')]
+    if '--godzina' in a: ako = ako[ako.godzina_uruchomienia == _arg(a, '--godzina')]
+    if '--tag' in a: ako = ako[ako.tag == _arg(a, '--tag')]
+    pob = sorted({f'{m.group(1)} {m.group(2)}:{m.group(3)}'
+                  for p in pliki for m in [re.search(r'(\d{4}-\d\d-\d\d)_(\d\d)-(\d\d)', p)] if m})
+    print('kursy SUPERBET/LVBET: ' + (f'pobrane {pob[-1]}' if pob else 'BRAK pliku z telefonu — wszystkie kupony u STS'))
     for (tag, nr), k in ako.groupby(['tag', 'nr_kuponu'], sort=False):
-        out, laczne = kupon(tab, list(zip(k.zdarzenie, k.rynek)))
-        print(f'{tag}#{nr}')
+        out, laczne = kupon(tab, list(zip(k.zdarzenie, k.rynek, k.kurs)))
+        print(f'{tag}#{nr} {gdzie_grac(out, laczne)}')
         for zd, ry, w in out:
-            print(f'  {zd} | {ry} | ' + ' | '.join(f'{b} {w.get(b, float("nan")):.2f}' for b in ('STS', 'SUPERBET', 'LVBET')))
-        if laczne:
-            b, k_ = max(laczne.items(), key=lambda x: x[1])
-            print('  KURS LACZNY: ' + ' | '.join(f'{x} {v:.3f}' for x, v in laczne.items()) + f'  -> najlepiej {b} {k_:.3f}')
+            print(f'  {zd} | {ry} | ' + ' | '.join(f'{b} {w.get(b, float("nan")):.2f}' for b in BUKMACHERZY))
 
 
 if __name__ == '__main__':
