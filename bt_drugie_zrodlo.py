@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Backtest bramki drugiego zrodla (Poprawka 48) — czy ona w ogole pomaga. Faza 4, 29.09.2026.
   python3 bt_drugie_zrodlo.py [START=2026-01-01] [KONIEC=dzis]
+  python3 bt_drugie_zrodlo.py --sporty [OD]   |   python3 bt_drugie_zrodlo.py --intl [OD=2024-01-01]
 
 Dla kazdego meczu z okresu testowego (walk-forward, model dopasowany na danych sprzed miesiaca):
   P_model — zespol DC+Elo+pi z wagami ensemble_wagi.json, korekta_rynkow_v5n.csv i −4 pp dla „ponizej” (jak typuj.py)
@@ -180,10 +181,52 @@ def sporty_wiersze(od='2026-01-01'):
     return d
 
 
+def intl_wiersze(df, od='2024-01-01'):
+    """To samo dla reprezentacji (typuj.intl): Elo z intl_elo, Poisson dopasowany na meczach 2010..od (bez przecieku),
+    P bez korekty rynkow (jak typuj.intl: tylko −4 pp dla „ponizej”), forma jak drugie_zrodlo() z calej tabeli intl."""
+    from typuj import intl_elo
+    df = df.dropna(subset=['home_score', 'away_score']).reset_index(drop=True)
+    _, pre = intl_elo(df)
+    x = np.array([(rh + adv - ra) / 100 for rh, ra, adv in pre])
+    def fit(msk, y, sgn):
+        X = np.c_[np.ones(msk.sum()), sgn * x[msk]]; b = np.zeros(2)
+        for _ in range(30):
+            lam = np.exp(X @ b); b += np.linalg.solve((X * lam[:, None]).T @ X, X.T @ (y[msk] - lam))
+        return b
+    msk = ((df.date >= '2010-01-01') & (df.date < od)).values
+    bh = fit(msk, df.home_score.values.astype(float), 1); ba = fit(msk, df.away_score.values.astype(float), -1)
+    hist, out = {}, []
+    for i, r in enumerate(df.itertuples()):
+        hs, as_ = int(r.home_score), int(r.away_score)
+        if r.date >= od:
+            fh, fa = hist.get(r.home_team, [])[-OKNO:], hist.get(r.away_team, [])[-OKNO:]
+            if min(len(fh), len(fa)) >= MIN_M:
+                mk = markets(float(np.exp(bh[0] + bh[1] * x[i])), float(np.exp(ba[0] - ba[1] * x[i])), -0.05)
+                pf, oc = p_forma(fh, fa), outcomes(hs, as_, np.nan, np.nan)
+                for k in RYNKI_P48:
+                    if k not in mk or oc.get(k) is None: continue
+                    pc = max(mk[k] - 0.04, 0.0) if k.startswith('U') and mk[k] >= 0.5 else mk[k]
+                    if pc >= 0.70: out.append((r.date, r.tournament, k, pc, pf[k], int(oc[k])))
+        hist.setdefault(r.home_team, []).append((hs, as_)); hist.setdefault(r.away_team, []).append((as_, hs))
+    d = pd.DataFrame(out, columns=['data', 'liga', 'rynek', 'p_model', 'p_forma', 'traf'])
+    d['brak_formy'] = False
+    d['zgodne'] = (d.p_model - d.p_forma).abs() <= PROG
+    d['p_min'] = np.where(d.zgodne, np.minimum(d.p_model, d.p_forma), np.nan)
+    return d
+
+
 DZ = OKNO
 
 if __name__ == '__main__':
     a = sys.argv[1:]
+    if '--intl' in a:
+        d = intl_wiersze(pd.read_sql('select * from intl order by date', sqlite3.connect(os.path.join(HERE, 'kb.sqlite'))),
+                         a[a.index('--intl') + 1] if len(a) > a.index('--intl') + 1 else '2024-01-01')
+        raport(d)
+        print('\nWg rynku (n, sr P, trafnosc, odsetek zgodnych):')
+        print(d.groupby('rynek').agg(n=('traf', 'size'), P=('p_model', 'mean'), traf=('traf', 'mean'),
+                                     zgodne=('zgodne', 'mean')).sort_values('n', ascending=False).round(3).to_string())
+        sys.exit(0)
     if '--sporty' in a:
         d = sporty_wiersze(a[a.index('--sporty') + 1] if len(a) > a.index('--sporty') + 1 else '2026-01-01')
         d.to_csv(os.path.join(HERE, 'bt_drugie_zrodlo_sporty.csv'), index=False)

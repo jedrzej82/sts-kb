@@ -141,6 +141,10 @@ SCAL_RECZNIE = {
     ('Serbia | Prva Liga', 'TSC Bačka Topola'): 'TSC',
     ('Spain | Primera Division RFEF', 'Real Zaragoza'): 'Zaragoza',
     ('Spain | Primera Division RFEF', 'SD Huesca'): 'Huesca',
+    # Raport 02.10 18:00: kluby z Primera RFEF 2025/26, ktore wrocily do SP2 — Sofascore pisze pelna nazwe,
+    # football-data krotka; bez sklejenia sezon 2025/26 wisial pod martwa nazwa ("CD Eldense NIESWIEZA").
+    ('Spain | Primera Division RFEF', 'CD Eldense'): 'Eldense',
+    ('Spain | Primera Division RFEF', 'Celta Vigo B'): 'Celta B',
     ('Switzerland | Challenge League', 'FC Winterthur'): 'Winterthur',
     ('Turkiye | 1. Lig', 'Corum FK'): 'Corum',
     # "Erzurumspor" w T1 2000-01 to dawny, INNY klub; BB Erzurumspor (2018-21) i Erzurumspor FK to jeden klub

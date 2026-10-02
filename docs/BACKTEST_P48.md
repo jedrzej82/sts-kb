@@ -73,3 +73,29 @@ Bez zmian (nie testowane): sezon.py (arkusz statystyk) i tenis — tam nadal mni
 - Regula „ponizej −4 pp” jest z grubsza trafna (U3.5 +1,2 pp, U4.5 +2,8 pp po jej zastosowaniu) — zostaje.
 - U2.5, BTTS i „2” przy P >= 70% sa mocno zawyzone (przy n ~ 60 blad standardowy ~6 pp, wiec to nie przypadek).
   Decyzja: `typuj.werdykt_nogi` — NIE NA KUPON na tych rynkach przy P >= 70% (tylko zaostrza).
+
+## Reprezentacje (typuj.py --intl) — `python3 bt_drugie_zrodlo.py --intl 2024-01-01` (02.10.2026)
+
+Powod: przebieg 02.10 18:00 — 23/23 meczow pilki (7 reprezentacji Ligi Narodow + kluby) z wszystkimi rynkami
+„ROZBIEZNE”, wartosci formy co 1/24. **To nie usterka**: 1/24 wynika z wzoru (forma z 10 meczow, (k+1)/12,
+srednia dwoch druzyn); rozbieznosci wynosily 26–37 pp (np. Francja – Wlochy 1X 91,4% vs 54,2%), wiec krok 4,2 pp
+przy progu 10 pp nie mial znaczenia. Kod sciezki bez zmian od Poprawki 58.
+
+Walk-forward: Elo jak `typuj.intl_elo`, Poisson dopasowany na 2010–2023, testowane mecze 01.2024–08.2026 (baza z 30.09),
+P bez korekty rynkow (jak typuj.intl, tylko −4 pp „ponizej”), nogi z P >= 70%.
+
+| P_model | n zgodne | trafnosc | n odrzucone | trafnosc | srednie P |
+|---|---|---|---|---|---|
+| 70–75% | 3 342 | 72,2% | 2 030 | 71,0% | 72,4% |
+| 75–80% | 1 248 | 79,2% | 1 186 | 75,3% | 77,4% |
+| 80–85% | 1 223 | 84,6% | 1 300 | 79,4% | 82,6% |
+| 85–90% | 956 | 89,2% | 1 576 | 86,9% | 86,8% |
+| 90–95% | 1 610 | 91,2% | 1 775 | 90,0% | 91,9% |
+| 95%+ | 234 | 96,6% | 1 094 | 95,9% | 97,1% |
+
+- 17 574 nogi; bramka odrzuca **51%** (w klubach 29%). Najmocniej rynki faworyta: 1X zgodne tylko w 14%, „1” w 2%,
+  „2” w 6%, gosp_O0.5 w 29% — forma nie zna sily rywali, a faworyt w Lidze Narodow gra z silnymi.
+- Odrzucone: srednie P 84,1%, trafnosc 82,4% (−1,7 pp); przepuszczone: 80,3% vs 81,1% (+0,8 pp). Przy tym samym
+  P zgodne trafiaja o 1–5 pp czesciej — w reprezentacjach bramka odsiewa troche lepiej niz w klubach.
+- Wniosek: zachowanie 18:00 jest zgodne z regula A9/P48/P58 (prawidlowe NIE NA KUPON). Bez zmian w kodzie.
+  Lagodniejsza bramka dla reprezentacji (np. forma wazona sila rywala) = zmiana wymogu uzytkownika — tylko jego decyzja.
