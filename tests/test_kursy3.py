@@ -96,3 +96,57 @@ def test_cli_kupon_kazdy_kupon_ma_linie(tmp_path, capsys):
     out = capsys.readouterr().out.splitlines()
     assert out[0].startswith('kursy SUPERBET/LVBET: BRAK pliku')
     assert [x.split(' GRAJ U: ')[0] for x in out if 'GRAJ U:' in x] == ['K5#1', 'AKOP-1200-1#1']
+
+
+# ---- 02.10.2026 (2): koszykowka / tenis / reczna, zapis rynkow w ako_log, pisownia nazw ----
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'termux'))
+import kursy_bukmacherow as kb  # noqa: E402
+
+
+def test_kody_rynkow_bukmacherow_dwudrogowe_i_z_remisem():
+    k = lambda r, w, sp, l='': kb.kod_rynku(r, w, l, 'A', 'B', sp)
+    assert k('Zwycięzca (z dogrywką)', '1', 'KOSZYKÓWKA') == 'Zwyciezca 1'
+    assert k('Zwycięzca', '2', 'TENIS') == 'Zwyciezca 2'
+    assert k('Zwycięzca meczu', 'B', 'KOSZYKÓWKA') == 'Zwyciezca 2'                  # LVBET bez dopisku = z dogrywka
+    assert k('Zwycięzca meczu (regulaminowy czas)', 'Remis', 'KOSZYKÓWKA') == 'X'     # czas regulaminowy = 1/X/2
+    assert k('Zwycięzca meczu', 'A', 'PIŁKA NOŻNA') == '1'                            # pilka: 1/X/2 jak dotad
+    assert k('Zwycięzca meczu', 'Remis', 'PIŁKA RĘCZNA') == 'X'
+    assert k('Liczba goli', 'poniżej 63.5', 'PIŁKA RĘCZNA', '63.5') == 'U63.5'
+    assert k('Liczba goli', 'powyżej 5.5', 'HOKEJ NA LODZIE', '5.5') == ''           # hokej O/U nadal bez kodu
+    assert k('Liczba punktów (z dogrywką)', 'powyżej', 'KOSZYKÓWKA', '157.5') == 'O157.5'
+    assert k('Liczba punktów', 'powyżej', 'KOSZYKÓWKA', '157.5') == ''               # bez „z dogrywką” — nie zgadujemy
+
+
+def test_kod_sts_i_porownanie_koszykowki():
+    sts = pd.DataFrame([dict(sport='KOSZYKÓWKA', data_meczu=D, godzina_meczu='20:00', gospodarz='Bayern Monachium',
+                             gosc='Partizan Belgrad', rynek=r, linia=l, kurs=k)
+                        for r, l, k in (('Zwycięzca meczu|1', '', '1.70'), ('Zwycięzca meczu|2', '', '2.10'), ('1', '', '1.80'),
+                                        ('Liczba punktów (z dogrywką)|-', '157.5', '1.90'))])
+    buk = _buk(('SUPERBET', 'KOSZYKÓWKA', '20:00', 'Bayern Munchen', 'Partizan Belgrad', 'Zwyciezca 1', '1.75'),
+               ('SUPERBET', 'KOSZYKÓWKA', '20:00', 'Bayern Munchen', 'Partizan Belgrad', 'U157.5', '1.85'))
+    tab, st = kursy3.tabela(sts, kursy3.wczytaj_bukmacherow_df(buk))
+    assert st['SUPERBET']['jednoznaczne'] == 1                                       # Monachium = Munchen
+    t = dict(zip(tab.rynek, tab.SUPERBET))
+    assert t['Zwyciezca 1'] == 1.75 and t['U157.5'] == 1.85 and pd.isna(t['1'])     # 1 (czas regulaminowy) != Zwyciezca
+    out, laczne = kursy3.kupon(tab, [('Bayern Monachium - Partizan Belgrad', '1', '1.70', 'koszykowka')])
+    assert out[0][1] == 'Zwyciezca 1' and laczne == {'STS': 1.70, 'SUPERBET': 1.75}
+
+
+def test_kod_ako_rozne_zapisy():
+    k = kursy3.kod_ako
+    assert k('Liczba goli ponizej 3.5', 'pilka') == 'U3.5' and k('poniżej 3,5 gola', 'piłka') == 'U3.5'
+    assert k('powyzej 1.5 gola', 'pilka') == 'O1.5' and k('Podwojna szansa 12', 'pilka') == '12'
+    assert k('Zwyciezca - Fenerbahce', 'koszykowka', 'Fenerbahce SK', 'BC Dubai') == 'Zwyciezca 1'
+    assert k('zwyciezca_1', 'tenis') == 'Zwyciezca 1' and k('1', 'koszykowka') == 'Zwyciezca 1'
+    assert k('1', 'hokej') == '1' and k('1 (60 min)', 'reczna') == '1' and k('1', '') == '1'
+    assert k('zwyciezca', 'koszykowka', 'A', 'B') == 'zwyciezca'                       # bez strony — bez kursu
+
+
+def test_pisownia_nazw():
+    sts = _sts((P, '19:00', 'Naestved BK', 'Nykoebing FC', '1', '2.0'), (P, '13:00', 'SC Poltava', 'FC Chernigiv', '1', '2.0'),
+               (P, '15:00', 'Al-Ain FC', 'Ajman SC', '1', '1.5'))
+    buk = _buk(('LVBET', P, '19:00', 'Naestved BK', 'Nykobing FC', '1', '2.1'), ('LVBET', P, '13:00', 'SC Poltava', 'FC Chernihiv', '1', '2.1'),
+               ('LVBET', P, '15:00', 'Al Ain Abu Dhabi', 'Ajman Club', '1', '1.5'))
+    _, st = kursy3.tabela(sts, kursy3.wczytaj_bukmacherow_df(buk))
+    assert st['LVBET'] == {'jednoznaczne': 3, 'brak': 0, 'kilka': 0}
+    assert kursy3._pisownia('Koelner') == 'kolner' and kursy3._pisownia('M.Gonzalez/A.Molteni') == 'm.gonzalez/a.molteni'

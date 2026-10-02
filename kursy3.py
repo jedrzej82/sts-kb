@@ -31,12 +31,69 @@ def _zn(n):
     return nazwy.znaczniki(re.sub(r'\((?:Wom|Women)\)', '(W)', str(n), flags=re.I))
 
 
+# 02.10.2026: pisownia tego samego miasta u roznych bukmacherow (STS „Pilzno”, Superbet „Plzen”; „Munchen” obok
+# „Monachium” -> Munich w nazwy.EGZONIMY). Tylko porownanie nazw u bukmacherow — rozliczen i typowania nie dotyczy.
+PISOWNIA = {'pilzno': 'plzen', 'pilsen': 'plzen', 'munchen': 'munich', 'muenchen': 'munich', 'chernigiv': 'chernihiv',
+            'kobenhavn': 'copenhagen', 'koebenhavn': 'copenhagen'}
+
+
+def _pisownia(slowo):
+    """ASCII, male litery; niemieckie/skandynawskie oe/ue/ae = o/u/a („Koelner” = „Kolner”, „Nykoebing” = „Nykobing”)."""
+    import dopasuj
+    def jedno(w):
+        w = PISOWNIA.get(w, w)
+        return re.sub(r'(?<=[a-z])(o|u|a)e', r'\1', w) if len(w) > 3 else w
+    # separatory („Al-Jazira”, „M.Gonzalez/A.Molteni”) zostaja — dziela nazwe na czlony
+    return ''.join(jedno(c) if c.isalnum() else c for c in re.split(r'([^a-z0-9]+)', dopasuj._ascii(slowo)))
+
+
 def _rdzen(n):
     """Nazwa bez znacznikow (U21, (W), II, Res. …) — znaczniki porownuje _zn, a wspolne „U21” to nie podobna nazwa
     (02.10: „Slowenia U21 - Holandia U21” bylo niejednoznaczne z „Austria U21 - Dania U21” o tej samej godzinie)."""
     t = [x for x in re.split(r'\s+', re.sub(r'\((?:Wom|Women)\)', '', str(n), flags=re.I))
          if not nazwy.ZNACZNIK.match(x.strip('[](){}<>.,;:'))]
-    return ' '.join(t) or str(n)
+    return ' '.join(_pisownia(x) or x for x in t) or str(n)
+
+
+def _kod_sts(sts_k):
+    """Rynki STS zapisane przez oferta.py jako „sekcja|wybor” -> kody bukmacherow: „Zwycięzca meczu|1” = Zwyciezca 1
+    (dwudrogowy, z dogrywka), „Liczba punktów (z dogrywką)|-” z linia 157.5 = U157.5."""
+    r = sts_k.rynek.astype(str)
+    lin = pd.to_numeric(sts_k.get('linia', pd.Series('', index=sts_k.index)), errors='coerce')
+    zw = r.str.extract(r'^Zwycięzca meczu\|([12])$')[0]
+    pk = r.str.extract(r'^Liczba punktów \(z dogrywką\)\|([+-])$')[0]
+    out = r.where(zw.isna(), 'Zwyciezca ' + zw.fillna(''))
+    ok = pk.notna() & lin.notna() & (lin % 1 != 0)
+    out = out.where(~ok, pk.map({'+': 'O', '-': 'U'}).fillna('') + lin.map(lambda v: f'{v:g}'))
+    return sts_k.assign(rynek=out)
+
+
+SPORTY_Z_REMISEM = ('pilka', 'piłka', 'pilka nozna', 'piłka nożna', 'hokej', 'hokej na lodzie', 'reczna', 'piłka ręczna',
+                    'pilka reczna', 'futsal')
+
+
+def kod_ako(rynek, sport='', gosp='', gosc=''):
+    """Rynek nogi z ako_log (zapisy bywaja rozne: „Liczba goli ponizej 3.5”, „poniżej 3,5 gola”, „Podwojna szansa 12”,
+    „Zwyciezca - Fenerbahce”, „1 (60 min)”) -> kod rynku bukmachera. W sportach bez remisu „1”/„2” = Zwyciezca
+    (dzienniki._zakres_rynku: caly mecz). Nierozpoznany zapis zostaje bez zmian (wtedy brak kursu, nie zgadujemy)."""
+    import dopasuj
+    s = re.sub(r'\s+', ' ', str(rynek)).strip()
+    t = dopasuj._ascii(s).replace(',', '.').replace('_', ' ').strip()
+    remis = str(sport).strip().lower() in SPORTY_Z_REMISEM
+    m = re.fullmatch(r'([12x])\s*\(?60\s*min\)?|([12x]) ?60min', t)
+    if m: return (m.group(1) or m.group(2)).upper()
+    if t in ('1', '2') and str(sport).strip() and not remis: return f'Zwyciezca {t}'
+    m = re.fullmatch(r'(?:podwojna szansa )?(1x|x2|12)', t)
+    if m: return m.group(1).upper()
+    m = re.fullmatch(r'(?:liczba goli )?(ponizej|powyzej) (\d+(?:\.\d+)?)(?: gol[ai]?)?', t)
+    if m: return ('U' if m.group(1) == 'ponizej' else 'O') + f'{float(m.group(2)):g}'
+    m = re.fullmatch(r'zwyciezca(?: meczu)?\s*[:\-]?\s*(.+)', t)
+    if m:
+        k = m.group(1).strip()
+        if k in ('1', '2'): return f'Zwyciezca {k}'
+        st = [i for i, n in ((1, gosp), (2, gosc)) if n and dopasuj.podobne(k, n)]
+        return f'Zwyciezca {st[0]}' if len(st) == 1 else s
+    return s
 
 
 def _podobne(a, b):
@@ -90,6 +147,7 @@ def dopasuj_mecze(sts, buk):
 def tabela(sts_k, buk_k):
     """Kurs STS i kazdego bukmachera dla tych samych (mecz, rynek). Kolumny: sport, data_meczu, gospodarz, gosc, rynek,
     STS, SUPERBET, LVBET (+ *_podejrzany)."""
+    sts_k = _kod_sts(sts_k)
     sts_k = sts_k[sts_k.rynek.astype(str).str.match(r'^(1|X|2|1X|X2|12|[OU]\d+\.5|BTTS_(tak|nie)|DNB_[12]|gosp_O0\.5|gość_O0\.5|Zwyciezca [12])$')].copy()
     sts_k['kurs'] = pd.to_numeric(sts_k.kurs, errors='coerce')
     baza = sts_k.dropna(subset=['kurs']).drop_duplicates(['sport', 'data_meczu', 'gospodarz', 'gosc', 'rynek'])[
@@ -113,12 +171,13 @@ def najlepszy(wiersz, bukmacherzy=('STS', 'SUPERBET', 'LVBET')):
 
 
 def kupon(tab, nogi):
-    """nogi: lista (zdarzenie „A - B”, rynek[, kurs STS z ako_log]). Zwraca (wiersze nog, kursy laczne per bukmacher —
+    """nogi: lista (zdarzenie „A - B”, rynek[, kurs STS z ako_log[, sport]]) — rynek przez kod_ako. Zwraca (wiersze nog, kursy laczne per bukmacher —
     tylko gdy KAZDA noga ma kurs u tego bukmachera). Kurs STS z ako_log uzupelnia brak w ofercie (kupon zawsze ma STS)."""
     out = []
     for n in nogi:
-        zd, ry = n[0], n[1]
+        zd = n[0]
         g, a = ([x.strip() for x in re.split(r'\s+-\s+', zd, maxsplit=1)] + [''])[:2]
+        ry = kod_ako(n[1], n[3] if len(n) > 3 else '', g, a)
         x = tab[(tab.gospodarz == g) & (tab.gosc == a) & (tab.rynek == ry)] if len(tab) else tab
         w = x.iloc[0].to_dict() if len(x) else {}
         if len(n) > 2 and pd.isna(w.get('STS', float('nan'))):
@@ -174,7 +233,7 @@ def main(a):
                   for p in pliki for m in [re.search(r'(\d{4}-\d\d-\d\d)_(\d\d)-(\d\d)', p)] if m})
     print('kursy SUPERBET/LVBET: ' + (f'pobrane {pob[-1]}' if pob else 'BRAK pliku z telefonu — wszystkie kupony u STS'))
     for (tag, nr), k in ako.groupby(['tag', 'nr_kuponu'], sort=False):
-        out, laczne = kupon(tab, list(zip(k.zdarzenie, k.rynek, k.kurs)))
+        out, laczne = kupon(tab, list(zip(k.zdarzenie, k.rynek, k.kurs, k.sport if 'sport' in k else [''] * len(k))))
         print(f'{tag}#{nr} {gdzie_grac(out, laczne)}')
         for zd, ry, w in out:
             print(f'  {zd} | {ry} | ' + ' | '.join(f'{b} {w.get(b, float("nan")):.2f}' for b in BUKMACHERZY))
