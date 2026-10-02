@@ -3,15 +3,16 @@ dostepu do stron bukmacherow). Tylko biblioteka standardowa Pythona (pip w Termu
 
 Zrodla (ustalone diagnozami 02.10, diagnoza_kursy1-4.txt w baza-wiedzy):
   Superbet: production-superbet-offer-pl.freetls.fastly.net/v2/pl-PL/events/by-date (lista, kursy glowne)
-            + /v2/pl-PL/events/{eventId} (wszystkie rynki meczu) — tylko pilka i hokej (gole, podwojna szansa, zwyciezca).
+            + /v2/pl-PL/events/{eventId} (wszystkie rynki meczu) — pilka, hokej, koszykowka, reczna.
   LVBET:    offer.lvbet.pl/client-api/v5/matches/?lang=pl (lista) + matches/{match_id}/markets/?lang=pl (rynki).
 
 Wynik: kursy_bukmacherow_RRRR-MM-DD_GG-MM.csv.gz (Pobrane) — kolumny:
   bukmacher, sport, data_meczu, godzina_meczu (czas polski), gospodarz, gosc, rynek_oryg, wybor_oryg, linia, rynek, kurs
   rynek = kod jak w ako_log (1, X, 2, 1X, X2, 12, O1.5, U3.5, BTTS_tak, BTTS_nie, DNB_1, DNB_2, Zwyciezca 1/2,
-          gosp_O0.5, gość_O0.5); pusty = rynek zapisany tylko surowo (rynek_oryg/wybor_oryg).
+          gosp_O0.5, gość_O0.5; koszykowka O/U z dogrywka); pusty = rynek zapisany tylko surowo (rynek_oryg/wybor_oryg).
 
-Uzycie:  python kursy_bukmacherow.py [--godzin 30] [--bez-lvbet] [--bez-superbet] [--katalog /sdcard/Download] [--wszystko]
+Uzycie:  python kursy_bukmacherow.py --diag-lvbet   (numery sportow LVBET)
+         python kursy_bukmacherow.py [--godzin 30] [--bez-lvbet] [--bez-superbet] [--katalog /sdcard/Download] [--wszystko]
          (--wszystko = takze rynki bez kodu; domyslnie tylko z kodem — plik ok. 30 razy mniejszy)"""
 import csv
 import datetime as dt
@@ -31,9 +32,10 @@ SB = 'https://production-superbet-offer-pl.freetls.fastly.net/v2/pl-PL'
 LV = 'https://offer.lvbet.pl/client-api/v5/'
 # Superbet sportId -> nazwa sportu jak w PDF STS
 SB_SPORT = {5: 'PIŁKA NOŻNA', 3: 'HOKEJ NA LODZIE', 4: 'KOSZYKÓWKA', 11: 'PIŁKA RĘCZNA', 1: 'SIATKÓWKA', 2: 'TENIS', 13: 'DART'}
-SB_DETAL = {5, 3}
+SB_DETAL = {5, 3, 4, 11}           # szczegoly: pilka, hokej, koszykowka, reczna
 # LVBET sports_groups_ids[0] -> sport (1 pilka, 2 hokej — z diagnozy; reszta dopisywana po sprawdzeniu)
 LV_SPORT = {1: 'PIŁKA NOŻNA', 2: 'HOKEJ NA LODZIE'}
+SPORTY_Z_REMISEM = ('PIŁKA NOŻNA', 'PIŁKA RĘCZNA')
 KOLUMNY = ['bukmacher', 'sport', 'data_meczu', 'godzina_meczu', 'gospodarz', 'gosc', 'rynek_oryg', 'wybor_oryg', 'linia',
            'rynek', 'kurs']
 
@@ -78,9 +80,11 @@ def kod_rynku(rynek, wybor, linia, gosp, gosc, sport):
     g, a = _n(gosp), _n(gosc)
     reg = r.endswith('(regulaminowy czas)')
     r = r.replace(' (regulaminowy czas)', '')
-    # LVBET: w hokeju „Zwycięzca meczu” bez dopisku = z dogrywka (dwudrogowy), „(regulaminowy czas)” = 1/X/2
-    if sport == 'HOKEJ NA LODZIE' and r == 'zwycięzca meczu' and not reg:
-        return {g: 'Zwyciezca 1', a: 'Zwyciezca 2'}.get(w, '')
+    # LVBET: w hokeju „Zwycięzca meczu” bez dopisku = z dogrywka (dwudrogowy), „(regulaminowy czas)” = 1/X/2.
+    # 02.10: tak samo koszykowka; Superbet „Zwycięzca” (tenis, siatkowka, dart) = dwudrogowy. Pilka nozna i reczna
+    # maja remis — tam „zwycięzca meczu” to 1/X/2 (nizej).
+    if sport not in SPORTY_Z_REMISEM and r in ('zwycięzca meczu', 'zwycięzca') and not reg:
+        return {g: 'Zwyciezca 1', a: 'Zwyciezca 2', '1': 'Zwyciezca 1', '2': 'Zwyciezca 2'}.get(w, '')
     if r in ('mecz', '1x2', 'wynik meczu', 'wynik meczu (1x2)', 'zwycięzca meczu (1x2)', 'zwycięzca meczu'):
         return {'1': '1', 'x': 'X', '2': '2', 'remis': 'X', g: '1', a: '2'}.get(w, '')
     if r == 'podwójna szansa':
@@ -93,15 +97,20 @@ def kod_rynku(rynek, wybor, linia, gosp, gosc, sport):
             return '1X' if t == g else ('X2' if t == a else '')
         if len(cz) == 2 and set(cz) == {g, a}: return '12'
         return ''
-    if sport == 'PIŁKA NOŻNA' and r in ('liczba goli', 'suma goli', 'gole', 'liczba bramek') and linia not in (None, ''):
+    if sport in SPORTY_Z_REMISEM and r in ('liczba goli', 'suma goli', 'gole', 'liczba bramek') and linia not in (None, ''):
         if w.startswith('powyżej'): return f'O{float(linia):g}' if float(linia) % 1 else ''
         if w.startswith('poniżej'): return f'U{float(linia):g}' if float(linia) % 1 else ''
     if r in ('obie drużyny strzelą', 'obie drużyny strzelą gola', 'obie strzelą'):
         return {'tak': 'BTTS_tak', 'nie': 'BTTS_nie'}.get(w, '')
     if r in ('zakład bez remisu', 'remis - brak zakładu', 'remis bez zakładu'):
         return {g: 'DNB_1', a: 'DNB_2', '1': 'DNB_1', '2': 'DNB_2'}.get(w, '')
-    if sport == 'HOKEJ NA LODZIE' and r.startswith('zwycięzca') and ('dogryw' in r or 'karn' in r):
+    if sport not in SPORTY_Z_REMISEM and r.startswith('zwycięzca') and ('dogryw' in r or 'karn' in r):
         return {g: 'Zwyciezca 1', a: 'Zwyciezca 2', '1': 'Zwyciezca 1', '2': 'Zwyciezca 2'}.get(w, '')
+    # koszykowka: suma punktow z dogrywka (jak STS „Liczba punktów (z dogrywką)”)
+    if (sport == 'KOSZYKÓWKA' and re.match(r'^(liczba|suma) punktów', r) and 'dogryw' in r
+            and linia not in (None, '') and float(linia) % 1):
+        if w.startswith(('powyżej', 'więcej', '+')): return f'O{float(linia):g}'
+        if w.startswith(('poniżej', 'mniej', '-')): return f'U{float(linia):g}'
     m = re.match(r'^(.*) - (liczba goli|suma goli)$', r)
     if sport == 'PIŁKA NOŻNA' and m and linia not in (None, '') and float(linia) == 0.5 and w.startswith('powyżej'):
         if m.group(1) == g: return 'gosp_O0.5'
@@ -164,7 +173,25 @@ def lvbet(od, do, wiersze):
     print(f'LVBET: {len(lista)} meczow w ofercie, rynki pobrane dla {n}')
 
 
+def diag_lvbet():
+    """Numery sportow LVBET (sports_groups_ids[0]): liczba meczow, przyklady par i nazwy rynkow pierwszego meczu."""
+    hl = dict(H, Origin='https://lvbet.pl', Referer='https://lvbet.pl/')
+    grupy = {}
+    for m in get(f'{LV}matches/?lang=pl', hl):
+        grupy.setdefault((m.get('sports_groups_ids') or [None])[0], []).append(m)
+    for sg, ms in sorted(grupy.items(), key=lambda x: -len(x[1])):
+        pary = [f"{(m.get('home') or ['?'])[0]} - {(m.get('away') or ['?'])[0]}" for m in ms[:3]]
+        print(f'{sg}: {len(ms)} | ' + ' | '.join(pary))
+        if sg not in LV_SPORT and len(ms) >= 5:
+            try:
+                nz = sorted({r.get('name', '') for r in get(f'{LV}matches/{ms[0]["match_id"]}/markets/?lang=pl', hl)})
+                print('    rynki: ' + ' ; '.join(nz[:15]))
+            except Exception as x:
+                print(f'    rynki: blad {x}')
+
+
 def main(a):
+    if '--diag-lvbet' in a: return diag_lvbet()
     godzin = float(a[a.index('--godzin') + 1]) if '--godzin' in a else 30
     kat = a[a.index('--katalog') + 1] if '--katalog' in a else '/sdcard/Download'
     od = dt.datetime.now(dt.timezone.utc).replace(microsecond=0, tzinfo=None); do = od + dt.timedelta(hours=godzin)
