@@ -32,8 +32,9 @@ def _zn(n):
 
 
 # 02.10.2026: pisownia tego samego miasta u roznych bukmacherow (STS „Pilzno”, Superbet „Plzen”; „Munchen” obok
-# „Monachium” -> Munich w nazwy.EGZONIMY). Tylko porownanie nazw u bukmacherow — rozliczen i typowania nie dotyczy.
-PISOWNIA = {'pilzno': 'plzen', 'pilsen': 'plzen', 'munchen': 'munich', 'muenchen': 'munich', 'chernigiv': 'chernihiv',
+# „Monachium” -> Munich w nazwy.EGZONIMY). „Konga”: Superbet/LVBET odmieniaja („DR Konga”, „Demokratyczna Republika
+# Konga”), STS pisze „DR Kongo” (Raport 02.10 12:00). Tylko porownanie nazw u bukmacherow — rozliczen i typowania nie dotyczy.
+PISOWNIA = {'konga': 'kongo', 'pilzno': 'plzen', 'pilsen': 'plzen', 'munchen': 'munich', 'muenchen': 'munich', 'chernigiv': 'chernihiv',
             'kobenhavn': 'copenhagen', 'koebenhavn': 'copenhagen'}
 
 
@@ -193,18 +194,29 @@ def kupon(tab, nogi):
 def gdzie_grac(out, laczne):
     """Linia „GRAJ U: …” do POWIADOMIENIA (Telegram) i AKO DNIA — ZAWSZE jest (02.10.2026, decyzja uzytkownika).
     Najwyzszy kurs laczny u bukmachera, u ktorego jest KAZDA noga; remis -> kolejnosc STS, SUPERBET, LVBET.
-    Brak kursow innych bukmacherow -> STS z powodem."""
+    Brak kursow innych bukmacherow -> STS z powodem.
+    02.10.2026 (Raport 12:00, K5): noga nieznaleziona w pliku z telefonu to NIE dowod, ze bukmacher jej nie ma
+    (LVBET mial „DR Kongo - Uganda” pod inna nazwa i godzina 17:00 zamiast 15:00 i dawal 2,35 przy STS 2,19).
+    Gdy bukmacher bez kompletu jest lepszy na nogach, ktore ma — linia mowi wprost: porownanie NIEPELNE, sprawdz."""
     if not laczne:
         return 'GRAJ U: STS (brak kursu lacznego u zadnego bukmachera — sprawdz kurs w aplikacji STS)'
     b = max(BUKMACHERZY, key=lambda x: (laczne.get(x, 0), -BUKMACHERZY.index(x)))
-    inne = []
+    inne, sprawdz = [], []
     for x in BUKMACHERZY:
         if x == b: continue
-        if x in laczne: inne.append(f'{x} {laczne[x]:.3f}')
-        else:
-            brak = [str(i + 1) for i, (_, _, w) in enumerate(out) if pd.isna(w.get(x, float('nan')))]
-            inne.append(f'{x} brak nogi {",".join(brak)}')
-    return f'GRAJ U: {b} @{laczne[b]:.3f} (' + ' | '.join(inne) + ')'
+        if x in laczne: inne.append(f'{x} {laczne[x]:.3f}'); continue
+        brak = [str(i + 1) for i, (_, _, w) in enumerate(out) if pd.isna(w.get(x, float('nan')))]
+        inne.append(f'{x} nie znaleziono nogi {",".join(brak)}')
+        # na nogach, ktore ma: iloraz kursow wzgledem wybranego bukmachera
+        wsp = [(w.get(x), w.get(b)) for _, _, w in out
+               if pd.notna(w.get(x, float('nan'))) and pd.notna(w.get(b, float('nan')))]
+        if wsp and math.prod(k / kb for k, kb in wsp) > 1.001:
+            sprawdz.append(f'{x} (lepszy o {100 * (math.prod(k / kb for k, kb in wsp) - 1):.0f}% na nogach, ktore ma; '
+                           f'noga {",".join(brak)} nieznaleziona w pliku)')
+    linia = f'GRAJ U: {b} @{laczne[b]:.3f} (' + ' | '.join(inne) + ')'
+    if sprawdz:
+        linia += ' — POROWNANIE NIEPELNE, sprawdz w aplikacji: ' + '; '.join(sprawdz)
+    return linia
 
 
 def _arg(a, nazwa, dom=None):
