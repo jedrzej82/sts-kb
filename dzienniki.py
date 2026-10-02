@@ -7,6 +7,7 @@ i szukania wynikow noga po nodze, ktore nie miescilo sie w czasie przebiegu (zal
       Tworzy kb/typy_log.csv, kb/sporty_typy.csv, kb/ako_log.csv — pelne dzienniki bez duplikatow
       (przy powtorzonym wierszu wygrywa ten z wypelnionym wynikiem, potem pozniejszy plik).
   python3 dzienniki.py rozlicz RRRR-MM-DD [--ako kb/ako_log.csv | KATALOG_Z_DELTAMI] [--wyjscie Rozliczenie_RRRR-MM-DD.csv]
+                                     [--zaklady zaklady_faktyczne.csv]   (02.10: faktyczne zaklady STS/LVBET/Superbet)
       Rozlicza kupony z ako_log uruchomione tego dnia: wynik kazdej nogi z kb.sqlite (kluby, reprezentacje),
       zewn/wyniki_* (365scores, Flashscore, Liga Pro), sporty_hist.csv i tenis_hist.csv. Zapisuje plik
       „Rozliczenie” (kolumny KROKU 5.3 + wiersze RAZEM_*) i wypisuje wiersz Bilansu dnia.
@@ -518,8 +519,79 @@ def kupon_pieniezny(r0):
     return stawka, bool(stawka > 0 and not any(x in status for x in ('PAPIER', 'ODWOL', 'NIE GRAC')))
 
 
-def rozlicz_dzien(data, ako, W):
-    """Wiersze pliku Rozliczenie dla kuponow uruchomionych w dniu `data` + podsumowanie Bilansu."""
+# 02.10.2026: FAKTYCZNE zaklady (STS, LVBET, Superbet) — plik zaklady_faktyczne.csv w baza-wiedzy (dane, NIE repo).
+# Jeden wiersz na noge + wiersz RAZEM (jak ako_log). Gdy dla dnia sa wpisy, Bilans liczy pieniadze WYLACZNIE z nich,
+# a kupony z ako_log ze stawka sa tylko zaleceniem systemu. Status bukmachera (WYGRANY/PRZEGRANY/ZWROT) rozstrzyga
+# wyplate; niezgodnosc z rozliczeniem kodu = kod ROZLICZENIE_NIEZGODNE_Z_BUKMACHEREM (sygnal bledu rozliczen).
+KOLUMNY_ZAKLADOW = ['data', 'godzina', 'bukmacher', 'nr_zakladu', 'noga_nr', 'sport', 'zdarzenie', 'rynek', 'kurs',
+                    'stawka', 'wyplata', 'status_bukmachera', 'tag_systemu', 'uwaga']
+BUKMACHERZY = ('STS', 'LVBET', 'SUPERBET')
+
+
+def rozlicz_zaklady(data, zaklady, W, ako=None):
+    """Faktyczne zaklady dnia `data` -> (wiersze Rozliczenia, dict postawione/wyplacone/liczba/trafione)."""
+    z = zaklady[zaklady.data == data]
+    wiersze, bil = [], dict(postawione=0.0, wyplacone=0.0, liczba=0, trafione=0, nierozliczone=[])
+    sport_z_ako = {} if ako is None else {str(r['zdarzenie']).strip(): r['sport'] for _, r in ako.iterrows() if r.get('sport')}
+    for (buk, nr), k in z.groupby(['bukmacher', 'nr_zakladu'], sort=False):
+        nogi, razem = k[k.noga_nr.astype(str) != 'RAZEM'], k[k.noga_nr.astype(str) == 'RAZEM']
+        r0 = razem.iloc[0] if len(razem) else pd.Series(dtype=str)
+        tag = f'FAKT_{str(buk).upper()}_{nr}'
+        stany = []
+        for _, r in nogi.iterrows():
+            r = r.copy()
+            if not str(r.get('sport', '')).strip(): r['sport'] = sport_z_ako.get(str(r['zdarzenie']).strip(), '')
+            stan, wyn, uw = rozlicz_noge(r, W)
+            wiersze.append(dict(tag=tag, zdarzenie=r.zdarzenie, rynek=r.rynek, P='', kurs_typu=r.get('kurs', ''),
+                                kurs_zamkniecia='', CLV='', wynik=wyn, TRAFIONY_PRZEGRANY=stan,
+                                kategoria=kod_anomalii(stan, uw), uwaga=uw))
+            stany.append(stan)
+        stawka = _liczba(r0.get('stawka', '')) or 0.0
+        kurs = _liczba(r0.get('kurs', ''))
+        if not kurs:
+            kn = [_liczba(v) for v in nogi.get('kurs', pd.Series(dtype=str))]
+            kurs = float(math.prod(kn)) if kn and all(kn) else None
+        kod = 'PRZEGRANY' if 'PRZEGRANY' in stany else ('NIEROZLICZONY' if 'BRAK WYNIKU' in stany or not stany else 'TRAFIONY')
+        sb = str(r0.get('status_bukmachera', '')).strip().upper()
+        sb = {'WYGRANA': 'WYGRANY', 'PRZEGRANA': 'PRZEGRANY'}.get(sb, sb)
+        kat = ''
+        if sb in ('WYGRANY', 'PRZEGRANY', 'ZWROT'):
+            if kod != 'NIEROZLICZONY' and (kod == 'TRAFIONY') != (sb == 'WYGRANY') and sb != 'ZWROT':
+                kat = 'ROZLICZENIE_NIEZGODNE_Z_BUKMACHEREM'
+            wynik = {'WYGRANY': 'TRAFIONY', 'PRZEGRANY': 'PRZEGRANY', 'ZWROT': 'ZWROT'}[sb]
+        else:
+            wynik = kod
+        wypl = _liczba(r0.get('wyplata', ''))
+        if wypl is None:
+            wypl = round(stawka * kurs * TAX, 2) if wynik == 'TRAFIONY' and kurs else (stawka if wynik == 'ZWROT' else 0.0)
+        if wynik == 'NIEROZLICZONY':
+            wypl = 0.0; bil['nierozliczone'].append(tag)
+        else:
+            bil['postawione'] += stawka; bil['wyplacone'] += wypl; bil['liczba'] += 1; bil['trafione'] += int(wynik == 'TRAFIONY')
+        wiersze.append(dict(tag=f'RAZEM_{tag}', zdarzenie=f'{len(stany)} nogi ({buk}, {r0.get("godzina", "")})', rynek='',
+                            P='', kurs_typu=f'{kurs:.3f}' if kurs else '', kurs_zamkniecia='', CLV='', wynik='',
+                            TRAFIONY_PRZEGRANY=f'{wynik} {stany.count("TRAFIONY")}/{len(stany)}' if wynik != 'ZWROT' else 'ZWROT',
+                            kategoria=kat,
+                            uwaga=f'FAKTYCZNY {buk}; stawka {stawka:.2f} zl; kurs {kurs or 0:.3f}; wyplata {wypl:.2f} zl; '
+                                  f'zysk/strata {wypl - stawka:+.2f} zl'
+                                  + (f'; status bukmachera {sb}' if sb else '')
+                                  + (f'; zalecenie systemu {r0.get("tag_systemu")}' if str(r0.get('tag_systemu', '')).strip() else '')))
+    return wiersze, bil
+
+
+def czytaj_zaklady(plik):
+    """zaklady_faktyczne.csv -> DataFrame (wszystko tekst) albo None, gdy pliku nie ma."""
+    if not plik or not os.path.exists(plik): return None
+    z = pd.read_csv(plik, dtype=str, keep_default_na=False)
+    for c in KOLUMNY_ZAKLADOW:
+        if c not in z: z[c] = ''
+    return z
+
+
+def rozlicz_dzien(data, ako, W, zaklady=None):
+    """Wiersze pliku Rozliczenie dla kuponow uruchomionych w dniu `data` + podsumowanie Bilansu.
+    zaklady: faktyczne zaklady (czytaj_zaklady) — gdy sa wpisy z tego dnia, pieniadze Bilansu licza sie z nich."""
+    fakt = zaklady is not None and (zaklady.data == data).any()
     a = ako[ako.data == data]
     wiersze, bil = [], dict(postawione=0.0, wyplacone=0.0, pap_liczba=0, pap_traf=0, pap_nierozl=0, pap_P=[],
                             pap_wirt=0.0, pien=0, pien_traf=0, nierozliczone=[])
@@ -544,12 +616,14 @@ def rozlicz_dzien(data, ako, W):
             kn = [_liczba(v) for v in nogi.get('kurs', pd.Series(dtype=str))]
             kurs = float(math.prod(kn)) if kn and all(kn) else None
         stawka, pien = kupon_pieniezny(r0)
+        zalecony = fakt and pien
+        if zalecony: pien = False   # 02.10: sa faktyczne zaklady dnia — kupon systemu to tylko zalecenie
         status = str(r0.get('status', '')).upper()
         n, traf = len(stany), stany.count('TRAFIONY')
         if 'PRZEGRANY' in stany: wynik = f'PRZEGRANY {traf}/{n}'
         elif 'BRAK WYNIKU' in stany: wynik = f'NIEROZLICZONY ({stany.count("BRAK WYNIKU")} bez wyniku)'
         else: wynik = f'TRAFIONY {traf}/{n}'
-        if not pien and stawka == 0 and re.search(r'ZAGRAN|DO GRY', status) and not re.search(r'NIE\s*(ZAGRAN|DO GRY)', status):
+        if not pien and not zalecony and stawka == 0 and re.search(r'ZAGRAN|DO GRY', status) and not re.search(r'NIE\s*(ZAGRAN|DO GRY)', status):
             wynik = 'NIEROZLICZONY (status gry bez stawki)'   # nie wolno go po cichu uznac za papierowy
         if kurs is None:
             if wynik.startswith('TRAFIONY'): wynik = 'NIEROZLICZONY (brak kursu)'
@@ -560,6 +634,10 @@ def rozlicz_dzien(data, ako, W):
             if not wynik.startswith('NIEROZL'):
                 bil['postawione'] += stawka; bil['wyplacone'] += wypl; bil['pien'] += 1; bil['pien_traf'] += int(wygral)
             uw = f'stawka {stawka:.2f} zl; kurs laczny {kurs:.3f}; wyplata {wypl:.2f} zl; zysk/strata {wypl - stawka:+.2f} zl'
+        elif zalecony:
+            uw = (f'zalecenie systemu (stawka {stawka:.2f} zl, kurs {kurs:.3f}) — pieniadze dnia z faktycznych zakladow; '
+                  f'wirtualnie: {(stawka * kurs * TAX - stawka) if wygral else -stawka:+.2f} zl' if not wynik.startswith('NIEROZL')
+                  else f'zalecenie systemu (stawka {stawka:.2f} zl) — pieniadze dnia z faktycznych zakladow')
         elif wynik == 'NIEROZLICZONY (status gry bez stawki)':
             uw = 'status ZAGRANY / DO GRY, ale stawki nie odczytano — uzupelnij „stawka N zl” w RAZEM (poza Bilansem i papierowymi)'
             _OSTRZEZENIA.append(f'{tag}#{nr}: {uw}')
@@ -574,6 +652,11 @@ def rozlicz_dzien(data, ako, W):
         if wynik.startswith('NIEROZL'): bil['nierozliczone'].append(f'{tag}#{nr}')
         wiersze.append(dict(tag=f'RAZEM_{tag}_{nr}', zdarzenie=f'{n} nogi ({godz})', rynek='', P=r0.get('P', ''), kurs_typu=f'{kurs:.3f}',
                             kurs_zamkniecia='', CLV='', wynik='', TRAFIONY_PRZEGRANY=wynik, kategoria='', uwaga=uw))
+    if fakt:
+        wf, bf = rozlicz_zaklady(data, zaklady, W, ako)
+        wiersze.extend(wf)
+        bil['postawione'] += bf['postawione']; bil['wyplacone'] += bf['wyplacone']
+        bil['pien'] += bf['liczba']; bil['pien_traf'] += bf['trafione']; bil['nierozliczone'] += bf['nierozliczone']
     wynik_dnia = bil['wyplacone'] - bil['postawione']
     wiersze.append(dict(tag='RAZEM_DZIEN', zdarzenie='', rynek='', P='', kurs_typu='', kurs_zamkniecia='', CLV='', wynik='',
                         TRAFIONY_PRZEGRANY=f'postawione {bil["postawione"]:.2f} zl; wyplacone {bil["wyplacone"]:.2f} zl; '
@@ -600,7 +683,14 @@ def main(a):
     if not os.path.exists(ako_p): sys.exit(f'brak {ako_p} — najpierw: python3 dzienniki.py scal KATALOG_Z_DELTAMI')
     ako = _czytaj(ako_p)
     W = dict(pilka=wyniki_pilka(), inne=wyniki_inne(), tenis=wyniki_tenis())
-    roz, bil = rozlicz_dzien(data, ako, W)
+    zp = a[a.index('--zaklady') + 1] if '--zaklady' in a else os.path.join(HERE, 'zaklady_faktyczne.csv')
+    zaklady = czytaj_zaklady(zp)
+    if zaklady is not None and (zaklady.data == data).any():
+        print(f'FAKTYCZNE ZAKLADY {data}: {zaklady[(zaklady.data == data) & (zaklady.noga_nr == "RAZEM")].shape[0]} '
+              f'z {os.path.basename(zp)} — Bilans pieniedzy z nich (kupony systemu = zalecenia)')
+    else:
+        print(f'FAKTYCZNE ZAKLADY {data}: brak wpisow ({os.path.basename(zp)}) — Bilans z kuponow ako_log jak dotad')
+    roz, bil = rozlicz_dzien(data, ako, W, zaklady)
     roz.to_csv(wyj, index=False)
     nogi = roz[~roz.tag.str.startswith('RAZEM_')]
     print(f'ROZLICZENIE {data}: {len(nogi)} nog | ' + ', '.join(f'{k} {v}' for k, v in nogi.TRAFIONY_PRZEGRANY.value_counts().items()))
@@ -611,6 +701,9 @@ def main(a):
         warstwa = {k: w for k, w, _ in ANOMALIE}
         print('SETTLEMENT_ANOMALY: ' + ', '.join(f'{k} {v} ({warstwa.get(k, "do sprawdzenia")})' for k, v in an.items()))
     print(roz[roz.tag.str.startswith('RAZEM_')][['tag', 'TRAFIONY_PRZEGRANY', 'uwaga']].to_string(index=False))
+    for r in roz[roz.kategoria == 'ROZLICZENIE_NIEZGODNE_Z_BUKMACHEREM'].itertuples():
+        print(f'  UWAGA ROZLICZENIE_NIEZGODNE_Z_BUKMACHEREM: {r.tag} — {r.TRAFIONY_PRZEGRANY} wg bukmachera, '
+              f'a nogi wg kodu inaczej; sprawdz nogi tego zakladu (blad rozliczen do reprodukcji)')
     sr = sum(bil['pap_P']) / len(bil['pap_P']) if bil['pap_P'] else float('nan')
     print(f'\nBILANS {data}: postawione_zl {bil["postawione"]:.2f} | wyplacone_zl {bil["wyplacone"]:.2f} | '
           f'wynik_dnia_zl {bil["wyplacone"] - bil["postawione"]:+.2f} | kupony pieniezne {bil["pien_traf"]}/{bil["pien"]} | '
