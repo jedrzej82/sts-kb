@@ -41,7 +41,7 @@ Użytkownik liczy w czasie polskim (UTC+2 latem): 10:00 UTC = 12:00 PL. Przebieg
 - Typowanie: `typuj.py` (piłka), `sporty.py` (inne sporty, linia WERDYKT), `tenis.py`, `sezon.py` (arkusze).
 - Kupony: `kupon.py`; rozliczenia i dzienniki: `dzienniki.py` (Settlement v2: kolumna `kategoria` = kod SETTLEMENT_ANOMALY
   z warstwa bledu, tabela `ANOMALIE`; stan/wynik/uwaga bez zmian; `--zaklady zaklady_faktyczne.csv` = FAKTYCZNE zaklady
-  STS/LVBET/Superbet — gdy sa wpisy dnia, pieniadze Bilansu tylko z nich, kupony systemu = zalecenia; plik tylko na Dysku); CLV: `clv.py`; porownanie kursow STS/SUPERBET/LVBET: `kursy3.py` (dane z telefonu: `termux/kursy_bukmacherow.py` -> `kursy_bukmacherow_*.csv.gz` na Dysku; mecz tylko jednoznaczny, roznica >35% = podejrzany); kursy z PDF oferty i kurs_zamkniecia: `oferta.py`.
+  STS/LVBET/Superbet — gdy sa wpisy dnia, pieniadze Bilansu tylko z nich, kupony systemu = zalecenia; plik tylko na Dysku); CLV: `clv.py`; porownanie kursow STS/SUPERBET/LVBET i linia „GRAJ U:” kazdego kuponu (Telegram): `kursy3.py kupon` (dane z telefonu: `termux/kursy_bukmacherow.py` -> `kursy_bukmacherow_*.csv.gz` na Dysku; mecz tylko jednoznaczny, roznica >35% = podejrzany); kursy z PDF oferty i kurs_zamkniecia: `oferta.py`.
 - Nazwy: `nazwy.py` (wspólne znaczniki), `aliasy.csv` (aliasy jako dane; działają tylko, gdy cel jest w puli),
   `dopasuj.py` (nauka aliasów STS -> baza z dowodów w źródłach: kotwica = jedyny mecz rozpoznanej drużyny w dniu meczu,
   godzina = ten sam mecz w terminarzu ±5 min; sprzeczności z resolverem tylko do raportu, nic nie nadpisują).
