@@ -11,7 +11,8 @@ Wynik: kursy_bukmacherow_RRRR-MM-DD_GG-MM.csv.gz (Pobrane) — kolumny:
   rynek = kod jak w ako_log (1, X, 2, 1X, X2, 12, O1.5, U3.5, BTTS_tak, BTTS_nie, DNB_1, DNB_2, Zwyciezca 1/2,
           gosp_O0.5, gość_O0.5); pusty = rynek zapisany tylko surowo (rynek_oryg/wybor_oryg).
 
-Uzycie:  python kursy_bukmacherow.py [--godzin 30] [--bez-lvbet] [--bez-superbet] [--katalog /sdcard/Download]"""
+Uzycie:  python kursy_bukmacherow.py [--godzin 30] [--bez-lvbet] [--bez-superbet] [--katalog /sdcard/Download] [--wszystko]
+         (--wszystko = takze rynki bez kodu; domyslnie tylko z kodem — plik ok. 30 razy mniejszy)"""
 import csv
 import datetime as dt
 import gzip
@@ -75,12 +76,24 @@ def kod_rynku(rynek, wybor, linia, gosp, gosc, sport):
     """Rynek bukmachera -> kod jak w ako_log; '' gdy rynek spoza uzywanych (zostaje surowy)."""
     r, w = _n(rynek), _n(wybor)
     g, a = _n(gosp), _n(gosc)
-    if r in ('mecz', '1x2', 'wynik meczu', 'wynik meczu (1x2)', 'zwycięzca meczu (1x2)'):
+    reg = r.endswith('(regulaminowy czas)')
+    r = r.replace(' (regulaminowy czas)', '')
+    # LVBET: w hokeju „Zwycięzca meczu” bez dopisku = z dogrywka (dwudrogowy), „(regulaminowy czas)” = 1/X/2
+    if sport == 'HOKEJ NA LODZIE' and r == 'zwycięzca meczu' and not reg:
+        return {g: 'Zwyciezca 1', a: 'Zwyciezca 2'}.get(w, '')
+    if r in ('mecz', '1x2', 'wynik meczu', 'wynik meczu (1x2)', 'zwycięzca meczu (1x2)', 'zwycięzca meczu'):
         return {'1': '1', 'x': 'X', '2': '2', 'remis': 'X', g: '1', a: '2'}.get(w, '')
     if r == 'podwójna szansa':
-        w = w.replace(' ', '').replace('lub', '').replace('/', '')
-        return {'1x': '1X', 'x2': 'X2', '12': '12', '2x': 'X2', 'x1': '1X', '21': '12'}.get(w, '')
-    if r in ('liczba goli', 'suma goli', 'gole', 'liczba bramek') and linia not in (None, ''):
+        k = {'1x': '1X', 'x2': 'X2', '12': '12', '2x': 'X2', 'x1': '1X', '21': '12'}.get(w.replace(' ', '').replace('/', ''))
+        if k: return k
+        # LVBET: „A lub remis” / „B lub remis” / „A lub B” („B or A”)
+        cz = [c.strip() for c in re.split(r'\s+(?:lub|or)\s+', w)]
+        if len(cz) == 2 and 'remis' in cz:
+            t = cz[0] if cz[1] == 'remis' else cz[1]
+            return '1X' if t == g else ('X2' if t == a else '')
+        if len(cz) == 2 and set(cz) == {g, a}: return '12'
+        return ''
+    if sport == 'PIŁKA NOŻNA' and r in ('liczba goli', 'suma goli', 'gole', 'liczba bramek') and linia not in (None, ''):
         if w.startswith('powyżej'): return f'O{float(linia):g}' if float(linia) % 1 else ''
         if w.startswith('poniżej'): return f'U{float(linia):g}' if float(linia) % 1 else ''
     if r in ('obie drużyny strzelą', 'obie drużyny strzelą gola', 'obie strzelą'):
@@ -90,7 +103,7 @@ def kod_rynku(rynek, wybor, linia, gosp, gosc, sport):
     if sport == 'HOKEJ NA LODZIE' and r.startswith('zwycięzca') and ('dogryw' in r or 'karn' in r):
         return {g: 'Zwyciezca 1', a: 'Zwyciezca 2', '1': 'Zwyciezca 1', '2': 'Zwyciezca 2'}.get(w, '')
     m = re.match(r'^(.*) - (liczba goli|suma goli)$', r)
-    if m and linia not in (None, '') and float(linia) == 0.5 and w.startswith('powyżej'):
+    if sport == 'PIŁKA NOŻNA' and m and linia not in (None, '') and float(linia) == 0.5 and w.startswith('powyżej'):
         if m.group(1) == g: return 'gosp_O0.5'
         if m.group(1) == a: return 'gość_O0.5'
     return ''
@@ -154,7 +167,7 @@ def lvbet(od, do, wiersze):
 def main(a):
     godzin = float(a[a.index('--godzin') + 1]) if '--godzin' in a else 30
     kat = a[a.index('--katalog') + 1] if '--katalog' in a else '/sdcard/Download'
-    od = dt.datetime.utcnow().replace(microsecond=0); do = od + dt.timedelta(hours=godzin)
+    od = dt.datetime.now(dt.timezone.utc).replace(microsecond=0, tzinfo=None); do = od + dt.timedelta(hours=godzin)
     wiersze = []
     for nazwa, f, wyl in (('superbet', superbet, '--bez-superbet'), ('lvbet', lvbet, '--bez-lvbet')):
         if wyl in a: continue
@@ -162,12 +175,13 @@ def main(a):
             f(od, do, wiersze)
         except Exception as x:
             print(f'BLAD {nazwa}: {x} — plik bez tego bukmachera')
-    teraz = na_pl(dt.datetime.utcnow())
+    teraz = na_pl(dt.datetime.now(dt.timezone.utc))
     plik = f'{kat}/kursy_bukmacherow_{teraz:%Y-%m-%d_%H-%M}.csv.gz'
+    wszystkie = len(wiersze)
+    if '--wszystko' not in a: wiersze = [x for x in wiersze if x['rynek']]   # domyslnie tylko rynki z kodem (maly plik)
     buf = io.StringIO(); w = csv.DictWriter(buf, fieldnames=KOLUMNY); w.writeheader(); w.writerows(wiersze)
     with gzip.open(plik, 'wt', encoding='utf-8') as fh: fh.write(buf.getvalue())
-    kod = sum(1 for x in wiersze if x['rynek'])
-    print(f'zapisano {plik}: {len(wiersze)} kursow, z kodem rynku {kod}')
+    print(f'zapisano {plik}: {len(wiersze)} kursow z kodem rynku (pobrano {wszystkie})')
     return plik
 
 
