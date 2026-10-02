@@ -997,11 +997,48 @@ def drugie_zrodlo(d, sport, h, g, p_h):
 LIGI_BEZ_PRZEWAGI = {'Liga Pro': 'Liga Pro — backtest 29.09: model bez przewagi (Brier 0,257 > 0,25)'}
 
 
-def werdykt_meczu(skala_ok, p_dz, n, ligi=()):
+# 02.10.2026 (Raport 12:00/18:00: hokej DEL/DEL2, P modelu o 16-49 pp nad rynkiem): druzyna po AWANSIE albo SPADKU
+# niesie Elo z innej ligi (Krefeld: dominowal w DEL2, w DEL model 76% przy rynku 47%; Dresdner Eislowen: dol DEL,
+# w DEL2 model widzi slabeusza, rynek faworyta). Sezon 2026/27 do 30.09, mecze ligowe, obie druzyny >= 10 meczow:
+# hokej — mecze z druzyna po zmianie ligi: faworyt modelu wygral 47,4% przy P 67,6% (n=19), pozostale 61,1% przy
+# P 63,9% (n=601). W koszykowce (n=108: 66,7% przy 70,1%) i siatkowce (n=36: 77,8% przy 69,9%) efektu brak —
+# dlatego tylko hokej. Do ZMIANA_LIGI_MIN meczow w nowej lidze noga NIE idzie na kupon (takze papierowy).
+ZMIANA_LIGI_SPORTY = ('hokej',)
+ZMIANA_LIGI_MIN = 15
+_PUCHAR = re.compile(r'cup|puchar|pokal|coppa|copa|coupe|champions|euro|friendl|super|trophy|playoff|qualif|nations|'
+                     r'world|olymp', re.I)
+
+
+def zmiana_ligi(d, sport, t, start=None):
+    """(liga poprzedniego sezonu, liga tego sezonu, mecze w nowej) gdy druzyna gra w tym sezonie (od START_SEZONU)
+    w innej lidze niz w poprzednim (>= 10 meczow ligowych) i ma w nowej mniej niz ZMIANA_LIGI_MIN meczow; inaczej None.
+    Puchary, CHL, sparingi i play-offy nie sa liga."""
+    start = pd.Timestamp(start or START_SEZONU)
+    x = d[(d.sport == sport) & ((d.gosp == t) | (d.gosc == t))]
+    x = x[~x.liga.astype(str).str.contains(_PUCHAR)]
+    dt_ = pd.to_datetime(x.data)
+    teraz = x[dt_ >= start].liga.value_counts()
+    przed = x[(dt_ >= start - pd.DateOffset(years=1)) & (dt_ < start)].liga.value_counts()
+    if teraz.empty or przed.empty or przed.iloc[0] < 10: return None
+    stara, nowa = przed.index[0], teraz.index[0]
+    if stara == nowa or teraz.iloc[0] >= ZMIANA_LIGI_MIN: return None
+    # zmiana NAZWY ligi (Lotwa: „LHL” -> „Optibet Hokeja Liga”) to nie awans: wiekszosc druzyn starej ligi gra w nowej
+    y = d[(d.sport == sport) & ~d.liga.astype(str).str.contains(_PUCHAR)]
+    dy = pd.to_datetime(y.data)
+    def druzyny(m): return set(m.gosp) | set(m.gosc)
+    stare = druzyny(y[(y.liga == stara) & (dy >= start - pd.DateOffset(years=1)) & (dy < start)])
+    w_nowej = druzyny(y[(y.liga == nowa) & (dy >= start)])
+    if len(stare) and len(stare & w_nowej) / len(stare) >= 0.5: return None
+    return stara, nowa, int(teraz.iloc[0])
+
+
+def werdykt_meczu(skala_ok, p_dz, n, ligi=(), zmiany=()):
     """29.09.2026: jedna linia WERDYKT zamiast bramek rozrzuconych po wyjsciu (wspolna skala, drugie
     zrodlo z Poprawek 48/51, dane rywala z Poprawki 15). Zwraca (P do kuponu | None, lista powodow).
-    ligi — ligi obu druzyn/graczy (Poprawka 60: LIGI_BEZ_PRZEWAGI)."""
+    ligi — ligi obu druzyn/graczy (Poprawka 60: LIGI_BEZ_PRZEWAGI); zmiany — [(druzyna, stara, nowa, n)] (02.10)."""
     powody = [p for k, p in LIGI_BEZ_PRZEWAGI.items() if any(k in str(l) for l in ligi)]
+    for t, stara, nowa, k in zmiany:
+        powody.append(f'zmiana ligi: {t} {stara} -> {nowa} ({k} mecz(e) w nowej, < {ZMIANA_LIGI_MIN}) — Elo z innej ligi')
     if not skala_ok: powody.append('rozne ligi bez wspolnej skali')
     if p_dz is None: powody.append('brak zgodnego drugiego zrodla')
     if n < 5: powody.append(f'brak danych rywala ({n} mecz(e))')
@@ -1187,7 +1224,12 @@ def main(a):
             print('  Wysokie EV na SLABSZEJ druzynie jest tu artefaktem, nie przewaga — nie graj go.')
             print('  P faworyta traktuj jako DOLNA granice. Mecze wyrownane sa wiarygodniejsze.')
         fav = h if ec >= 0.5 else g
-        p_k, powody = werdykt_meczu(ok_, p_dz, n, _ligi_druzyny(d[d.sport == sport], h, 1) | _ligi_druzyny(d[d.sport == sport], g, 1))
+        zmiany = [(t,) + z for t in (h, g) if sport in ZMIANA_LIGI_SPORTY for z in [zmiana_ligi(d, sport, t)] if z]
+        for t, stara, nowa, k in zmiany:
+            print(f'  ZMIANA LIGI (awans/spadek): {t}: {stara} -> {nowa}, {k} mecz(e) w nowej lidze — Elo z innej ligi, '
+                  f'P NIEPOROWNYWALNE z rynkiem (02.10: Krefeld, Dresdner Eislowen); nie buduj nogi kuponu, takze papierowej.')
+        p_k, powody = werdykt_meczu(ok_, p_dz, n, _ligi_druzyny(d[d.sport == sport], h, 1) | _ligi_druzyny(d[d.sport == sport], g, 1),
+                                    zmiany)
         if powody:
             print(f'\nWERDYKT: NIE NA KUPON — {"; ".join(powody)}')
         else:
