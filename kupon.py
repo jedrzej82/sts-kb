@@ -11,7 +11,7 @@ DOPUSZCZONA”), z P do kuponu z tej linii:
   kolumny opcjonalne: sport, szacunek (0/1), polski (0/1: polski klub / puchar krajowy), marza (overround, np. 1.07),
                       kryteria (0..6 spelnionych kryteriow A4.3; brak = 0 -> poziom D -> papierowy)
 
-Wypisuje K1, K2, K3, K5 (lub „brak”) z lacznym P, kursem, EV po podatku, poziomem, stawka i powodem, gdy kupon jest
+Wypisuje K1, K2, K3, K5 (lub „brak”) i linie NAJPEWNIEJSZY MIX (informacyjnie, 02.10.2026) z lacznym P, kursem, EV po podatku, poziomem, stawka i powodem, gdy kupon jest
 PAPIEROWY. Kod pilnuje progow z tabeli DEFINICJE KUPONOW i CZESCI A; nie zna skladow ani kursow z aplikacji —
 te kroki (A3, 4.6, 6.4, 6.5) zostaja po stronie przebiegu."""
 import argparse
@@ -24,7 +24,8 @@ import pandas as pd
 TAX = 0.88
 FAZY = {1: {'A': 5, 'B': 3, 'C': 2}, 2: {'A': 8, 'B': 5, 'C': 2}, 3: {'A': 8, 'B': 5, 'C': 2}}
 LIMIT_DZIEN_ZL, LIMIT_DZIEN_KUPONY, BUDZET = 10, 3, 300
-MAKS_NOG_KANDYDATOW = 25   # najlepsze wg P — kombinacje 4 z 25 to 12 650, liczy sie w sekundy
+MAKS_NOG_KANDYDATOW = 25
+MIX_MIN_KURS = 1.50        # ponizej wyplata po podatku < 1,32 x stawki — „mix” bez sensu   # najlepsze wg P — kombinacje 4 z 25 to 12 650, liczy sie w sekundy
 
 
 def ev(p, kurs):
@@ -92,6 +93,15 @@ def najlepszy(d, rodzaj):
                     o['zakres'] = zakres; kand.append(o)
             if kand: break
         klucz = lambda o: (o['ev'], o['p'])   # K5: najwyzsze EV; EV <= 0 -> PAPIEROWY (nie odpada)
+    elif rodzaj == 'MIX':
+        # 02.10.2026 (decyzja uzytkownika): „najpewniejszy mix” — kupon o NAJWYZSZYM lacznym P (2-4 nogi z roznych
+        # meczow, kurs laczny >= MIX_MIN_KURS, maks. 1 szacunek); przy rownym P — wiecej sportow, potem wyzsze EV.
+        # TYLKO INFORMACYJNIE: najwyzsze P to zwykle EV < 0 (podatek 12%), stawke ustala CZESC A, nie ten kupon.
+        for c in _kombinacje(d, 2, 4):
+            o = _opis(d, c)
+            if o['kurs'] >= MIX_MIN_KURS and o['szacunki'] <= 1:
+                o['sporty'] = d.loc[list(c), 'sport'].nunique(); kand.append(o)
+        klucz = lambda o: (round(o['p'], 4), o['sporty'], o['ev'])
     else:
         raise ValueError(rodzaj)
     return max(kand, key=klucz) if kand else None
@@ -152,6 +162,17 @@ def main(argv):
             wydane += st; kupony += 1; a.lacznie += st
             print(f'   → DO GRY: stawka {st} zl (wyplata {st * TAX * o["kurs"]:.2f} zl); kurs minimalny {1 / (o["p"] * TAX):.2f}'
                   f' — PRZED POSTAWIENIEM przepisz kursy z aplikacji i przelicz EV')
+    print('\n' + linia_mix(najlepszy(d[(d.polski == 0) & (d.marza <= 1.10)], 'MIX'), d))
+
+
+def linia_mix(o, d):
+    """Linia „NAJPEWNIEJSZY MIX” do POWIADOMIENIA (02.10.2026) — zawsze z EV i informacja, ze to nie zalecenie."""
+    if o is None:
+        return f'NAJPEWNIEJSZY MIX: brak (za malo nog dopuszczonych na kurs laczny >= {MIX_MIN_KURS:.2f})'
+    nogi = ' + '.join(f'{d.at[i, "mecz"]} {d.at[i, "rynek"]} ({d.at[i, "p"]:.0%} @{d.at[i, "kurs"]:.2f})' for i in o['nogi'])
+    return (f'NAJPEWNIEJSZY MIX: {nogi} | laczne P {o["p"]:.1%} | kurs {o["kurs"]:.2f} | EV {o["ev"]:+.1%} | '
+            + ('EV > 0 — mozna rozwazyc (stawka wg CZESCI A)' if o['ev'] > 0
+               else 'EV < 0 — informacyjnie, NIE zalecenie (srednio traci po podatku)'))
 
 
 if __name__ == '__main__':
