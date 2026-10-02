@@ -5,3 +5,4 @@ redstarbelgrade,"ten sam klub w dwoch przestrzeniach nazw: typuj.ALIASES_KLUBY -
 lommel,"dwa kluby w roznych okresach: kluby.SCAL_RECZNIE ma wpisy z data (Lommel 1932-2003 do 2003, potem Lommel SK) — nie sprzecznosc; sprawdzone 29.09.2026"
 parissaintgermain,"rozne sporty: pilka (typuj/build_kb/uzupelnij_ligi) -> Paris SG, sporty (pilka reczna, LM) -> Paris Handball; alias sporty dziala tylko gdy cel jest w puli recznej; sprawdzone 29.09.2026"
 psg,"rozne sporty i przestrzenie nazw: typuj.ALIASES / uzupelnij_ligi.ALIAS_ZEWN -> pilkarski Paris SG, aliasy.csv (sporty) -> Paris Handball (reczna, zapis 365scores); alias sporty dziala tylko, gdy cel jest w puli recznej; sprawdzone 30.09.2026"
+sportinglizbona,"rozne sporty: typuj.ALIASES -> Sp Lisbon (pilka), sporty -> Sporting Cp (reczna, zapis 365scores); ten sam klub, rozne pule; sprawdzone 02.10.2026"
