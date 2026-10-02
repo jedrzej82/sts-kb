@@ -33,8 +33,9 @@ LV = 'https://offer.lvbet.pl/client-api/v5/'
 # Superbet sportId -> nazwa sportu jak w PDF STS
 SB_SPORT = {5: 'PIŁKA NOŻNA', 3: 'HOKEJ NA LODZIE', 4: 'KOSZYKÓWKA', 11: 'PIŁKA RĘCZNA', 1: 'SIATKÓWKA', 2: 'TENIS', 13: 'DART'}
 SB_DETAL = {5, 3, 4, 11}           # szczegoly: pilka, hokej, koszykowka, reczna
-# LVBET sports_groups_ids[0] -> sport (1 pilka, 2 hokej — z diagnozy; reszta dopisywana po sprawdzeniu)
-LV_SPORT = {1: 'PIŁKA NOŻNA', 2: 'HOKEJ NA LODZIE'}
+# LVBET sports_groups_ids[0] -> sport (1 pilka, 2 hokej — diagnoza 02.10; 3 koszykowka, 4 tenis, 29 reczna —
+# --diag-lvbet 02.10 08:19: NBA / BC Elbrus, turnieje tenisowe, BM Granollers; 6 = futbol amerykanski, pominiety)
+LV_SPORT = {1: 'PIŁKA NOŻNA', 2: 'HOKEJ NA LODZIE', 3: 'KOSZYKÓWKA', 4: 'TENIS', 29: 'PIŁKA RĘCZNA'}
 SPORTY_Z_REMISEM = ('PIŁKA NOŻNA', 'PIŁKA RĘCZNA')
 KOLUMNY = ['bukmacher', 'sport', 'data_meczu', 'godzina_meczu', 'gospodarz', 'gosc', 'rynek_oryg', 'wybor_oryg', 'linia',
            'rynek', 'kurs']
@@ -74,8 +75,9 @@ def _n(s):
     return re.sub(r'\s+', ' ', str(s)).strip().lower()
 
 
-def kod_rynku(rynek, wybor, linia, gosp, gosc, sport):
-    """Rynek bukmachera -> kod jak w ako_log; '' gdy rynek spoza uzywanych (zostaje surowy)."""
+def kod_rynku(rynek, wybor, linia, gosp, gosc, sport, z_remisem=False):
+    """Rynek bukmachera -> kod jak w ako_log; '' gdy rynek spoza uzywanych (zostaje surowy).
+    z_remisem = rynek ma wybor „Remis” (trojdrogowy) — wtedy NIE jest to „Zwyciezca” z dogrywka."""
     r, w = _n(rynek), _n(wybor)
     g, a = _n(gosp), _n(gosc)
     reg = r.endswith('(regulaminowy czas)')
@@ -83,7 +85,7 @@ def kod_rynku(rynek, wybor, linia, gosp, gosc, sport):
     # LVBET: w hokeju „Zwycięzca meczu” bez dopisku = z dogrywka (dwudrogowy), „(regulaminowy czas)” = 1/X/2.
     # 02.10: tak samo koszykowka; Superbet „Zwycięzca” (tenis, siatkowka, dart) = dwudrogowy. Pilka nozna i reczna
     # maja remis — tam „zwycięzca meczu” to 1/X/2 (nizej).
-    if sport not in SPORTY_Z_REMISEM and r in ('zwycięzca meczu', 'zwycięzca') and not reg:
+    if sport not in SPORTY_Z_REMISEM and r in ('zwycięzca meczu', 'zwycięzca') and not reg and not z_remisem:
         return {g: 'Zwyciezca 1', a: 'Zwyciezca 2', '1': 'Zwyciezca 1', '2': 'Zwyciezca 2'}.get(w, '')
     if r in ('mecz', '1x2', 'wynik meczu', 'wynik meczu (1x2)', 'zwycięzca meczu (1x2)', 'zwycięzca meczu'):
         return {'1': '1', 'x': 'X', '2': '2', 'remis': 'X', g: '1', a: '2'}.get(w, '')
@@ -104,7 +106,7 @@ def kod_rynku(rynek, wybor, linia, gosp, gosc, sport):
         return {'tak': 'BTTS_tak', 'nie': 'BTTS_nie'}.get(w, '')
     if r in ('zakład bez remisu', 'remis - brak zakładu', 'remis bez zakładu'):
         return {g: 'DNB_1', a: 'DNB_2', '1': 'DNB_1', '2': 'DNB_2'}.get(w, '')
-    if sport not in SPORTY_Z_REMISEM and r.startswith('zwycięzca') and ('dogryw' in r or 'karn' in r):
+    if sport not in SPORTY_Z_REMISEM and r.startswith('zwycięzca') and ('dogryw' in r or 'karn' in r) and not z_remisem:
         return {g: 'Zwyciezca 1', a: 'Zwyciezca 2', '1': 'Zwyciezca 1', '2': 'Zwyciezca 2'}.get(w, '')
     # koszykowka: suma punktow z dogrywka (jak STS „Liczba punktów (z dogrywką)”)
     if (sport == 'KOSZYKÓWKA' and re.match(r'^(liczba|suma) punktów', r) and 'dogryw' in r
@@ -164,11 +166,13 @@ def lvbet(od, do, wiersze):
         for r in rynki:
             if (r.get('state') or {}).get('status') != 'open': continue
             linia = r.get('line')
+            z_remisem = any(_n(s.get('name', '')) == 'remis' for s in r.get('selections') or [])
             for s in r.get('selections') or []:
                 if s.get('status') != 'open': continue
                 wiersze.append(dict(bukmacher='LVBET', sport=sport, data_meczu=d, godzina_meczu=g, gospodarz=gosp, gosc=gosc,
                                     rynek_oryg=r.get('name', ''), wybor_oryg=s.get('name', ''), linia='' if linia is None else linia,
-                                    rynek=kod_rynku(re.sub(r'\s+[\d.]+$', '', r.get('name', '')), s.get('name', ''), linia, gosp, gosc, sport),
+                                    rynek=kod_rynku(re.sub(r'\s+[\d.]+$', '', r.get('name', '')), s.get('name', ''), linia, gosp, gosc,
+                                                    sport, z_remisem),
                                     kurs=(s.get('rate') or {}).get('decimal', '')))
     print(f'LVBET: {len(lista)} meczow w ofercie, rynki pobrane dla {n}')
 

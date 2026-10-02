@@ -150,3 +150,12 @@ def test_pisownia_nazw():
     _, st = kursy3.tabela(sts, kursy3.wczytaj_bukmacherow_df(buk))
     assert st['LVBET'] == {'jednoznaczne': 3, 'brak': 0, 'kilka': 0}
     assert kursy3._pisownia('Koelner') == 'kolner' and kursy3._pisownia('M.Gonzalez/A.Molteni') == 'm.gonzalez/a.molteni'
+
+
+def test_lvbet_sporty_i_rynek_trojdrogowy():
+    assert {3: 'KOSZYKÓWKA', 4: 'TENIS', 29: 'PIŁKA RĘCZNA'}.items() <= kb.LV_SPORT.items() and 6 not in kb.LV_SPORT
+    # „Zwycięzca meczu” z wyborem „Remis” w koszykowce = czas regulaminowy, nie Zwyciezca z dogrywka
+    assert kb.kod_rynku('Zwycięzca meczu', 'A', '', 'A', 'B', 'KOSZYKÓWKA', z_remisem=True) == '1'
+    assert kb.kod_rynku('Zwycięzca meczu', 'A', '', 'A', 'B', 'KOSZYKÓWKA') == 'Zwyciezca 1'
+    assert kb.kod_rynku('Zwycięzca meczu', 'Remis', '', 'A', 'B', 'PIŁKA RĘCZNA', z_remisem=True) == 'X'
+    assert kb.kod_rynku('Suma goli', 'Powyżej (55.5)', 55.5, 'A', 'B', 'PIŁKA RĘCZNA') == 'O55.5'
