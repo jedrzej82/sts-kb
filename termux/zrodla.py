@@ -51,6 +51,7 @@ STAN = os.path.expanduser('~/.zrodla_stan.json')
 OKNO_H = 3.5            # szczegoly dla meczow zaczynajacych sie w ciagu tylu godzin
 MAKS_SZCZEGOLY = 60     # na zrodlo i uruchomienie
 SURowe_NA_ZRODLO = 4
+SUROWE_LIMIT = {'90minut': 10}   # 03.10.2026: strony lig 90minut potrzebne w calosci do sprawdzenia parsera
 SURowe_MAKS_B = 300_000
 
 H_SOFA = {**H_JSON, 'Referer': 'https://www.sofascore.com/', 'Origin': 'https://www.sofascore.com'}
@@ -69,6 +70,18 @@ TM_LIGI = ('GB1', 'GB2', 'ES1', 'ES2', 'IT1', 'IT2', 'L1', 'L2', 'FR1', 'FR2', '
 US_LIGI = ('EPL', 'La_liga', 'Bundesliga', 'Serie_A', 'Ligue_1', 'RFPL')
 
 
+def dekoduj(b):
+    """Bajty -> tekst. 03.10.2026: 90minut.pl jest w ISO-8859-2 — utf-8 'replace' gubil polskie litery w nazwach
+    druzyn („Wis�a”). Najpierw scisle utf-8, potem kodowanie z <meta charset>, na koncu cp1250."""
+    try: return b.decode('utf-8')
+    except UnicodeDecodeError: pass
+    m = re.search(rb'charset=["\']?([A-Za-z0-9_-]+)', b[:3000])
+    for kod in ([m.group(1).decode('ascii', 'ignore')] if m else []) + ['cp1250']:
+        try: return b.decode(kod)
+        except (LookupError, UnicodeDecodeError): continue
+    return b.decode('utf-8', 'replace')
+
+
 def curl_get(url, naglowki, opcje=()):
     """Systemowy curl (Termux: OpenSSL + nghttp2) -> (kod, tekst); (0, opis) gdy brak curla albo blad."""
     if not shutil.which('curl'): return 0, 'brak curl'
@@ -79,7 +92,7 @@ def curl_get(url, naglowki, opcje=()):
         r = subprocess.run(cmd + [url], capture_output=True, timeout=40)
     except (OSError, subprocess.SubprocessError) as e:
         return 0, f'{type(e).__name__}: {e}'
-    out = r.stdout.decode('utf-8', 'replace')
+    out = dekoduj(r.stdout)
     tekst, _, kod = out.rpartition('\n__KOD__')
     return (int(kod) if kod.strip().isdigit() else 0), (tekst if kod.strip().isdigit() else r.stderr.decode('utf-8', 'replace'))
 
@@ -108,7 +121,7 @@ class Sesja:
                 r = urllib.request.urlopen(urllib.request.Request(url, headers=naglowki), timeout=30, context=CTX)
                 b = r.read()
                 if r.headers.get('Content-Encoding') == 'gzip': b = gzip.decompress(b)
-                kod, tekst = r.status, b.decode('utf-8', 'replace')
+                kod, tekst = r.status, dekoduj(b)
                 break
             except urllib.error.HTTPError as e:
                 kod = e.code
@@ -121,8 +134,9 @@ class Sesja:
         time.sleep(pauza)
         self.kody.setdefault(zrodlo, {}).setdefault(kod, 0)
         self.kody[zrodlo][kod] += 1
-        if sum(1 for s in self.surowe if s['zrodlo'] == zrodlo) < SURowe_NA_ZRODLO or kod != 200:
-            if sum(1 for s in self.surowe if s['zrodlo'] == zrodlo) < SURowe_NA_ZRODLO * 3:
+        lim = SUROWE_LIMIT.get(zrodlo, SURowe_NA_ZRODLO)
+        if sum(1 for s in self.surowe if s['zrodlo'] == zrodlo) < lim or kod != 200:
+            if sum(1 for s in self.surowe if s['zrodlo'] == zrodlo) < lim * 3:
                 self.surowe.append({'zrodlo': zrodlo, 'url': url, 'kod': kod, 'tekst': tekst[:SURowe_MAKS_B]})
         return kod, tekst
 
@@ -615,8 +629,8 @@ def scal_miesiace(wiersze, prefiks, kat):
 
 
 S24_HIST_DNI, S24_LIMIT_S = 21, 240
-S24_STRONY = ('/en/table-tennis', '/en/table-tennis/c-ukraine', '/en/table-tennis/c-international', '/en/table-tennis/c-world',
-              '/en/table-tennis/c-russia', '/en/table-tennis/c-europe')
+S24_STRONY = ('/en/table-tennis',)   # strony krajow (c-ukraine, c-international...) daly 404 — cron 03.10 11:40
+SETKA_STRONY = ('https://setkacup.com/', 'https://www.setkacup.com/en/', 'https://setka-cup.com/')   # diagnoza: inne zrodlo
 S24_KANDYDACI = ('setka-cup', 'setka-cup-1', 'ukraine-setka-cup', 'ukraine-setka-cup-1', 'international-setka-cup',
                  'international-setka-cup-1', 'world-setka-cup', 'world-setka-cup-1', 'setka-cup-men', 'setka-cup-ukraine',
                  'europe-setka-cup', 'europe-setka-cup-1', 'russia-setka-cup', 'russia-setka-cup-1')
@@ -634,7 +648,16 @@ def z_s24(s, w, teraz, stan, dni_hist, kat):
         kod, t = s.get('s24', S24 + strona, H_HTML)
         wszystkie |= set(s24_slugi(t))
     cele = [(x, v) for x in sorted(wszystkie) for k, v in S24_LIGI.items() if k in x]
-    if not cele:
+    # 03.10.2026 (cron 11:40): scores24 ma 3 ligi tenisa stolowego (Liga Pro, TT Cup, TT Elite Series), Setka Cup nie ma,
+    # a 14 kandydatow API dalo puste odpowiedzi. Kandydaci i inne strony Setka Cup — raz na 7 dni, nie co 3 godziny.
+    dzis = str(teraz.date())
+    ost = stan.get('s24_proba')
+    if not cele and (not ost or (teraz.date() - dt.date.fromisoformat(ost)).days >= 7):
+        stan['s24_proba'] = dzis
+        for url in SETKA_STRONY:
+            kod, t = s.get('setka', url, H_HTML, proby=1)
+            w.setdefault('setka_strony', []).append({'url': url, 'kod': kod, 'bajty': len(t or ''),
+                                                    'setka': len(re.findall(r'(?i)setka', t or ''))})
         od_ = teraz - dt.timedelta(days=2)
         for slug in S24_KANDYDACI:
             url = (f'{S24}/rapi/leagues/table-tennis/{slug}/matches?lang=en&audience=en&first=5&status=ended&with_statistics=false'
@@ -665,9 +688,57 @@ def z_s24(s, w, teraz, stan, dni_hist, kat):
     w.setdefault('_pliki_wynikow', []).extend(scal_miesiace(wiersze, 'wyniki_s24_inne', kat))
 
 
-def z_90minut(s, w):
-    """90minut.pl (polskie ligi II-IV, CLJ, kobiety): na razie DIAGNOZA — strona glowna i linki do lig w surowych
-    odpowiedziach; parser po pierwszym pobraniu (jak przy pozostalych zrodlach 03.10)."""
+MIESIACE_PL = {'stycznia': 1, 'lutego': 2, 'marca': 3, 'kwietnia': 4, 'maja': 5, 'czerwca': 6, 'lipca': 7, 'sierpnia': 8,
+               'wrzesnia': 9, 'września': 9, 'pazdziernika': 10, 'października': 10, 'listopada': 11, 'grudnia': 12}
+# ligi z menu strony glownej (03.10.2026): nazwa w menu -> turniej w pliku (zapis jak Flashscore, do odsiewania dubli)
+LIGI_90M = {'II liga': 'II Liga', 'III liga, gr. I': 'III Liga - Group I', 'III liga, gr. II': 'III Liga - Group II',
+            'III liga, gr. III': 'III Liga - Group III', 'III liga, gr. IV': 'III Liga - Group IV', 'CLJ': 'CLJ U19'}
+
+
+def _bez_tagow(x):
+    return _html.unescape(re.sub(r'<[^>]+>', ' ', x)).replace('\xa0', ' ').strip()
+
+
+def _data_pl(tekst, rok_domyslny):
+    """„26 lipca 2026”, „26 lipca, 18:00”, „26.07.2026” -> 'RRRR-MM-DD' albo None."""
+    m = re.search(r'(\d{1,2})\.(\d{1,2})\.(\d{4})', tekst)
+    if m: return f'{int(m.group(3)):04d}-{int(m.group(2)):02d}-{int(m.group(1)):02d}'
+    # zakres kolejki „27-28 września” -> pierwszy dzien (wiersz meczu bez wlasnej daty; dopasowanie dubli ma +-1 dzien)
+    m = re.search(r'(\d{1,2})(?:\s*[-–]\s*\d{1,2})?\s+([a-ząćęłńóśźż]+)(?:\s+(\d{4}))?', tekst.lower())
+    if m and m.group(2) in MIESIACE_PL:
+        return f'{int(m.group(3) or rok_domyslny):04d}-{MIESIACE_PL[m.group(2)]:02d}-{int(m.group(1)):02d}'
+    return None
+
+
+def m90_wiersze(html, turniej, rok):
+    """Strona ligi 90minut.pl -> mecze z wynikiem (format NAGL_WYNIKI). Kolejki: naglowek „Kolejka N - <data>”,
+    wiersz meczu: komorki gospodarz | wynik „2-1” | gosc [| data]. Data z wiersza, inaczej z naglowka kolejki.
+    UWAGA: napisane na podstawie ogolnego ukladu strony — sprawdzane na surowych stronach z telefonu (diagnoza)."""
+    out, kol, data_kol = [], '', None
+    for kaw in re.split(r'(?i)(?=<tr)', html or ''):
+        tekst = _bez_tagow(kaw)
+        mk = re.search(r'(?i)kolejka\s+(\d+)\s*[-–]?\s*(.*)', tekst)
+        if mk and len(tekst) < 120:
+            kol, data_kol = mk.group(1), _data_pl(mk.group(2), rok) or data_kol
+            continue
+        kom = [_bez_tagow(x) for x in re.findall(r'(?is)<td[^>]*>(.*?)</td>', kaw)]
+        for i in range(1, len(kom) - 1):
+            w = re.fullmatch(r'(\d{1,2})\s*[-:]\s*(\d{1,2})', kom[i])
+            if not w or not kom[i - 1] or not kom[i + 1] or re.search(r'\d', kom[i - 1][:1]): continue
+            d = next((x for x in (_data_pl(c, rok) for c in kom[i + 2:i + 4]) if x), None) or data_kol
+            if not d: break
+            g, a = int(w.group(1)), int(w.group(2))
+            out.append({'data': d, 'sport': 'football', 'kraj': 'Poland', 'turniej': turniej, 'runda': f'90m:{kol}',
+                        'gosp': kom[i - 1], 'gosc': kom[i + 1], 'wg': g, 'wa': a, 'okresy_g': '', 'okresy_a': '',
+                        'zwyciezca': 1 if g > a else (2 if a > g else 0), 'nawierzchnia': ''})
+            break
+    return out
+
+
+def z_90minut(s, w, teraz=None):
+    """90minut.pl: polskie ligi II-IV i CLJ (Flashscore/365 maja je czesciowo, bez dlugiej historii). TRYB OBSERWACJI:
+    mecze tylko w zipie zrodel (zrodla_90minut_mecze), nic w przebiegu ich nie uzywa do czasu przegladu."""
+    teraz = teraz or dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
     baza, curl = 'https://www.90minut.pl/', None
     kod, t = s.get('90minut', baza, H_HTML)
     if kod != 200:   # 03.10.2026 (przebieg 10:19): HTTP 0 z Pythona — druga proba zwyklym http i curlem (inny TLS)
@@ -675,8 +746,22 @@ def z_90minut(s, w):
         kod, t = s.get('90minut', baza, H_HTML, curl=curl)
     linki = sorted(set(re.findall(r'href="(/?(?:liga|archsezon|skarb)[^"]+)"', t or '')))
     w['90minut_linki'] = [{'link': x} for x in linki[:400]]
-    for l in linki[:3]:
-        s.get('90minut', baza + l.lstrip('/'), H_HTML, curl=curl)
+    ligi = {}
+    for href, nazwa in re.findall(r'(?is)<a[^>]+href="(/liga/[^"]+)"[^>]*>(.*?)</a>', t or ''):
+        nazwa = _bez_tagow(nazwa)
+        if nazwa in LIGI_90M: ligi.setdefault(LIGI_90M[nazwa], href)
+    rok = teraz.year
+    mecze, stat = [], []
+    for turniej, href in sorted(ligi.items()):
+        kod, tl = s.get('90minut', baza + href.lstrip('/'), H_HTML, curl=curl)
+        r = m90_wiersze(tl, turniej, rok) if kod == 200 else []
+        # sezon jesien-wiosna: mecze z „przyszlych” miesiecy naleza do poprzedniego roku
+        for x in r:
+            if x['data'] > str((teraz + dt.timedelta(days=2)).date()): x['data'] = str(int(x['data'][:4]) - 1) + x['data'][4:]
+        mecze += r
+        stat.append({'turniej': turniej, 'link': href, 'kod': kod, 'mecze': len(r)})
+    w['90minut_ligi'] = stat
+    w['90minut_mecze'] = mecze
 
 
 DZIENNE = ('elo', 'transfermarkt', 'understat', 'tenis', 'darty')
@@ -721,7 +806,7 @@ def main(a):
     gotowe = set(stan.get('gotowe', []))
     s, w, bledy = Sesja(budzet * 60), {}, {}
     zadania = [('s24', lambda: z_s24(s, w, teraz, stan, int(a[a.index('--historia-s24') + 1]) if '--historia-s24' in a else 0, kat)),
-               ('90minut', lambda: z_90minut(s, w)),
+               ('90minut', lambda: z_90minut(s, w, teraz)),
                ('fotmob', lambda: z_fotmob(s, w, dzis, teraz, gotowe)), ('sofascore', lambda: z_sofa(s, w, dzis, teraz)),
                ('nhl', lambda: z_nhl(s, w, dzis)), ('pogoda', lambda: z_pogoda(s, w)),
                ('elo', lambda: z_elo(s, w)), ('tenis', lambda: z_tenis(s, w)), ('darty', lambda: z_darty(s, w, dzis)),

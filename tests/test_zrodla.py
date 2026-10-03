@@ -268,7 +268,40 @@ def test_s24_slug_przez_api_i_90minut_curl(monkeypatch):
     assert stan['s24_slug'] == traf and any(x['cel'] for x in w['s24_ligi'])
     proby = []
     def get(zr, url, *a, curl=None, **k):
-        proby.append((url, curl)); return (0, '') if curl is None else (200, '<a href="/liga/1/liga1.html">')
+        proby.append((url, curl)); return (0, '') if curl is None else (200, '<a href="/liga/1/liga1.html"><b>CLJ</b></a>')
     s.get = get
-    z.z_90minut(s, w)
+    z.z_90minut(s, w, dt.datetime(2026, 10, 3, 10, 0))
     assert proby[1] == ('http://www.90minut.pl/', []) and proby[2] == ('http://www.90minut.pl/liga/1/liga1.html', [])
+    assert w['90minut_ligi'] == [{'turniej': 'CLJ U19', 'link': '/liga/1/liga1.html', 'kod': 200, 'mecze': 0}]
+
+
+def test_90minut_parser_i_kodowanie():
+    # 03.10: 90minut.pl jest w ISO-8859-2; wiersze meczow: gospodarz | wynik | gosc [| data], naglowek kolejki z data
+    html = ('<html><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-2"></head><table>'
+            '<tr><td colspan=4><b>Kolejka 11 - 27-28 września 2026</b></td></tr>'
+            '<tr><td align="right">Wisła II Płock</td><td><a href="/mecz/1">2-1</a></td><td>Elana Toruń</td><td>27 września, 15:00</td></tr>'
+            '<tr><td align="right">Bałtyk Koszalin</td><td>0-0</td><td>Grom Nowy Staw</td><td></td></tr>'
+            '<tr><td>Kotwica Kórnik</td><td>-</td><td>Unia Swarzędz</td><td>4 października, 16:00</td></tr></table></html>')
+    t = z.dekoduj(html.encode('iso-8859-2'))
+    assert 'Wisła II Płock' in t and 'Bałtyk' in t
+    r = z.m90_wiersze(t, 'III Liga - Group II', 2026)
+    assert [(x['data'], x['gosp'], x['gosc'], x['wg'], x['wa'], x['runda']) for x in r] == [
+        ('2026-09-27', 'Wisła II Płock', 'Elana Toruń', 2, 1, '90m:11'), ('2026-09-27', 'Bałtyk Koszalin', 'Grom Nowy Staw', 0, 0, '90m:11')]
+    assert z._data_pl('3.10.2026', 2025) == '2026-10-03' and z._data_pl('1 sierpnia', 2026) == '2026-08-01'
+
+
+def test_s24_kandydaci_raz_na_tydzien():
+    import datetime as dt
+    s = z.Sesja(600)
+    adresy = []
+    s.get = lambda zr, url, *a, **k: adresy.append(url) or (200, '<a href="/en/table-tennis/l-czech-liga-pro-1">')
+    s.get_json = lambda zr, url, *a, **k: adresy.append(url) or {'data': {'edges': []}}
+    stan, w = {}, {}
+    z.z_s24(s, w, dt.datetime(2026, 10, 3, 10, 0), stan, 0, '/tmp')
+    n1 = len(adresy)
+    assert n1 == 1 + len(z.SETKA_STRONY) + len(z.S24_KANDYDACI) and stan['s24_proba'] == '2026-10-03'
+    assert len(w['setka_strony']) == len(z.SETKA_STRONY)
+    adresy.clear(); z.z_s24(s, {}, dt.datetime(2026, 10, 5, 10, 0), stan, 0, '/tmp')
+    assert len(adresy) == 1                                         # 2 dni pozniej: tylko strona glowna
+    adresy.clear(); z.z_s24(s, {}, dt.datetime(2026, 10, 10, 10, 0), stan, 0, '/tmp')
+    assert len(adresy) == n1                                        # po tygodniu znowu pelne szukanie
