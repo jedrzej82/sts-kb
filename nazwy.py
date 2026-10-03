@@ -72,6 +72,10 @@ def wspolna_liga(m, a, b, dni=730):
 ALIASY_CSV = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'aliasy.csv')
 
 
+# 03.10.2026: aliasy uczone w przebiegu (dopasuj.py auto) — wczytywane PO aliasy.csv (setdefault: reczne wygrywaja)
+ALIASY_AUTO_CSV = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'aliasy_auto.csv')
+
+
 def aliasy_z_pliku(modul, klucz, slownik, plik=None):
     """29.09.2026 (faza 3b): aliasy jako DANE — aliasy.csv (modul,nazwa,cel,uzasadnienie,data), nazwa tak jak
     w ofercie; klucz liczy funkcja danego modulu. Dopisuje przez setdefault, wiec wpis w kodzie wygrywa

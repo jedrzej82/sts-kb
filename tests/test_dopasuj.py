@@ -200,3 +200,31 @@ def test_rdzen_pasuje():
     assert dopasuj._rdzen_pasuje(t('TuS N-Lubbecke'), t('N-Lubbecke'))
     assert not dopasuj._rdzen_pasuje(t('Polonia Leszno'), t('Polonia Warszawa'))
     assert not dopasuj._rdzen_pasuje(t('HC Bolzano'), t('HC Lugano'))
+
+
+def test_kotwica_ligowa_bez_kolizji_odrzuca_pare():
+    # 03.10 (tryb auto): „Virtus Zagreb” -> „KK Zagreb” ma kolizje rdzenia (Cedevita/Dinamo Zagreb) — odpada cala para
+    import pandas as pd
+    import dopasuj
+    ev = pd.DataFrame({'S': ['koszykówka'], 'd': pd.to_datetime(['2026-10-02']), 'A': ['Virtus Zagreb'], 'B': ['Furnir Dubrava']})
+    pule = {'koszykówka': {'KK Zagreb', 'Cedevita Zagreb', 'KK Dubrava'}}
+    ligi = dopasuj.ligi_druzyn(pd.DataFrame({'S': ['koszykówka'] * 2, 'liga': ['Croatia | Premijer'] * 2,
+                                             'A': ['KK Zagreb', 'Cedevita Zagreb'], 'B': ['KK Dubrava', 'KK Dubrava']}))
+    rozwiaz = lambda S, n: None
+    al, _ = dopasuj.kotwica_ligowa(ev, rozwiaz, pule, ligi)
+    assert dict(zip(al.nazwa, al.cel)) == {'Virtus Zagreb': 'KK Zagreb', 'Furnir Dubrava': 'KK Dubrava'}   # tryb przegladu
+    al2, st2 = dopasuj.kotwica_ligowa(ev, rozwiaz, pule, ligi, bez_kolizji=True)
+    assert al2.empty and st2['kolizja (do przegladu)'] == 1
+
+
+def test_aliasy_auto_po_recznych(tmp_path):
+    # aliasy_auto.csv wczytywany PO aliasy.csv — reczny wpis wygrywa, auto tylko dopisuje brakujace
+    import nazwy
+    r, a = tmp_path / 'r.csv', tmp_path / 'a.csv'
+    r.write_text('modul,nazwa,cel,uzasadnienie,data\ntypuj,JYP Jyvaskyla,Jyvaskyla,x,2026-10-03\n', encoding='utf-8')
+    a.write_text('modul,nazwa,cel,uzasadnienie,data\ntypuj,JYP Jyvaskyla,JYP,auto,2026-10-03\n'
+                 'typuj,Medi Bayreuth,Bayreuth,auto,2026-10-03\n', encoding='utf-8')
+    d = {}
+    nazwy.aliasy_z_pliku('typuj', str.lower, d, str(r)); nazwy.aliasy_z_pliku('typuj', str.lower, d, str(a))
+    assert d == {'jyp jyvaskyla': 'Jyvaskyla', 'medi bayreuth': 'Bayreuth'}
+    assert nazwy.ALIASY_AUTO_CSV.endswith('aliasy_auto.csv')

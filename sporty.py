@@ -1283,7 +1283,9 @@ def main(a):
 
 # 29.09.2026 (faza 3b): aliasy z pliku danych aliasy.csv (modul=sporty) — na koncu, zeby wpisy w kodzie wygrywaly
 from nazwy import aliasy_z_pliku as _aliasy_z_pliku
+import nazwy as _nazwy
 _aliasy_z_pliku('sporty', norm, _ALIASY_RECZNE)
+_aliasy_z_pliku('sporty', norm, _ALIASY_RECZNE, _nazwy.ALIASY_AUTO_CSV)   # dopasuj.py auto (03.10.2026)
 
 if __name__ == '__main__':
     main(sys.argv[1:] or ['stan'])

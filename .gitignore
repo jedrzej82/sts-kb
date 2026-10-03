@@ -57,3 +57,4 @@ zrodla_*.csv.gz
 zrodla_*.zip
 zrodla_diag_*.txt
 zrodla_surowe_*.jsonl.gz
+aliasy_auto.csv

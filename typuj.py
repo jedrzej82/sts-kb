@@ -1246,7 +1246,9 @@ def intl(home, away, neutral, kursy):
 
 # 29.09.2026 (faza 3b): aliasy z pliku danych aliasy.csv (modul=typuj) — na koncu, zeby wpisy w kodzie wygrywaly
 from nazwy import aliasy_z_pliku as _aliasy_z_pliku
+import nazwy as _nazwy
 _aliasy_z_pliku('typuj', norm, ALIASES)
+_aliasy_z_pliku('typuj', norm, ALIASES, _nazwy.ALIASY_AUTO_CSV)   # dopasuj.py auto (03.10.2026)
 
 if __name__ == '__main__':
     args = [x for x in sys.argv[1:]]
