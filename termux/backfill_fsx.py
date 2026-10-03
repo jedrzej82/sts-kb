@@ -51,11 +51,10 @@ UZYCIE
 
 PO POBRANIU
 -----------
-Wrzuc powstale wyniki_fsx_inne_RRRR-MM.csv.gz do folderu baza-wiedzy na Dysku.
-To jest bezpieczne: wynikiFsDruzynowe przy nastepnym uruchomieniu CZYTA istniejacy
-plik o tej nazwie i SCALA go po kluczu (data..gosc), a nie nadpisuje — wiec Twoje
-nadrobione mecze zostana, a skrypt dolozy do nich swoje biezace dni.
-Przebieg pobierze je potem normalnie w paczce (P107).
+Wgrywaj TYLKO plik scalony z aktualna kopia z Dysku. Skrypt scala sie wylacznie z plikiem,
+ktory lezy w --katalog; najpierw pobierz tam aktualne wyniki_fsx_inne_RRRR-MM.csv.gz z baza-wiedzy.
+Bez tego wynik zawiera same nadrobione dni i dostaje nazwe *_TYLKO_NADROBIONE.csv.gz — NIE wgrywaj go:
+paczka.gs przy dwoch plikach o tej samej nazwie bierze najnowszy i przebieg straci reszte miesiaca.
 """
 
 import csv
@@ -159,16 +158,25 @@ def wczytaj_istniejace(sciezka):
 
 
 def zapisz_miesiac(katalog, miesiac, wiersze, sucho):
+    """Zwraca (nowych, razem, nazwa_pliku). nowych = UNIKALNE mecze, ktorych nie bylo w pliku.
+
+    03.10.2026 (pierwsze prawdziwe uruchomienie): gdy w katalogu NIE bylo pliku miesiecznego z Dysku, wynik zawiera
+    wylacznie nadrobione dni. paczka.gs przy dwoch plikach o tej samej nazwie bierze NAJNOWSZY — wgranie takiego pliku
+    zastapiloby w przebiegu pelny miesiac (ok. 1600 meczow wrzesnia, 300 pazdziernika) kilkoma dniami. Dlatego bez
+    pliku bazowego zapisujemy pod nazwa, ktorej paczka.gs nie podejmie (_TYLKO_NADROBIONE)."""
     sciezka = os.path.join(katalog, 'wyniki_fsx_inne_%s.csv.gz' % miesiac)
+    bazowy = os.path.exists(sciezka)
     stare = wczytaj_istniejace(sciezka)
     if stare is None:
-        return 0, 0
-    nowych = sum(1 for w in wiersze if klucz7(w) not in stare)
+        return 0, 0, None
+    nowe = {klucz7(w): w for w in wiersze}            # ten sam mecz bywa w dwoch dziennych odczytach
+    nowych = sum(1 for k in nowe if k not in stare)
     scalone = dict(stare)
-    for w in wiersze:
-        scalone[klucz7(w)] = w
+    scalone.update(nowe)
+    if not bazowy:
+        sciezka = os.path.join(katalog, 'wyniki_fsx_inne_%s_TYLKO_NADROBIONE.csv.gz' % miesiac)
     if sucho:
-        return nowych, len(scalone)
+        return nowych, len(scalone), os.path.basename(sciezka)
     buf = io.StringIO()
     wr = csv.writer(buf, lineterminator='\n')
     wr.writerow(NAGLOWEK)
@@ -178,7 +186,7 @@ def zapisz_miesiac(katalog, miesiac, wiersze, sucho):
     with gzip.open(tmp, 'wt', encoding='utf-8', newline='') as fh:
         fh.write(buf.getvalue())
     os.replace(tmp, sciezka)           # podmiana dopiero po udanym zapisie
-    return nowych, len(scalone)
+    return nowych, len(scalone), os.path.basename(sciezka)
 
 
 def sonda(sporty, przerwa):
@@ -275,15 +283,27 @@ def main(argv):
     if not wg_miesiaca:
         print('Nic nie zebrano. Uruchom: python backfill_fsx.py --sonda')
         return 1
-    suma_nowych = 0
+    suma_nowych, tylko_nadrobione = 0, []
     for m in sorted(wg_miesiaca):
-        nowych, razem = zapisz_miesiac(katalog, m, wg_miesiaca[m], sucho)
+        nowych, razem, nazwa = zapisz_miesiac(katalog, m, wg_miesiaca[m], sucho)
+        if nazwa is None:
+            continue
         suma_nowych += nowych
-        print('  wyniki_fsx_inne_%s.csv.gz: +%d nowych, razem %d meczow' % (m, nowych, razem))
+        if nazwa.endswith('_TYLKO_NADROBIONE.csv.gz'):
+            tylko_nadrobione.append(nazwa)
+        print('  %s: +%d nowych, razem %d meczow' % (nazwa, nowych, razem))
     print('\nNowych meczow: %d (bledow pobrania: %d)' % (suma_nowych, bledy))
-    if not sucho:
-        print('\nWrzuc te pliki do folderu baza-wiedzy na Dysku — wynikiFsDruzynowe je SCALI,')
-        print('nie nadpisze (klucz: data..gosc). Przebieg pobierze je potem w paczce.')
+    if sucho:
+        return 0
+    if tylko_nadrobione:
+        print('\nUWAGA — NIE WGRYWAJ plikow *_TYLKO_NADROBIONE na Dysk.')
+        print('W katalogu nie bylo aktualnego pliku z Dysku, wiec zawieraja WYLACZNIE nadrobione dni.')
+        print('paczka.gs bierze najnowszy plik o danej nazwie — pelny miesiac zostalby zastapiony kilkoma dniami.')
+        print('Zeby nadrobic bezpiecznie: pobierz z baza-wiedzy aktualne wyniki_fsx_inne_RRRR-MM.csv.gz do')
+        print('%s i uruchom backfill jeszcze raz — wtedy skrypt scali sie z nimi i zapisze pod wlasciwa nazwa.' % katalog)
+    else:
+        print('\nPliki zostaly SCALONE z aktualnymi plikami z Dysku — mozna je wgrac do baza-wiedzy.')
+        print('wynikiFsDruzynowe scali je ponownie przy nastepnym uruchomieniu (klucz: data..gosc).')
     return 0
 
 

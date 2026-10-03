@@ -86,8 +86,8 @@ def test_scalanie_nie_gubi_istniejacych(tmp_path):
     stary = ['2026-10-01', 'handball', 'SPAIN', 'Liga Asobal', '', 'A', 'B', '20', '19', '', '', 1, '']
     _plik(str(tmp_path), '2026-10', [stary])
     nowy = ['2026-10-02', 'handball', 'SPAIN', 'Liga Asobal', '', 'C', 'D', '30', '20', '', '', 1, '']
-    nowych, razem = B.zapisz_miesiac(str(tmp_path), '2026-10', [nowy], False)
-    assert (nowych, razem) == (1, 2)
+    nowych, razem, nazwa = B.zapisz_miesiac(str(tmp_path), '2026-10', [nowy], False)
+    assert (nowych, razem, nazwa) == (1, 2, 'wyniki_fsx_inne_2026-10.csv.gz')
     po = B.wczytaj_istniejace(os.path.join(str(tmp_path), 'wyniki_fsx_inne_2026-10.csv.gz'))
     assert B.klucz7(stary) in po and B.klucz7(nowy) in po
 
@@ -95,7 +95,7 @@ def test_scalanie_nie_gubi_istniejacych(tmp_path):
 def test_ten_sam_mecz_nie_duplikuje_sie(tmp_path):
     w = ['2026-10-01', 'handball', 'SPAIN', 'Liga Asobal', '', 'A', 'B', '20', '19', '', '', 1, '']
     _plik(str(tmp_path), '2026-10', [w])
-    nowych, razem = B.zapisz_miesiac(str(tmp_path), '2026-10', [w], False)
+    nowych, razem, _ = B.zapisz_miesiac(str(tmp_path), '2026-10', [w], False)
     assert (nowych, razem) == (0, 1)
 
 
@@ -105,7 +105,7 @@ def test_uszkodzony_plik_zostaje_nietkniety(tmp_path):
     with open(s, 'wb') as fh:
         fh.write(b'to nie jest gzip')
     assert B.zapisz_miesiac(str(tmp_path), '2026-11', [['2026-11-01', 'handball', 'X', 'Y', '',
-                                                        'A', 'B', '1', '0', '', '', 1, '']], False) == (0, 0)
+                                                        'A', 'B', '1', '0', '', '', 1, '']], False) == (0, 0, None)
     with open(s, 'rb') as fh:
         assert fh.read() == b'to nie jest gzip'
 
@@ -115,14 +115,14 @@ def test_obcy_naglowek_nie_zostaje_nadpisany(tmp_path):
     with gzip.open(s, 'wt', encoding='utf-8', newline='') as fh:
         fh.write('cos,zupelnie,innego\n1,2,3\n')
     assert B.zapisz_miesiac(str(tmp_path), '2026-12', [['2026-12-01', 'handball', 'X', 'Y', '',
-                                                        'A', 'B', '1', '0', '', '', 1, '']], False) == (0, 0)
+                                                        'A', 'B', '1', '0', '', '', 1, '']], False) == (0, 0, None)
 
 
 def test_sucho_nic_nie_zapisuje(tmp_path):
     w = ['2026-10-01', 'handball', 'SPAIN', 'Liga Asobal', '', 'A', 'B', '20', '19', '', '', 1, '']
-    nowych, razem = B.zapisz_miesiac(str(tmp_path), '2026-10', [w], True)
+    nowych, razem, _ = B.zapisz_miesiac(str(tmp_path), '2026-10', [w], True)
     assert (nowych, razem) == (1, 1)
-    assert not os.path.exists(os.path.join(str(tmp_path), 'wyniki_fsx_inne_2026-10.csv.gz'))
+    assert not os.listdir(str(tmp_path))
 
 
 def test_sporty_zgodne_z_apps_script():
@@ -135,3 +135,30 @@ def test_nazwa_druzyny_z_AE_albo_FH(pole):
     rek = REK.replace('AE÷Bidasoa Irun', '%s÷Bidasoa Irun' % pole)
     r = B.parsuj(rek, 'handball')
     assert r and r[0][5] == 'Bidasoa Irun'
+
+
+# --- 03.10.2026: pierwsze prawdziwe uruchomienie (--od -3 --do -7, 1101 meczow) ---
+
+def test_bez_pliku_bazowego_nie_dostaje_nazwy_dla_paczki(tmp_path):
+    """W katalogu nie bylo kopii z Dysku -> plik zawiera same nadrobione dni. paczka.gs bierze NAJNOWSZY plik
+    o danej nazwie, wiec wgranie go zastapiloby w przebiegu pelny miesiac kilkoma dniami."""
+    w = ['2026-09-26', 'handball', 'X', 'Y', '', 'A', 'B', '30', '20', '', '', 1, '']
+    _, _, nazwa = B.zapisz_miesiac(str(tmp_path), '2026-09', [w], False)
+    assert nazwa == 'wyniki_fsx_inne_2026-09_TYLKO_NADROBIONE.csv.gz'
+    assert not os.path.exists(os.path.join(str(tmp_path), 'wyniki_fsx_inne_2026-09.csv.gz'))
+
+
+def test_z_plikiem_bazowym_zapisuje_pod_wlasciwa_nazwa(tmp_path):
+    _plik(str(tmp_path), '2026-09', [['2026-09-22', 'handball', 'X', 'Y', '', 'C', 'D', '1', '0', '', '', 1, '']])
+    w = ['2026-09-26', 'handball', 'X', 'Y', '', 'A', 'B', '30', '20', '', '', 1, '']
+    nowych, razem, nazwa = B.zapisz_miesiac(str(tmp_path), '2026-09', [w], False)
+    assert (nowych, razem, nazwa) == (1, 2, 'wyniki_fsx_inne_2026-09.csv.gz')
+
+
+def test_licznik_nowych_liczy_unikalne_mecze(tmp_path):
+    """Ten sam mecz przychodzi w dwoch dziennych odczytach. Uruchomienie 03.10 wypisalo
+    '+1098 nowych, razem 1079' — nowych nie moze byc wiecej niz wszystkich."""
+    w = ['2026-09-26', 'handball', 'X', 'Y', '', 'A', 'B', '30', '20', '', '', 1, '']
+    nowych, razem, _ = B.zapisz_miesiac(str(tmp_path), '2026-09', [w, list(w), list(w)], True)
+    assert (nowych, razem) == (1, 1)
+    assert nowych <= razem

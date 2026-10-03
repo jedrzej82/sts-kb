@@ -53,7 +53,12 @@ def kompletnosc(daty, etykieta):
 # Dzien klubowy jest usprawiedliwiony, gdy w plikach zewn/ (365 i Flashscore) w oknie [dzien-3, dzien+1]
 # jest co najmniej PROG_PRZERWY meczow SENIORSKICH reprezentacji. Tabela intl sie tu nie nadaje (zrodlo spoznione).
 _KRAJE_REPR = {'international', 'world', 'europe', 'africa', 'asia', 'north america', 'south america', 'oceania'}
-_TURNIEJ_REPR = r'nations league|qualif|friendly international|world cup|cup of nations|euro|gold cup|copa america|asian cup'
+# 03.10.2026: +gulf cup|asean cup|kirin cup. Skan zewn/ po 26.08: 416 meczow ZNANYCH reprezentacji seniorskich, 41 odrzuconych
+# wylacznie przez nazwe turnieju — Arabian Gulf Cup (Irak, Oman, ZEA, Bahrajn...), FIFA ASEAN Cup, Kirin Cup. ZEA nie mialy
+# w bazie meczu od 2025-12-15 (292 dni), a graly 24.09 i 27.09; wynik Panama - Nowa Zelandia (Kirin Cup, 01.10) nie trafial
+# do bazy, wiec noga z 30.09 wisiala jako 'jeszcze bez wyniku'. Bezpieczne: uzupelnij_intl i tak wymaga, by OBIE druzyny
+# byly znanymi reprezentacjami seniorskimi (mecze od 2018) i bez znacznikow mlodziezy/kobiet; _TURNIEJ_NIE dalej wyklucza kluby.
+_TURNIEJ_REPR = r'nations league|qualif|friendly international|world cup|cup of nations|euro|gold cup|copa america|asian cup|gulf cup|asean cup|kirin cup'
 _TURNIEJ_NIE = r'\bu\d\d\b|women|\(w\)|femen|club|champions|europa|conference|libertadores|sudamericana|concacaf cup'
 PROG_PRZERWY = 30        # 28.09.2026: 212; zwykle tygodnie 0–20 (pojedyncze sparingi)
 
