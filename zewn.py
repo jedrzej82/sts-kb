@@ -3,7 +3,7 @@
 Pliki z Drive (folder baza-wiedzy) kładzie się do kb/zewn/:
   wyniki_espn_RRRR-MM.csv, wyniki_sofa_pilka_RRRR-MM.csv, wyniki_sofa_inne_RRRR-MM.csv
 Funkcje używane przez uzupelnij_ligi.py (piłka) i hist_import.py / tenis.py (reszta). Kursy nie są pobierane."""
-import os, re, glob, unicodedata, functools, pandas as pd, numpy as np
+import os, re, glob, difflib, unicodedata, functools, pandas as pd, numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__)); ZD = os.path.join(HERE, 'zewn')
 
 ESPN_DIV = {'nor.1': 'NOR', 'swe.1': 'SWE', 'swe.2': 'SWE2', 'den.1': 'DEN', 'fin.1': 'FIN', 'irl.1': 'IRL', 'sui.1': 'SUI',
@@ -81,6 +81,21 @@ def z_znacznikiem(nazwa, znak):
     if not znak: return nazwa
     rodzaj = nazwy.znaczniki(znak)
     return nazwa if set(rodzaj) <= set(nazwy.znaczniki(nazwa)) else f'{nazwa} {znak}'
+
+
+def _rozgrywki_inne(d):
+    """Maska wierszy rozgrywek kobiet/mlodziezy/rezerw/amatorow (INNE_DRUZYNY), bez pucharow."""
+    if not len(d): return pd.Series([], dtype=bool, index=d.index)
+    _nie_puchar = ~pd.Series([_liga_nie_puchar(k, t) for k, t in zip(d.kraj, d.turniej)], index=d.index, dtype=bool)
+    return d.turniej.str.contains(INNE_DRUZYNY) & ~d.turniej.str.contains(PUCHAR_WLASCIWY) & _nie_puchar
+
+
+def _oznacz_inne(d, inne=None):
+    """Znacznik rozgrywek (W/U19/Res.) dopisany do nazw druzyn w wierszach INNE_DRUZYNY (idempotentne)."""
+    if not len(d): return d
+    inne = _rozgrywki_inne(d) if inne is None else inne
+    zn = [znacznik_rozgrywek(t) if i else '' for t, i in zip(d.turniej, inne)]
+    return d.assign(gosp=[z_znacznikiem(g, z) for g, z in zip(d.gosp, zn)], gosc=[z_znacznikiem(g, z) for g, z in zip(d.gosc, zn)])
 
 
 def _n(s): return unicodedata.normalize('NFKD', str(s)).encode('ascii', 'ignore').decode().lower().strip()
@@ -308,12 +323,11 @@ def pilka():
     s = _pilka_fs(s)
     if len(s):
         _nie_puchar = ~pd.Series([_liga_nie_puchar(k, t) for k, t in zip(s.kraj, s.turniej)], index=s.index, dtype=bool)
-        _inne = s.turniej.str.contains(INNE_DRUZYNY) & ~s.turniej.str.contains(PUCHAR_WLASCIWY) & _nie_puchar
+        _inne = _rozgrywki_inne(s)
         _puchar = s.turniej.str.contains(PUCHAR) & _nie_puchar & ~_inne
         s = s[~_puchar & ~s.kraj.str.contains(r'^(?:international|world|europe|south america|africa|asia|oceania|north america|north (?:and|&) central america|club.*)$', case=False)]
         _inne = _inne.reindex(s.index)
-        zn = [znacznik_rozgrywek(t) if i else '' for t, i in zip(s.turniej, _inne)]
-        s = s.assign(gosp=[z_znacznikiem(g, z) for g, z in zip(s.gosp, zn)], gosc=[z_znacznikiem(g, z) for g, z in zip(s.gosc, zn)])
+        s = _oznacz_inne(s, _inne)
         div = [f'{k} | {t}' if i else (sofa_div(k, t) or f'{k} | {t}') for k, t, i in zip(s.kraj, s.turniej, _inne)]
         s = s.assign(Division=div)
         # 30.09.2026 (przeglad): 365 podaje czesc sezonu pod „Regionalliga” i drugi raz pod „Regional League North/
@@ -361,8 +375,6 @@ WYGRANA = {'mma', 'boks', 'krykiet'}   # liczy się zwycięzca, nie punkty
 #  2) odpada takze cala liga FS, ktorej nazwa (kraj + liga) jest identyczna jak liga w 365 (duble lig top);
 #  3) nazwa druzyny FS zamieniana na zapis 365 TYLKO przy jednoznacznym kandydacie w tym samym kraju.
 _ZNACZNIK_FS = re.compile(r'^(?:b|c|ii|iii|u1\d|u2[0-3]|w|women|res|reserves?|youth|jun|juniors?|am)$')
-_MLODZI_KOBIETY_FS = re.compile(r'\bU-?\d{2}\b|\byouth\b|\bjunior|\bjuvenil|\bprimavera\b|\bwomen\b|\bfemin|\(W\)|'
-                                r'\bW$|\breserve|\bII$|\bB$|\bfriendl|\bu-?\d{2}$', re.I)
 
 
 @functools.lru_cache(maxsize=None)
@@ -375,6 +387,20 @@ def _znaczniki_fs(t):
     return _tok_fs(t)[1]
 
 
+_OGOLNE_FS = {'club', 'united', 'city', 'town', 'sport', 'sports', 'sporting', 'deportivo', 'atletico', 'athletic', 'real', 'union',
+              'inter', 'internacional', 'dynamo', 'dinamo', 'hapoel', 'maccabi', 'beitar', 'ironi', 'academy', 'rovers', 'rangers',
+              'wanderers', 'olympic', 'olympique', 'calcio', 'football', 'futbol', 'clube', 'esporte', 'associacao', 'sociedad',
+              'juniors', 'women', 'reserve', 'reserves', 'youth', 'national', 'municipal', 'universidad', 'young', 'stars', 'star'}
+
+
+def _podobna_druzyna(a, b):
+    """Ta sama druzyna pod dwoma zapisami: wspolny wyrazisty czlon (>=4 znaki, nie ogolny) albo zapis podobny w >=75%."""
+    ta = [w for w in _nrm(a) if len(w) >= 4 and w not in _OGOLNE_FS]
+    tb = [w for w in _nrm(b) if len(w) >= 4 and w not in _OGOLNE_FS]
+    if any(x == y or (min(len(x), len(y)) >= 5 and (x.startswith(y) or y.startswith(x))) for x in ta for y in tb): return True
+    return difflib.SequenceMatcher(None, ' '.join(_nrm(a)), ' '.join(_nrm(b))).ratio() >= 0.75
+
+
 def _pilka_fs(s):
     fs = pd.concat([czytaj('wyniki_fs_pilka_*.csv'), czytaj('wyniki_fs_inne_*.csv')], ignore_index=True)
     if not len(fs): return s
@@ -383,11 +409,15 @@ def _pilka_fs(s):
     n0 = len(fs)
     fs['kraj'] = fs.kraj.map(_kraj_365)
     fs['sport'] = 'football'
-    # mlodziez, kobiety, rezerwy, sparingi — tylko przez 365 (tam sa oznaczone); z FS nie wchodza wcale
-    mk = [bool(_MLODZI_KOBIETY_FS.search(f'{t}')) or bool(_MLODZI_KOBIETY_FS.search(a_.strip())) or bool(_MLODZI_KOBIETY_FS.search(b_.strip()))
-          for t, a_, b_ in zip(fs.turniej, fs.gosp, fs.gosc)]
-    fs = fs[[not x for x in mk]]
-    n_mk = sum(mk)
+    # 03.10.2026: do dzis odpadaly tu WSZYSTKIE mecze z kobietami/mlodzieza/rezerwami (ok. 2000 z 8300), a regex
+    # na nazwie turnieju lapal tez „Serie B”, „Primera B”, „Group B” (\bB$) — gubily sie zwykle ligi seniorow.
+    # Teraz odpadaja tylko sparingi; reszta idzie ta sama droga co inne mecze FS (odsianie lig 365, pucharow,
+    # dubli). Nazwy w rozgrywkach INNE_DRUZYNY dostaja znacznik (W/U19/Res.) PRZED porownaniem — po obu stronach,
+    # zeby „Arsenal W” (FS) i „Arsenal” z ligi kobiet 365 byly tym samym meczem, a nie dublem.
+    mk = fs.turniej.str.contains(r'\bfriendl', case=False) | fs.gosp.str.contains(r'\bfriendl', case=False)
+    n_mk = int(mk.sum())
+    fs = _oznacz_inne(fs[~mk])
+    s = _oznacz_inne(s)
     ligi365 = set(zip(s.kraj.str.lower(), s.turniej.str.lower())) if len(s) else set()
     fs = fs[[(k.lower(), t.lower()) not in ligi365 for k, t in zip(fs.kraj, fs.turniej)]]
 
@@ -478,8 +508,21 @@ def _pilka_fs(s):
                        for q in dd for h, g in po_dniu.get(q, []))
         dubel.append(jest)
     fs = fs[~pd.Series(dubel, index=fs.index, dtype=bool)]
-    print(f'  zewn: pilka z Flashscore: {n0} meczow; odrzucono {n_mk} mlodziezowych/kobiecych/rezerw/sparingow; po odsianiu lig '
-          f'i meczow obecnych w 365scores zostaje {len(fs)} ({fs.kraj.nunique()} krajow); '
+    # 4) 03.10.2026: dubel po WYNIKU — ten kraj, +-1 dzien, ten sam wynik i gospodarz LUB gosc podobny (wspolny
+    #    wyrazisty czlon albo zapis podobny w >=75%). Zmierzone na 17.09-03.10: Liga Alef (FS) = Division 3 (365)
+    #    („Tzeirey Tamra”/„SC Tzeirei Tamra”), „Ath Bilbao B”/„Athletic Bilbao B”, „Irapuato II”/„Irapuato "B"”.
+    #    Wspolny wynik w tym samym kraju i dniu to mocny dowod; mylne odrzucenie gubi tylko mecz FS (bezpieczniej).
+    po_wyniku = {}
+    if len(s) and {'wg', 'wa'} <= set(s.columns):
+        for d, k, a_, b_, g1, g2 in zip(s.data.str[:10], s.kraj.str.lower(), s.gosp, s.gosc, s.wg, s.wa):
+            po_wyniku.setdefault((k, d, str(g1), str(g2)), []).append((a_, b_))
+    dubel_w = [any(_podobna_druzyna(a_, h) or _podobna_druzyna(b_, g) for q in dni(d) for h, g in po_wyniku.get((k, q, str(g1), str(g2)), []))
+               for d, k, a_, b_, g1, g2 in zip(fs.data.str[:10], fs.kraj.str.lower(), fs.gosp, fs.gosc,
+                                               fs.get('wg', pd.Series('', index=fs.index)), fs.get('wa', pd.Series('', index=fs.index)))]
+    n_w = sum(dubel_w)
+    fs = fs[~pd.Series(dubel_w, index=fs.index, dtype=bool)]
+    print(f'  zewn: pilka z Flashscore: {n0} meczow; odrzucono {n_mk} sparingow; po odsianiu lig '
+          f'i meczow obecnych w 365scores ({n_w} rozpoznanych po wyniku) zostaje {len(fs)} ({fs.kraj.nunique()} krajow); '
           f'{len(mapa)} nazw druzyn i {len(lmapa)} lig przypisanych do zapisu 365; {n_zle} meczow odrzuconych, bo druzyna '
           f'z ligi znanej w 365 nie ma jednoznacznego odpowiednika.')
     return pd.concat([s, fs[s.columns]], ignore_index=True) if len(s) else fs
