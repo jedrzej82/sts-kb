@@ -51,7 +51,7 @@ STAN = os.path.expanduser('~/.zrodla_stan.json')
 OKNO_H = 3.5            # szczegoly dla meczow zaczynajacych sie w ciagu tylu godzin
 MAKS_SZCZEGOLY = 60     # na zrodlo i uruchomienie
 SURowe_NA_ZRODLO = 4
-SUROWE_LIMIT = {'90minut': 10, 'setka': 12}   # 03.10.2026: strony lig 90minut potrzebne w calosci do sprawdzenia parsera
+SUROWE_LIMIT = {'90minut': 10, 'setka': 25}   # 03.10.2026: strony lig 90minut potrzebne w calosci do sprawdzenia parsera
 SURowe_MAKS_B = 300_000
 
 H_SOFA = {**H_JSON, 'Referer': 'https://www.sofascore.com/', 'Origin': 'https://www.sofascore.com'}
@@ -805,10 +805,43 @@ def z_setka(s, w):
     if '/graphql' in sciezki:
         intro = '{"query":"{__schema{queryType{fields{name args{name type{name kind ofType{name}}} type{name kind ofType{name}}}}}}"}'
         w['setka_graphql'] = [setka_post(s, baza + '/graphql', intro)]
-    dz = dt.date.today()
-    for url in (f'/api/Matches/?date={dz}', f'/api/Matches/date/{dz}', '/api/Matches/results/', '/api/Matches/paged?page=1',
-                f'/api/DayPeriods/?date={dz}', '/api/Locations/'):
-        s.get('setka', baza + url, {**H_JSON, 'Accept': 'application/json, text/plain, */*', 'Origin': baza, 'Referer': baza + '/'}, proby=1)
+    setka_turnieje(s, w, dt.date.today())
+
+
+SETKA_NAGL = {**H_JSON, 'Accept': 'application/json, text/plain, */*', 'Origin': 'https://setkacup.com', 'Referer': 'https://setkacup.com/'}
+
+
+def setka_turnieje(s, w, dzien):
+    """03.10.2026 (kod aplikacji z telefonu 15:41): adresy to „/api/<Zasob>/” + jezyk (js.locale), parametry w query:
+    getTournaments -> /api/Tournaments/<jez>?<query> (lista: id, locationId, dayPeriodToken, startDate),
+    getTournamentDetails -> /api/Matches/<jez>?<query z tournamentId>, getLocations -> /api/Locations/<jez>,
+    getDayPeriods -> /api/DayPeriods/<jez>. Nazwy parametrow daty nieznane — probujemy warianty i zapisujemy
+    PELNE odpowiedzi (surowe), parser wynikow na ich podstawie."""
+    baza = 'https://setkacup.com'
+    for jez in ('en', 'ru'):
+        for zas in ('Locations', 'DayPeriods'):
+            s.get('setka', f'{baza}/api/{zas}/{jez}', SETKA_NAGL, proby=1)
+    wczoraj = dzien - dt.timedelta(days=1)
+    warianty = [f'date={wczoraj}', f'date={wczoraj}T00:00:00', f'startDate={wczoraj}', f'from={wczoraj}&to={dzien}',
+                f'dateFrom={wczoraj}&dateTo={dzien}', f'day={wczoraj}', '']
+    proby = []
+    for q in warianty:
+        url = f'{baza}/api/Tournaments/en' + (f'?{q}' if q else '')
+        j = s.get_json('setka', url, SETKA_NAGL, proby=1)
+        n = len(j) if isinstance(j, list) else (len(j.get('data') or []) if isinstance(j, dict) else -1)
+        proby.append({'url': url, 'elementow': n, 'probka': json.dumps(j, ensure_ascii=False)[:1500] if j is not None else ''})
+        if n > 0:
+            t0 = j if isinstance(j, list) else j.get('data')
+            for t in t0[:2]:
+                tid = t.get('id') if isinstance(t, dict) else None
+                if tid is None: continue
+                for q2 in (f'tournamentId={tid}', f'id={tid}'):
+                    u2 = f'{baza}/api/Matches/en?{q2}'
+                    j2 = s.get_json('setka', u2, SETKA_NAGL, proby=1)
+                    proby.append({'url': u2, 'elementow': len(j2) if isinstance(j2, (list, dict)) else -1,
+                                  'probka': json.dumps(j2, ensure_ascii=False)[:3000] if j2 is not None else ''})
+            break
+    w['setka_proby'] = proby
 
 
 def setka_post(s, url, cialo):
