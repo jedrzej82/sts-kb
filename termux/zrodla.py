@@ -464,13 +464,30 @@ DARTY_STATY = (('25', 'srednia'), ('10011', 'proc_meczow'), ('1053', 'proc_check
 
 
 def darty_api(j, stat):
-    """DartsOrakel /api/stats/player (DataTables: {"data": [{rank, player_name, stat, ...}]}) — kolumny z kodu strony 03.10."""
+    """DartsOrakel /api/stats/player — uklad z odpowiedzi 03.10 08:35: {"recordsTotal", "data": [{player_key, player_name,
+    country, stat, rank, sumField1, sumField2 | total_matches, wins}]}. API pomija minMatches (21 680 graczy na statystyke)."""
     out = []
     for r in (j or {}).get('data', []) if isinstance(j, dict) else (j or []):
         if not isinstance(r, dict): continue
-        out.append({'stat': stat, 'pozycja': r.get('rank', ''), 'zawodnik': tekst_html(str(r.get('player_name', ''))),
-                    'wartosc': r.get('stat', ''), 'mecze': r.get('matches', r.get('played', ''))})
+        out.append({'stat': stat, 'klucz': r.get('player_key', ''), 'pozycja': r.get('rank', ''),
+                    'zawodnik': tekst_html(str(r.get('player_name', ''))), 'kraj': r.get('country') or '',
+                    'wartosc': r.get('stat', ''), 'licznik': r.get('sumField1', r.get('wins', '')),
+                    'mianownik': r.get('sumField2', r.get('total_matches', ''))})
     return out
+
+
+def darty_scal(wiersze, min_meczow=10):
+    """Jeden wiersz na gracza: mecze/wygrane z 'proc_meczow', pozostale statystyki jako kolumny; tylko gracze z >= min_meczow."""
+    g = {}
+    for r in wiersze:
+        x = g.setdefault(r['klucz'], {'klucz': r['klucz'], 'zawodnik': r['zawodnik'], 'kraj': r['kraj']})
+        if r['stat'] == 'proc_meczow':
+            x['mecze'], x['wygrane'] = r['mianownik'], r['licznik']
+        else:
+            x[r['stat']] = r['wartosc']
+            x[r['stat'] + '_n'] = r['mianownik']
+    return sorted((x for x in g.values() if isinstance(x.get('mecze'), int) and x['mecze'] >= min_meczow),
+                  key=lambda x: -float(str(x.get('srednia') or 0).rstrip('%') or 0))
 
 
 def z_darty(s, w, dzis):
@@ -482,7 +499,7 @@ def z_darty(s, w, dzis):
         url = (f'https://dartsorakel.com/api/stats/player?dateFrom={dzis - dt.timedelta(days=365)}&dateTo={dzis + dt.timedelta(days=1)}'
                f'&rankKey={klucz}&organStat=All&minMatches=10&tourCardYear=&showStatsBreakdown=0&excludeWGP=0')
         out += darty_api(s.get_json('darty', url, nag, pauza=1.0), nazwa)
-    w['darty_ranking'] = out
+    w['darty_ranking'] = darty_scal(out)
 
 
 def z_nhl(s, w, dzis):
