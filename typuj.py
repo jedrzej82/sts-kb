@@ -291,6 +291,8 @@ def _zaw_nazwy(a, b):
 # CELOWO NIE MA tu: u19/u21/u23, ii, b, reserves (to INNE druzyny) ani rdzeni typu
 # Real/Sporting/Dinamo/Independiente (to ONE sa wspolne dla wielu klubow).
 _OGOLNE = frozenset('fc cf sc ac as ss sv fk nk sk bk hk hc mhk vk kk rk ok ks cd ca cs ud sd ec afc cfc fbc sad '
+                    'bsc ksv krc kvc rsc kaa kfc '   # 03.10.2026: formy prawne (BSC Young Boys, KSV Roeselare, KRC Genk)
+
                     'club clube klub calcio futbol football fussball handball basket basketball volley volleyball '
                     'hockey sport sports de del la el the da do'.split())
 
@@ -997,6 +999,9 @@ def club(home, away, kursy, live=None):
     if len(hh):
         print('\nH2H (ost. 8):', ' | '.join(f"{r.MatchDate.date()} {r.HomeTeam} {int(r.FTHome)}:{int(r.FTAway)} {r.AwayTeam}" for r in hh.itertuples()))
     _mm = m[(m.HomeTeam.isin([h, a]) | m.AwayTeam.isin([h, a])) & m.FTHome.notna() & m.FTAway.notna()].sort_values('MatchDate')
+    global LIGA_BEZ_TESTU
+    LIGA_BEZ_TESTU = liga_bez_testu(m, {dh, da})
+    if LIGA_BEZ_TESTU: print(f'\nLIGA BEZ TESTU: {LIGA_BEZ_TESTU} — P informacyjnie, ZADNA noga z tego meczu NIE idzie na kupon.')
     dz = drugie_zrodlo([(r.MatchDate, r.HomeTeam, r.AwayTeam, int(r.FTHome), int(r.FTAway)) for r in _mm.itertuples()], h, a, rows)
     value(rows, kursy, dz, mecz=f'{home} - {away}', szacunek=bool(szac), polski='poland' in (kh, ka))
     for a_, b_, k_ in PARY:
@@ -1069,9 +1074,28 @@ RYNKI_ZAWYZONE_P70 = {'U2.5': (64, 0.745, 0.531), 'BTTS_nie': (60, 0.797, 0.517)
                       'BTTS_tak': (8, 0.833, 0.500), '2': (69, 0.757, 0.652)}
 
 
+LIGA_BEZ_TESTU = None   # 03.10.2026: powod blokady meczu z ligi bez historii/testu (ustawia main po rozpoznaniu lig)
+MIN_MECZOW_NA_KUPON = 60
+
+
+def liga_bez_testu(m, ligi):
+    """03.10.2026: ligi dolaczone do bazy dla rozpoznawania nazw (kobiety, mlodziez, rezerwy, amatorzy, ligi z < 60 meczami)
+    licza P, ale NIE ida na kupon, dopoki nie maja historii i testu wstecznego. Zwraca powod albo None."""
+    import zewn
+    for l in ligi:
+        if not isinstance(l, str): continue
+        if '|' in l and zewn.INNE_DRUZYNY.search(l.split('|', 1)[1]):
+            return f'liga {l} (kobiety/mlodziez/rezerwy/amatorzy) bez testu wstecznego'
+        n = int((m.Division == l).sum())
+        if n < MIN_MECZOW_NA_KUPON:
+            return f'liga {l}: {n} meczow w bazie (< {MIN_MECZOW_NA_KUPON}) — za malo historii'
+    return None
+
+
 def werdykt_nogi(k, dz):
     """P do kuponu wg Poprawek 48/58 i powod, gdy noga odpada.
     dz = wynik drugie_zrodlo(): {} (brak drugiego zrodla), {rynek: P | None}."""
+    if LIGA_BEZ_TESTU: return None, f'LIGA BEZ TESTU — {LIGA_BEZ_TESTU}'
     if dz is None: return None, 'drugie zrodlo nie liczone'
     if not dz: return None, 'BRAK DRUGIEGO ZRODLA'
     if k not in dz: return None, 'rynek bez drugiego zrodla'

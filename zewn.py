@@ -56,6 +56,31 @@ def _liga_nie_puchar(kraj, turniej):
 
 
 PUCHAR = re.compile(r'cup|pokal|copa|coupe|coppa|ta[cç]a|beker|pohar|puchar|friendl|qualif|play-?off|super ?cup|trophy|shield|u1\d|u2\d|youth|reserv|amateur|femen|feminin|women|frauen|damen|\(w\)|liga f$|premier league 2|primavera|juvenil|sub-?\d\d', re.I)
+# 03.10.2026 (uzytkownik: „nic nie moze sie gubic”): z PUCHAR wydzielone rozgrywki INNYCH DRUZYN (kobiety, mlodziez,
+# rezerwy, amatorzy) — w 365scores wchodza do bazy jako OSOBNE druzyny (znacznik w nazwie) i OSOBNA liga „kraj | turniej”
+# (nigdy kod pierwszej ligi: sofa_div mapowal „Liga Profesional - Reserva” na ARG). Na kupon nie ida (typuj: LIGA_BEZ_TESTU).
+INNE_DRUZYNY = re.compile(r'u1\d|u2\d|youth|reserv|amateur|femen|feminin|women|frauen|damen|\(w\)|liga f$|premier league 2|primavera|juvenil|sub-?\d\d', re.I)
+PUCHAR_WLASCIWY = re.compile(r'cup|pokal|copa|coupe|coppa|ta[cç]a|beker|pohar|puchar|friendl|qualif|play-?off|super ?cup|trophy|shield', re.I)
+MIN_MECZOW_LIGI = 10   # 03.10.2026: bylo 60 — nowe ligi (Flashscore od 09.2026) odpadaly w calosci; ponizej 60 = LIGA_BEZ_TESTU
+
+
+def znacznik_rozgrywek(turniej):
+    """Znacznik dopisywany do nazw druzyn rozgrywek INNE_DRUZYNY, gdy nazwa go nie ma: (W) / U19 / Res. / '' (amatorzy)."""
+    t = str(turniej)
+    if re.search(r'femen|feminin|women|frauen|damen|\(w\)|liga f$', t, re.I): return '(W)'
+    m = re.search(r'(?:u|sub-?)(\d\d)', t, re.I)
+    if m: return f'U{m.group(1)}'
+    if re.search(r'youth|juvenil|primavera', t, re.I): return 'U19'
+    if re.search(r'reserv|premier league 2', t, re.I): return 'Res.'
+    return ''
+
+
+def z_znacznikiem(nazwa, znak):
+    """Dopisuje znacznik, gdy nazwa nie ma znacznika TEGO rodzaju (nazwy.znaczniki) — „Racing Club Res.” bez zmian."""
+    import nazwy
+    if not znak: return nazwa
+    rodzaj = nazwy.znaczniki(znak)
+    return nazwa if set(rodzaj) <= set(nazwy.znaczniki(nazwa)) else f'{nazwa} {znak}'
 
 
 def _n(s): return unicodedata.normalize('NFKD', str(s)).encode('ascii', 'ignore').decode().lower().strip()
@@ -282,9 +307,14 @@ def pilka():
     s = czytaj('wyniki_*_pilka_*.csv', bez=r'^wyniki_fs_')
     s = _pilka_fs(s)
     if len(s):
-        _puchar = s.turniej.str.contains(PUCHAR) & ~pd.Series([_liga_nie_puchar(k, t) for k, t in zip(s.kraj, s.turniej)], index=s.index, dtype=bool)
+        _nie_puchar = ~pd.Series([_liga_nie_puchar(k, t) for k, t in zip(s.kraj, s.turniej)], index=s.index, dtype=bool)
+        _inne = s.turniej.str.contains(INNE_DRUZYNY) & ~s.turniej.str.contains(PUCHAR_WLASCIWY) & _nie_puchar
+        _puchar = s.turniej.str.contains(PUCHAR) & _nie_puchar & ~_inne
         s = s[~_puchar & ~s.kraj.str.contains(r'^(?:international|world|europe|south america|africa|asia|oceania|north america|north (?:and|&) central america|club.*)$', case=False)]
-        div = [sofa_div(k, t) or f'{k} | {t}' for k, t in zip(s.kraj, s.turniej)]
+        _inne = _inne.reindex(s.index)
+        zn = [znacznik_rozgrywek(t) if i else '' for t, i in zip(s.turniej, _inne)]
+        s = s.assign(gosp=[z_znacznikiem(g, z) for g, z in zip(s.gosp, zn)], gosc=[z_znacznikiem(g, z) for g, z in zip(s.gosc, zn)])
+        div = [f'{k} | {t}' if i else (sofa_div(k, t) or f'{k} | {t}') for k, t, i in zip(s.kraj, s.turniej, _inne)]
         s = s.assign(Division=div)
         # 30.09.2026 (przeglad): 365 podaje czesc sezonu pod „Regionalliga” i drugi raz pod „Regional League North/
         # Southwest” — sklejanie nazw odmawia (jedna nazwa z kilkoma), wiec ten sam mecz wchodzil dwa razy (221).
@@ -293,7 +323,7 @@ def pilka():
         s = s.assign(_c=_c).sort_values('_c', ascending=False, kind='stable').drop_duplicates(
             ['data', 'gosp', 'gosc', 'wg', 'wa']).drop(columns='_c').sort_index()
         n = s.groupby('Division').Division.transform('size')
-        s = s[(n >= 60) | s.Division.isin(set(ESPN_DIV.values()) | {kod for _, _, kod in SOFA_DIV})]   # nieznane ligi: tylko z historią ≥60 meczów
+        s = s[(n >= MIN_MECZOW_LIGI) | s.Division.isin(set(ESPN_DIV.values()) | {kod for _, _, kod in SOFA_DIV})]   # 03.10: bylo >= 60
         out.append(pd.DataFrame(dict(Division=s.Division, MatchDate=pd.to_datetime(s.data), HomeTeam=s.gosp, AwayTeam=s.gosc,
                                      FTHome=pd.to_numeric(s.wg, errors='coerce'), FTAway=pd.to_numeric(s.wa, errors='coerce'),
                                      HTHome=pd.to_numeric(s.okresy_g.str.split(';').str[0], errors='coerce'),

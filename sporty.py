@@ -996,7 +996,8 @@ def drugie_zrodlo(d, sport, h, g, p_h):
 # 29.09.2026 (Poprawka 60): ligi, w ktorych backtest nie znalazl przewagi modelu — WERDYKT zawsze NIE NA KUPON.
 # Liga Pro (CZ), walk-forward Elo na 4912 meczach 04-29.09 (2156 ocenionych, obaj gracze >= 15 meczow):
 # Brier 0,257 przy 0,250 dla rzutu moneta; faworyci P 70-80% wygrali 38% (n=65), P 60-70% — 54% (n=556).
-LIGI_BEZ_PRZEWAGI = {'Liga Pro': 'Liga Pro — backtest 29.09: model bez przewagi (Brier 0,257 > 0,25)'}
+LIGI_BEZ_PRZEWAGI = {'Liga Pro': 'Liga Pro — backtest 29.09: model bez przewagi (Brier 0,257 > 0,25)',
+                     'Setka Cup': 'Setka Cup — nowe zrodlo 03.10 (scores24), bez testu wstecznego'}
 
 
 # 02.10.2026 (Raport 12:00/18:00: hokej DEL/DEL2, P modelu o 16-49 pp nad rynkiem): druzyna po AWANSIE albo SPADKU
