@@ -331,3 +331,9 @@ sporty,Lahti Basketball,Namika Lahti,Raport 02.10 15:00 usterka 4 (Korisliiga; w
 sporty,Sporting Lizbona,Sporting Cp,Raport 02.10 15:00 usterka 5 (reczna; w bazie Sporting Cp),2026-10-02
 sporty,Koelner Haie,Kölner Haie,Raport 02.10 18:00 usterka 7 (DEL; w bazie Kölner Haie),2026-10-02
 typuj,Deportiva Tarma,ADT Tarma,Rozliczenie 01.10 NAZWA_NIEDOPASOWANA (Peru Liga 1; w bazie ADT Tarma),2026-10-02
+typuj,West Bromwich Albion,West Brom,03.10 audyt nazw: resolver dawal "Albion" (Urugwaj) — zgubione "West Bromwich",2026-10-03
+typuj,Queens Park Rangers,QPR,03.10 audyt nazw: resolver dawal "Queens Park" (Szkocja) — zgubione "Rangers",2026-10-03
+typuj,FC Barcelona,Barcelona,03.10 audyt nazw: resolver dawal "FC Barcelona Atlètic" (rezerwy),2026-10-03
+typuj,Grasshopper Club Zurich,Grasshoppers,03.10 audyt nazw: resolver dawal "Zurich" (inny klub — FC Zurich),2026-10-03
+typuj,Atletico-GO,Atl Goianiense,03.10 audyt nazw: resolver dawal "Atletico-MG" (Mineiro),2026-10-03
+typuj,Al Jazira,Jazira Abu Dhabi,03.10 audyt nazw: resolver dawal "Al Jazira Al Hamra" (inny klub ZEA),2026-10-03
