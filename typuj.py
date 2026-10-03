@@ -1139,46 +1139,11 @@ def ev_kelly(p, o):
     return ev, (max(0.0, ev / (o * TAX - 1)) if o * TAX > 1 else 0.0)
 
 
-# 03.10.2026: FILTR MODEL-RYNEK (KROK 6.4 instrukcji v7) — do tej pory istnial WYLACZNIE jako krok reczny
-# w instrukcji ("P do kuponu vs P z kursu; rozbieznosc > 15 pp utrzymana -> odrzuc") i w zadnym przebiegu nie byl
-# wykonywany przez kod: --kurs sluzylo tylko do EV, kursu sprawiedliwego i Kelly'ego. Kazda noga z Raportow 03.10,
-# ktora okazala sie artefaktem danych, lamala ten prog:
-#   Le Puy - Lusitanos X2: model 69,3% vs rynek 48,4% (20,9 pp) — gosc bez meczu od 140 dni;
-#   Salisbury - Dulwich Hamlet X2: model 66,2%, dane goscia z 2014 r.;
-#   hokej na rynku 1X2: P modelu jest "z dogrywka", wiec kontra czasowi regulaminowemu dawala +22...+23%.
-# Filtr tylko ODRZUCA nogi — nie jest w stanie zadnej dopuscic (A2: progi wolno zaostrzac, nie luzowac).
-MAX_ROZBIEZNOSC_RYNEK = 0.15
+# 03.10.2026: FILTR MODEL-RYNEK (KROK 6.4) mieszka w rynek.py — wspolny z sporty.py.
+# Nazwy reeksportowane, bo testy i starsze wywolania siegaja po typuj.p_rynku / typuj.MAX_ROZBIEZNOSC_RYNEK.
+from rynek import MAX_ROZBIEZNOSC_RYNEK, filtr_model_rynek, p_rynku    # noqa: F401
 
-# Rynki dopelniajace sie do 1 — po nich liczymy ksiege (overround) i zdejmujemy marze.
-_DOPELNIENIA = {'1': ('X', '2'), 'X': ('1', '2'), '2': ('1', 'X'),
-                '1X': ('2',), 'X2': ('1',), '12': ('X',),
-                'O0.5': ('U0.5',), 'U0.5': ('O0.5',), 'O1.5': ('U1.5',), 'U1.5': ('O1.5',),
-                'O2.5': ('U2.5',), 'U2.5': ('O2.5',), 'O3.5': ('U3.5',), 'U3.5': ('O3.5',),
-                'O4.5': ('U4.5',), 'U4.5': ('O4.5',),
-                'BTTS_tak': ('BTTS_nie',), 'BTTS_nie': ('BTTS_tak',),
-                'DNB_1': ('DNB_2',), 'DNB_2': ('DNB_1',)}
-
-
-def p_rynku(k, kursy):
-    """P rynku po zdjeciu marzy. None, gdy nie da sie policzyc ksiegi (brak kursu dopelnienia)."""
-    reszta = _DOPELNIENIA.get(k)
-    if reszta is None or k not in kursy: return None
-    try:
-        if not all(x in kursy and float(kursy[x]) > 1 for x in reszta) or float(kursy[k]) <= 1: return None
-        ksiega = 1 / float(kursy[k]) + sum(1 / float(kursy[x]) for x in reszta)
-    except (TypeError, ValueError, ZeroDivisionError):
-        return None
-    return (1 / float(kursy[k])) / ksiega if ksiega > 0 else None
-
-
-def filtr_model_rynek(k, p, kursy):
-    """KROK 6.4. Zwraca powod odrzucenia albo None. Brak kursu dopelnienia = brak filtra (nie blokujemy w ciemno)."""
-    pr = p_rynku(k, kursy)
-    if pr is None: return None
-    d = p - pr
-    if abs(d) <= MAX_ROZBIEZNOSC_RYNEK: return None
-    return (f'FILTR MODEL-RYNEK (6.4): P do kuponu {p:.1%} vs P rynku {pr:.1%} po zdjeciu marzy '
-            f'— rozbieznosc {d * 100:+.1f} pp, prog {MAX_ROZBIEZNOSC_RYNEK * 100:.0f} pp')
+__all__ = ['MAX_ROZBIEZNOSC_RYNEK', 'filtr_model_rynek', 'p_rynku']
 
 
 # 29.09.2026 (Poprawka 58.5, docs/BACKTEST_P48.md): rynki, na ktorych model przy P >= 70% mocno ZAWYZA.

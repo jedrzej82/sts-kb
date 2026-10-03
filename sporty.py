@@ -12,6 +12,7 @@ codziennie do sporty_delta.csv. Model uczy się od zera — im więcej wyników,
 Baza = sporty_hist.csv (NBA/WNBA/NHL/NFL/MLB z GitHub, hist_import.py) + sporty_delta.csv (wyniki dopisywane codziennie)."""
 import os, sys, re, difflib, unicodedata, numpy as np, pandas as pd
 import functools, html
+import rynek
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DB, LOG, CAL = (os.path.join(HERE, f) for f in ('sporty_delta.csv', 'sporty_typy.csv', 'sporty_kalibracja.csv'))
@@ -1172,6 +1173,9 @@ def main(a):
             print(f'\nBIEZACY SEZON (od {START_SEZONU}) — rozegrane kolejki na lige (A1 a: szacunek, gdy < 3):')
             print(biezacy_sezon(d).to_string())
     elif a[0] == 'typuj':
+        # 03.10.2026: sporty.py przyjmuje teraz kursy (--kurs 1=1.72 --kurs X=4.25 --kurs 2=3.60,
+        # albo Z1/Z2 dla rynku "Zwyciezca meczu" z dogrywka), zeby wykonac KROK 6.4 w kodzie.
+        a, kursy_cli = rynek.kursy_z_argv(a)
         sport = a[1].lower(); d = load(); inf = {}; R, N, hfa, draws, pdraw = elo(d, sport, info=inf); L_ = inf['last']
         pool = set(R); _KANDYDAT.clear(); h, g = resolve(a[2], pool, sport), resolve(a[3], pool, sport)
         h, g = potwierdz_rywalem(d, sport, (a[2], a[3]), (h, g))
@@ -1250,8 +1254,23 @@ def main(a):
                   f'P NIEPOROWNYWALNE z rynkiem (02.10: Krefeld, Dresdner Eislowen); nie buduj nogi kuponu, takze papierowej.')
         p_k, powody = werdykt_meczu(ok_, p_dz, n, _ligi_druzyny(d[d.sport == sport], h, 1) | _ligi_druzyny(d[d.sport == sport], g, 1),
                                     zmiany)
-        if powody:
-            print(f'\nWERDYKT: NIE NA KUPON — {"; ".join(powody)}')
+        # 03.10.2026 (KROK 6.4 + KROK 4.5). Dwie bramki, obie tylko odrzucajace:
+        # (a) P "z dogrywka" nie opisuje rynku 1/X/2, ktory jest czasem regulaminowym (P121.2).
+        #     03.10 na 11 nogach hokeja i recznej STS mial w ofercie WYLACZNIE 1/X/2, a doslowne
+        #     zastosowanie werdyktu dawalo EV +24,9% / +9,1% / +9,0% zamiast +3,2% / -9,8% / -10,0%.
+        # (b) rozbieznosc z rynkiem > 15 pp (03.10: Vitoria SC - FC Porto 42,0% vs 5,7% = 36,3 pp).
+        pow_rynek = None
+        if not powody and kursy_cli:
+            strona = '1' if fav == h else '2'
+            if draws and not any(k in kursy_cli for k in ('Z1', 'Z2')) and any(k in kursy_cli for k in ('1', 'X', '2')):
+                pow_rynek = ('P jest "z dogrywka", a podane kursy to rynek 1/X/2 = CZAS REGULAMINOWY (P121.2) — '
+                             'to nie jest ten sam rynek. Podaj --kurs Z1/Z2 ("Zwyciezca meczu") albo policz EV '
+                             'z P dla 60 min z tabeli wyzej')
+            else:
+                klucz = ('Z' + strona) if ('Z' + strona) in kursy_cli else strona
+                pow_rynek = rynek.filtr_model_rynek(klucz, p_k, kursy_cli)
+        if powody or pow_rynek:
+            print(f'\nWERDYKT: NIE NA KUPON — {"; ".join(powody) if powody else pow_rynek}')
         else:
             print(f'\nWERDYKT: NOGA DOPUSZCZONA — {fav}' + (' (z dogrywka)' if draws else '')
                   + f', P do kuponu {p_k:.1%}' + (' (SZACUNEK: < 10 meczow)' if n < 10 else '')
