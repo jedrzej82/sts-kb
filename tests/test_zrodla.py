@@ -320,40 +320,36 @@ def test_90minut_bez_dzisiejszych_wynikow():
     assert [(x['gosp'], x['data']) for x in w['90minut_mecze']] == [('A', '2026-10-02')]
 
 
-def test_setka_api_z_kodu_aplikacji():
-    # 03.10: setkacup.com to aplikacja JS („Loading application...”) — adresy API szukane w app.*.js
-    js = ('var a="https://api.setkacup.com/v1",b="/api/matches?date="+d,c=`/api/tournaments/${id}`;'
-          'x("https://www.googletagmanager.com/gtm.js");y.get("/v2/results/list")')
-    pelne, sciezki = z.setka_api(js)
-    assert pelne == ['https://api.setkacup.com/v1']
-    assert sciezki == ['/api/matches?date=', '/api/tournaments/${id}', '/v2/results/list']
-    s = z.Sesja(600)
-    adresy = []
-    s.get = lambda zr, url, *a, **k: adresy.append((zr, url)) or ((200, '<script src="/app.x.js"></script>') if url.endswith('.com/') else (200, js))
-    w = {}
-    z.z_setka(s, w)
-    assert ('setka_js', 'https://setkacup.com/app.x.js') in adresy
-    assert ('setka', 'https://setkacup.com/api/matches?date=') in adresy        # kandydat o meczach sprawdzony
-    assert not any('${' in u for _, u in adresy)                              # szablonow nie wolamy
-    assert {'adres': '/v2/results/list'} in w['setka_api']
+# 03.10.2026: prawdziwa odpowiedz setkacup.com /api/Tournaments/en?date=2026-10-02 (telefon 15:52) — 2 mecze turnieju
+# „2026-10-02 Men Morning Rome” (bez zdjec) i walkower z „Men Evening Europe” (statusId 4, technicalResult 1, wynik L/W)
+SETKA_MECZE = [{'id': 832988, 'tournamentId': 63306, 'statusId': 3, 'position': 1, 'player1': {'id': 1312, 'firstName': 'Oleksandr', 'lastName': 'Syksa', 'gender': True}, 'player1ColorId': 2, 'player2': {'id': 1318, 'firstName': 'Oleksandr', 'lastName': 'Lyman', 'gender': True}, 'player2ColorId': 5, 'player1Score': '3', 'player2Score': '1', 'technicalResult': 0, 'startDate': '2026-10-02T04:30:00.000Z', 'activePlayerId': 1318, 'reverse': 1, 'forPositionId': 1, 'tournamentName': '2026-10-02 Men Morning Rome', 'locationId': 13, 'dayPeriodToken': 1, 'correction': 0, 'winner': {'id': 1312, 'firstName': 'Oleksandr', 'lastName': 'Syksa', 'gender': True}, 'setScores': [{'match_id': 832988, 'number': 1, 'p1Score': 6, 'p2Score': 11}, {'match_id': 832988, 'number': 2, 'p1Score': 11, 'p2Score': 4}, {'match_id': 832988, 'number': 3, 'p1Score': 11, 'p2Score': 6}, {'match_id': 832988, 'number': 4, 'p1Score': 14, 'p2Score': 12}]}, {'id': 832989, 'tournamentId': 63306, 'statusId': 3, 'position': 2, 'player1': {'id': 177, 'firstName': 'Dmytro', 'lastName': 'Prylepa', 'gender': True}, 'player1ColorId': 2, 'player2': {'id': 1306, 'firstName': 'Dmytro', 'lastName': 'Kuzmenko', 'gender': True}, 'player2ColorId': 5, 'player1Score': '3', 'player2Score': '2', 'technicalResult': 0, 'startDate': '2026-10-02T05:00:00.000Z', 'activePlayerId': 177, 'reverse': 1, 'forPositionId': 1, 'tournamentName': '2026-10-02 Men Morning Rome', 'locationId': 13, 'dayPeriodToken': 1, 'correction': 0, 'winner': {'id': 177, 'firstName': 'Dmytro', 'lastName': 'Prylepa', 'gender': True}, 'setScores': [{'match_id': 832989, 'number': 1, 'p1Score': 6, 'p2Score': 11}, {'match_id': 832989, 'number': 2, 'p1Score': 11, 'p2Score': 6}, {'match_id': 832989, 'number': 3, 'p1Score': 11, 'p2Score': 8}, {'match_id': 832989, 'number': 4, 'p1Score': 2, 'p2Score': 11}, {'match_id': 832989, 'number': 5, 'p1Score': 11, 'p2Score': 5}]}]
+SETKA_WALKOWER = {'id': 833078, 'tournamentId': 63313, 'statusId': 4, 'player1': {'firstName': 'Volodymyr', 'lastName': 'Voronenkov', 'gender': True}, 'player2': {'firstName': 'Andrii', 'lastName': 'Hrabskyi', 'gender': True}, 'player1Score': 'L', 'player2Score': 'W', 'technicalResult': 1, 'startDate': '2026-10-02T10:40:00.000Z', 'setScores': []}
 
 
-def test_setka_turnieje_warianty_i_mecze():
-    # 03.10 15:41: /api/<Zasob>/<jezyk>?query — pierwszy wariant daty z niepusta lista turniejow, potem mecze turnieju
+def test_setka_wiersze_z_prawdziwej_odpowiedzi():
+    r = z.setka_wiersze([{'id': 63306, 'matches': SETKA_MECZE + [SETKA_WALKOWER]}])
+    assert [(x['data'], x['gosp'], x['gosc'], x['wg'], x['wa'], x['zwyciezca']) for x in r] == [
+        ('2026-10-02', 'Syksa Oleksandr', 'Lyman Oleksandr', 3, 1, 1), ('2026-10-02', 'Prylepa Dmytro', 'Kuzmenko Dmytro', 3, 2, 1)]
+    assert r[0]['okresy_g'] == '6;11;11;14' and r[0]['okresy_a'] == '11;4;6;12'
+    assert r[0]['runda'] == 'setka:832988' and r[0]['turniej'] == 'Setka Cup' and r[0]['kraj'] == 'UKRAINE'
+    assert set(r[0]) == set(z.NAGL_WYNIKI)
+
+
+def test_setka_dni_od_stanu_i_limit(tmp_path, monkeypatch):
     import datetime as dt
+    monkeypatch.setattr(z, 'WYNIKI_DIR', str(tmp_path / 'w'))
+    kat = tmp_path / 'k'; kat.mkdir()
     s = z.Sesja(600)
     pyt = []
-    s.get = lambda zr, url, *a, **k: pyt.append(url) or (200, '[]')
-    def gj(zr, url, *a, **k):
-        pyt.append(url)
-        if 'Tournaments/en?startDate=' in url: return [{'id': 77, 'locationId': 1, 'startDate': '2026-10-02T08:00:00'}]
-        if 'Matches/en?tournamentId=77' in url: return [{'player1': 'A', 'player2': 'B'}]
-        return []
-    s.get_json = gj
-    w = {}
-    z.setka_turnieje(s, w, dt.date(2026, 10, 3))
-    assert 'https://setkacup.com/api/Locations/en' in pyt
-    udane = [p for p in w['setka_proby'] if p['elementow'] > 0]
-    assert udane[0]['url'] == 'https://setkacup.com/api/Tournaments/en?startDate=2026-10-02'
-    assert udane[1]['url'] == 'https://setkacup.com/api/Matches/en?tournamentId=77'
-    assert not any('Tournaments/en?day=' in u for u in pyt)              # po trafieniu dalsze warianty pominiete
+    s.get_json = lambda zr, url, *a, **k: pyt.append(url) or [{'id': 1, 'matches': SETKA_MECZE}]
+    stan, w = {}, {}
+    z.z_setka(s, w, dt.datetime(2026, 10, 3, 13, 0), stan, str(kat))
+    assert len(pyt) == z.SETKA_HIST_DNI + 1 and pyt[0].endswith('date=2026-09-12') and pyt[-1].endswith('date=2026-10-03')
+    assert stan['setka_do'] == '2026-10-03'                    # dzisiejszy dzien pobierany ponownie przy nastepnym
+    assert w['_pliki_wynikow'] and all('wyniki_setka_inne_' in p for p in w['_pliki_wynikow'])
+    pyt.clear(); z.z_setka(s, {}, dt.datetime(2026, 10, 3, 16, 0), stan, str(kat))
+    assert pyt == ['https://setkacup.com/api/Tournaments/en?date=2026-10-03']
+    s.get_json = lambda zr, url, *a, **k: None                    # blad -> stan bez zmian, nastepne uruchomienie ponowi
+    z.z_setka(s, {}, dt.datetime(2026, 10, 4, 1, 0), stan, str(kat))
+    assert stan['setka_do'] == '2026-10-03'
+
