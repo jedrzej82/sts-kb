@@ -27,8 +27,28 @@ MAKS_ROZNICA = 0.35
 BUKMACHERZY = ('STS', 'SUPERBET', 'LVBET')
 
 
+_OBCIETE = re.compile(r'\s*(?:\.\.\.|…)\s*$')
+
+
+def _obciete(n):
+    """PDF STS ucina dlugie nazwy: „Polonia Lidzbark W...”, „Podravka Kopri...”. Zwraca (czy_obcieta, nazwa bez
+    niepelnego ostatniego czlonu). 03.10: ucięte „W...” bylo czytane jako znacznik kobiet, a z „Podravka Kopri...”
+    znikal znacznik [K] — mecz nie laczyl sie z LVBET/Superbet."""
+    n = str(n)
+    if not _OBCIETE.search(n): return False, n
+    t = _OBCIETE.sub('', n).split()
+    return True, ' '.join(t[:-1]) if len(t) > 1 else ' '.join(t)
+
+
 def _zn(n):
+    """Znaczniki nazwy; None = nieznane (nazwa ucieta w PDF — znacznik mogl byc w ucietej czesci)."""
+    ob, n = _obciete(n)
+    if ob: return None
     return nazwy.znaczniki(re.sub(r'\((?:Wom|Women)\)', '(W)', str(n), flags=re.I))
+
+
+def _zn_rowne(a, b):
+    return a is None or b is None or a == b
 
 
 # 02.10.2026: pisownia tego samego miasta u roznych bukmacherow (STS „Pilzno”, Superbet „Plzen”; „Munchen” obok
@@ -36,6 +56,8 @@ def _zn(n):
 # Konga”), STS pisze „DR Kongo” (Raport 02.10 12:00). Tylko porownanie nazw u bukmacherow — rozliczen i typowania nie dotyczy.
 PISOWNIA = {'konga': 'kongo', 'pilzno': 'plzen', 'pilsen': 'plzen', 'munchen': 'munich', 'muenchen': 'munich', 'chernigiv': 'chernihiv',
             'kobenhavn': 'copenhagen', 'koebenhavn': 'copenhagen'}
+# cala nazwa (nie czlon — „WKS Slask” to klub): 03.10 Superbet „WKS - Kamerun”, STS „Wybrzeże Kości Słoniowej - Kamerun”
+CALE_NAZWY = {'wks': 'wybrzeze kosci sloniowej'}
 
 
 def _pisownia(slowo):
@@ -51,6 +73,8 @@ def _pisownia(slowo):
 def _rdzen(n):
     """Nazwa bez znacznikow (U21, (W), II, Res. …) — znaczniki porownuje _zn, a wspolne „U21” to nie podobna nazwa
     (02.10: „Slowenia U21 - Holandia U21” bylo niejednoznaczne z „Austria U21 - Dania U21” o tej samej godzinie)."""
+    n = _obciete(n)[1]
+    n = CALE_NAZWY.get(_pisownia(str(n).strip().lower()), n)
     t = [x for x in re.split(r'\s+', re.sub(r'\((?:Wom|Women)\)', '', str(n), flags=re.I))
          if not nazwy.ZNACZNIK.match(x.strip('[](){}<>.,;:'))]
     return ' '.join(_pisownia(x) or x for x in t) or str(n)
@@ -136,7 +160,8 @@ def dopasuj_mecze(sts, buk):
         c = g[(g.t - r.t).abs() <= TOLERANCJA_MIN]
         c = [x for x in c.itertuples(index=False)
              if _podobne(r.gospodarz, x.gospodarz) and _podobne(r.gosc, x.gosc)
-             and _zn(r.gospodarz) == _zn(x.gospodarz) and _zn(r.gosc) == _zn(x.gosc)]
+             and _zn_rowne(_zn(r.gospodarz), _zn(x.gospodarz)) and _zn_rowne(_zn(r.gosc), _zn(x.gosc))
+             and not (_zn(r.gospodarz) is None and _zn(r.gosc) is None)]   # obie strony uciete = znaczniki nieznane
         pary = {(x.gospodarz, x.gosc) for x in c}
         if len(pary) == 1:
             wynik[(r.sport, r.data_meczu, r.gospodarz, r.gosc)] = next(iter(pary)); stat['jednoznaczne'] += 1

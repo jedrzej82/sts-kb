@@ -49,5 +49,6 @@ Użytkownik liczy w czasie polskim (UTC+2 latem): 10:00 UTC = 12:00 PL. Przebieg
   instalacja: `termux/instaluj_zrodla.sh`.
 - Nazwy: `nazwy.py` (wspólne znaczniki), `aliasy.csv` (aliasy jako dane; działają tylko, gdy cel jest w puli),
   `dopasuj.py` (nauka aliasów STS -> baza z dowodów w źródłach: kotwica = jedyny mecz rozpoznanej drużyny w dniu meczu,
-  godzina = ten sam mecz w terminarzu ±5 min; sprzeczności z resolverem tylko do raportu, nic nie nadpisują).
+  godzina = ten sam mecz w terminarzu ±5 min; sprzeczności z resolverem tylko do raportu, nic nie nadpisują; `dopasuj.py liga` = kotwica ligowa dla meczów jeszcze bez wyniku: jedyny kandydat o pasującym rdzeniu nazwy
+  grający w lidze rozpoznanego rywala albo jedyna para kandydatów ze wspólną ligą — wynik do przejrzenia przed dopisaniem).
 - Apps Script (wkleja użytkownik): `apps_script/terminarz.gs`, `apps_script/ligapro.gs`, `apps_script/arkusze.gs` (arkusze statystyk jako .csv.gz), `apps_script/dzienniki.gs` (wszystkie dzienniki w jednym dzienniki.zip; `python3 przebieg.py --dzienniki`), `apps_script/paczka.gs` (wszystkie dane przebiegu w jednym paczka.zip — przebieg.py rozpakowuje ja sam).

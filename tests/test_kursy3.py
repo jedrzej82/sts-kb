@@ -192,3 +192,31 @@ def test_raport_0210_1200_dr_kongo_i_porownanie_niepelne():
     # bukmacher bez nogi, ale gorszy na pozostalych -> bez ostrzezenia
     gorszy = [('A - B', 'U3.5', {'STS': 1.6, 'LVBET': 1.5}), ('C - D', 'O1.5', {'STS': 1.3})]
     assert 'NIEPELNE' not in kursy3.gdzie_grac(gorszy, {'STS': 2.08})
+
+
+def test_obciete_nazwy_pdf_i_cale_nazwy():
+    # 03.10 (oferta 03.10 vs LVBET/Superbet 02.10 20:43): PDF STS ucina nazwy — „W...” bylo znacznikiem kobiet,
+    # z „Podravka Kopri...” znikal [K]; Superbet pisze „WKS” zamiast „Wybrzeże Kości Słoniowej”
+    import kursy3 as k
+    assert k._obciete('Polonia Lidzbark W...') == (True, 'Polonia Lidzbark')
+    assert k._obciete('Sokół Aleksandrów Ł…') == (True, 'Sokół Aleksandrów')
+    assert k._obciete('Lech Poznań') == (False, 'Lech Poznań')
+    assert k._zn('Polonia Lidzbark W...') is None and k._zn('Medyk Konin [K]') == ('kobiety',)
+    assert k._podobne('Polonia Lidzbark W...', 'MKS Polonia Lidzbark Warminski')
+    assert k._podobne('Wybrzeże Kości Słoniowej', 'WKS') and not k._podobne('WKS Śląsk Wrocław', 'Wybrzeże Kości Słoniowej')
+    sts = k.pd.DataFrame([('PIŁKA RĘCZNA', '2026-10-03', '16:00', 'HSG Blomberg-Lippe [K]', 'Podravka Kopri...'),
+                          ('PIŁKA NOŻNA', '2026-10-03', '15:00', 'Lechia Tomaszów Mazowiecki', 'Polonia Lidzbark W...'),
+                          ('PIŁKA NOŻNA', '2026-10-03', '21:00', 'Wybrzeże Kości Słoniowej', 'Kamerun')],
+                         columns=['sport', 'data_meczu', 'godzina_meczu', 'gospodarz', 'gosc'])
+    buk = k.pd.DataFrame([('PIŁKA RĘCZNA', '2026-10-03', '16:00', 'HSG Blomberg-Lippe (Kobiety)', 'ZRK Podravka Vegeta (Kobiety)'),
+                          ('PIŁKA RĘCZNA', '2026-10-03', '16:00', 'HSG Blomberg-Lippe', 'Podravka Vegeta'),   # mezczyzni — nie
+                          ('PIŁKA NOŻNA', '2026-10-03', '15:00', 'Lechia Tomaszów Mazowiecki', 'MKS Polonia Lidzbark Warminski'),
+                          ('PIŁKA NOŻNA', '2026-10-03', '21:00', 'WKS', 'Kamerun')],
+                         columns=['sport', 'data_meczu', 'godzina_meczu', 'gospodarz', 'gosc'])
+    m, st = k.dopasuj_mecze(k.zdarzenia(sts), k.zdarzenia(buk))
+    assert st == {'jednoznaczne': 3, 'brak': 0, 'kilka': 0}
+    assert m[('PIŁKA RĘCZNA', '2026-10-03', 'HSG Blomberg-Lippe [K]', 'Podravka Kopri...')] == \
+        ('HSG Blomberg-Lippe (Kobiety)', 'ZRK Podravka Vegeta (Kobiety)')
+    # obie strony uciete = znaczniki nieznane -> nie laczymy (mogloby trafic w mecz kobiet albo mezczyzn)
+    s2 = sts.iloc[:1].assign(gospodarz='HSG Blomberg-Li...')
+    assert k.dopasuj_mecze(k.zdarzenia(s2), k.zdarzenia(buk))[1]['jednoznaczne'] == 0
