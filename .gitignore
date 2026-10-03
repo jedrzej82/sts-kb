@@ -52,3 +52,7 @@ zaklady_faktyczne*.csv
 ligi_extra.csv
 ligi_extra_nazwy.json
 mma_metody.csv
+# 03.10.2026: pliki z telefonu (termux/zrodla.py) — dane, tylko na Dysku
+zrodla_*.csv.gz
+zrodla_diag_*.txt
+zrodla_surowe_*.jsonl.gz
