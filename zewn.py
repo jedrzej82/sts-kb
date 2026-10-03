@@ -662,6 +662,40 @@ def _bez_kraju(n):
     return re.sub(r'\s*\([A-Z][a-z]{2}\)$', '', str(n))
 
 
+def _fsx_mapa_lig(fs, pary_lig, min_wspolnych=2, min_udzial=0.5):
+    """(sport, kraj FS, turniej FS) -> (kraj 365, turniej 365) dla lig, ktore sa TA SAMA liga w obu zrodlach.
+
+    04.10.2026 (P133.6, Raport 03.10 21:00 KOREKTA 1). 365scores i Flashscore nazywaja te same rozgrywki
+    inaczej: „Spain | 1ª FEB” i „SPAIN | Primera FEB”, „Germany | Bundesliga” i „GERMANY | BBL”,
+    „France | Lidl Starligue” i „FRANCE | Starligue”. Baza dostawala wtedy DWIE ligi zamiast jednej,
+    a zmiana_ligi() widziala w tym AWANS albo SPADEK: Cb Zamora „1ª FEB -> Primera FEB” dostawalo bramke
+    z P133, choc nigdzie nie awansowalo. _scal_nazwy_rozgrywek tego nie lapie, bo dziala wewnatrz JEDNEGO
+    zrodla (czytaj() po wzorcu pliku), a tu nazwy pochodza z dwoch roznych plikow.
+
+    Sygnal jest STRUKTURALNY, nie podobienstwem nazw (ta sama zasada co w _scal_nazwy_rozgrywek): liga FS
+    jest ta sama co liga 365, gdy POTWIERDZONE DUBLE — ten sam mecz w obu zrodlach — lacza je ze soba.
+    Zabezpieczenia wziete z dwoch regresji tamtej funkcji:
+      * dokladnie JEDEN odpowiednik 365 (inaczej nie zgadujemy),
+      * co najmniej `min_wspolnych` meczow i `min_udzial` meczow ligi FS (jeden wspolny mecz sklejal kiedys
+        II lige z I przez baraz),
+      * obie nazwy po tej samej stronie OBU filtrow pucharowych. Sam PUCHAR nie wystarcza: zawiera
+        „women”, wiec „Euroleague Women - Qualification” i „Euroleague Women” sa po tej samej jego
+        stronie. Dopiero PUCHAR_WLASCIWY (same puchary i fazy: cup, qualif, play-off) odrzuca
+        mapowanie ELIMINACJI na rozgrywki glowne, ktore zmieniloby znaczenie danych.
+    """
+    if not len(fs) or not pary_lig: return {}
+    licz = fs.groupby(['sport', 'kraj', 'turniej']).size()
+    mapa = {}
+    for k, cele in pary_lig.items():
+        if len(cele) != 1: continue
+        cel, n = next(iter(cele.items()))
+        if (_kraj_365(k[1]), k[2]) == cel: continue                       # juz ten sam zapis
+        if n < max(min_wspolnych, min_udzial * int(licz.get(k, 0))): continue
+        if any(bool(rx.search(str(k[2]))) != bool(rx.search(str(cel[1]))) for rx in (PUCHAR, PUCHAR_WLASCIWY)): continue
+        mapa[k] = cel
+    return mapa
+
+
 def _fsx_bez_dubli(s, fsx=None):
     """29.09.2026: wyniki koszykowki/recznej/siatkowki z Flashscore (wyniki_fsx_inne_*, Apps Script wynikiFsDruzynowe).
     Mecz z Flashscore jest DUBLEM, gdy 365scores ma tego dnia mecz tego sportu z obiema pasujacymi druzynami
@@ -679,19 +713,26 @@ def _fsx_bez_dubli(s, fsx=None):
     baza = s[~jest & s.sport.isin(FSX_SPORTY)]
     dni = {}
     for r in baza.itertuples():
-        dni.setdefault((r.sport, str(r.data)[:10]), []).append((r.gosp, r.gosc, str(r.wg), str(r.wa)))
+        dni.setdefault((r.sport, str(r.data)[:10]), []).append((r.gosp, r.gosc, str(r.wg), str(r.wa), r.kraj, r.turniej))
     dubel = pd.Series(False, index=s.index)
     pary = {}   # (sport, nazwa FS) -> {nazwa 365} z potwierdzonych dubli
+    pary_lig = {}   # (sport, kraj FS, turniej FS) -> {(kraj 365, turniej 365): ile wspolnych meczow}
     for i, r in s[jest].iterrows():
-        for g, a, wg, wa in dni.get((r.sport, str(r.data)[:10]), ()):
+        for g, a, wg, wa, b_kraj, b_turniej in dni.get((r.sport, str(r.data)[:10]), ()):
             proste = (pasuje(r.gosp, g), pasuje(r.gosc, a)); odwr = (pasuje(r.gosp, a), pasuje(r.gosc, g))
             # druzyna gra najwyzej raz dziennie: ten sam dzien + ten sam wynik + jedna pasujaca druzyna = ten sam mecz
             # (29.09: „Hamburg”/„HSV Handball”, „Kobe”/„Nishinomiya”, „Ulm”/„Ratiopharm Ulm” — 33 takie przypadki)
+            trafil = False
             if all(proste) or (any(proste) and (str(r.wg), str(r.wa)) == (wg, wa)):
-                dubel[i] = True; pary.setdefault((r.sport, r.gosp), set()).add(g); pary.setdefault((r.sport, r.gosc), set()).add(a); break
-            if all(odwr) or (any(odwr) and (str(r.wg), str(r.wa)) == (wa, wg)):
-                dubel[i] = True; pary.setdefault((r.sport, r.gosp), set()).add(a); pary.setdefault((r.sport, r.gosc), set()).add(g); break
+                dubel[i] = True; pary.setdefault((r.sport, r.gosp), set()).add(g); pary.setdefault((r.sport, r.gosc), set()).add(a); trafil = True
+            elif all(odwr) or (any(odwr) and (str(r.wg), str(r.wa)) == (wa, wg)):
+                dubel[i] = True; pary.setdefault((r.sport, r.gosp), set()).add(a); pary.setdefault((r.sport, r.gosc), set()).add(g); trafil = True
+            if trafil:
+                lg = pary_lig.setdefault((r.sport, r.kraj, r.turniej), {})
+                lg[(b_kraj, b_turniej)] = lg.get((b_kraj, b_turniej), 0) + 1
+                break
     zostaje = jest & ~dubel
+    mapa_lig = _fsx_mapa_lig(s[jest], pary_lig)
     nazwy = {sp: sorted(set(g.gosp) | set(g.gosc)) for sp, g in baza.groupby('sport')}
     fs_nazwy = {sp: {_bez_kraju(n) for n in set(g.gosp) | set(g.gosc)} for sp, g in s[jest].groupby('sport')}
     kraje = {}   # (sport, nazwa) -> kraje/rozgrywki miedzynarodowe, w ktorych druzyna grala (365 i FS osobno)
@@ -728,12 +769,26 @@ def _fsx_bez_dubli(s, fsx=None):
         if len({_bez_kraju(k[1]) for k in zr}) > 1 and niepewne:   # „Seoul Knights” i „Seoul Knights (Kor)” to jeden klub
             for k in niepewne: del mapa[k]; zle += 1
     s = s.copy()
-    s.loc[zostaje, 'kraj'] = s.loc[zostaje, 'kraj'].map(_kraj_365)
+    # nazwa ligi PRZED krajem: mapa_lig jest kluczowana krajem w zapisie Flashscore
+    przeniesione = {}
+    if mapa_lig:
+        kl = list(zip(s.loc[zostaje, 'sport'], s.loc[zostaje, 'kraj'], s.loc[zostaje, 'turniej']))
+        for k in kl:
+            if k in mapa_lig: przeniesione[k] = przeniesione.get(k, 0) + 1
+        s.loc[zostaje, 'kraj'] = [mapa_lig[k][0] if k in mapa_lig else k[1] for k in kl]
+        s.loc[zostaje, 'turniej'] = [mapa_lig[k][1] if k in mapa_lig else k[2] for k in kl]
+        zmapowane = zostaje.copy(); zmapowane[zostaje] = [k in mapa_lig for k in kl]
+    else:
+        zmapowane = pd.Series(False, index=s.index)
+    s.loc[zostaje & ~zmapowane, 'kraj'] = s.loc[zostaje & ~zmapowane, 'kraj'].map(_kraj_365)
     for c in ('gosp', 'gosc'):
         s.loc[zostaje, c] = [mapa.get((sp, t), t) for sp, t in zip(s.loc[zostaje, 'sport'], s.loc[zostaje, c])]
     print(f'  zewn: koszykowka/reczna/siatkowka z Flashscore: {int(jest.sum())} meczow, {int(dubel.sum())} dubli z 365 '
           f'odrzuconych, zostaje {int(zostaje.sum())}; {len(mapa)} nazw ujednoliconych do zapisu 365'
           + (f', {zle} nazw z kilkoma kandydatami (zostaja jak w Flashscore)' if zle else '') + '.')
+    for k, cel in sorted(mapa_lig.items()):   # tylko ligi, z ktorych cos realnie zostalo przepisane
+        if przeniesione.get(k): print(f'  zewn: ta sama liga w dwoch zrodlach — FS "{k[1]} | {k[2]}" -> '
+                                      f'365 "{cel[0]} | {cel[1]}" ({przeniesione[k]} meczow przeniesionych).')
     return s[~dubel]
 
 
