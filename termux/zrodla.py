@@ -176,6 +176,7 @@ def tm_wiersze(s):
         reszta = b.rsplit('</table>', 1)[-1]
         klub = re.search(r'<a title="([^"]+)" href="/[^"]*/(?:startseite|spielplan)/verein/(\d+)', reszta)
         kom = [tekst_html(c) for c in re.findall(r'<td[^>]*>(.*?)</td>', reszta, re.S)]
+        if not nazwa: continue   # inne tabele "items" na stronie ligi (np. "25 | 3") — nie kluby i nie gracze (audyt 03.10)
         out.append({'nazwa': _html.unescape(nazwa.group(1)) if nazwa else '', 'pozycja': (poz.group(1).strip() if poz else ''),
                     'klub': _html.unescape(klub.group(1)) if klub else '', 'klub_id': klub.group(2) if klub else '',
                     'komorki': ' | '.join(c for c in kom if c)})
@@ -190,7 +191,9 @@ def tabela_z_naglowkiem(wiersze):
         n = n.strip() or f'k{i}'
         uzyte[n] = uzyte.get(n, 0) + 1
         nag.append(n if uzyte[n] == 1 else f'{n}_{uzyte[n]}')
-    return [dict(zip(nag, w)) for w in wiersze[1:] if len(w) == len(nag)]
+    rows = [dict(zip(nag, w)) for w in wiersze[1:] if len(w) == len(nag)]
+    puste = [n for i, n in enumerate(nag) if n == f'k{i}' and all(not r[n] for r in rows)]   # kolumny-odstepy
+    return [{k: v for k, v in r.items() if k not in puste} for r in rows]
 
 
 def elo_reprezentacji(world_tsv, teams_tsv):
@@ -310,13 +313,25 @@ def understat_mecze(tekst, liga, sezon):
     return out
 
 
+# api-web.nhle.com podaje tylko przydomek ("Red Wings") — w bazie i w ofercie sa pelne nazwy (audyt nazw 03.10)
+NHL_PELNE = {'ANA': 'Anaheim Ducks', 'BOS': 'Boston Bruins', 'BUF': 'Buffalo Sabres', 'CGY': 'Calgary Flames',
+             'CAR': 'Carolina Hurricanes', 'CHI': 'Chicago Blackhawks', 'COL': 'Colorado Avalanche', 'CBJ': 'Columbus Blue Jackets',
+             'DAL': 'Dallas Stars', 'DET': 'Detroit Red Wings', 'EDM': 'Edmonton Oilers', 'FLA': 'Florida Panthers',
+             'LAK': 'Los Angeles Kings', 'MIN': 'Minnesota Wild', 'MTL': 'Montreal Canadiens', 'NSH': 'Nashville Predators',
+             'NJD': 'New Jersey Devils', 'NYI': 'New York Islanders', 'NYR': 'New York Rangers', 'OTT': 'Ottawa Senators',
+             'PHI': 'Philadelphia Flyers', 'PIT': 'Pittsburgh Penguins', 'SJS': 'San Jose Sharks', 'SEA': 'Seattle Kraken',
+             'STL': 'St. Louis Blues', 'TBL': 'Tampa Bay Lightning', 'TOR': 'Toronto Maple Leafs', 'UTA': 'Utah Mammoth',
+             'VAN': 'Vancouver Canucks', 'VGK': 'Vegas Golden Knights', 'WSH': 'Washington Capitals', 'WPG': 'Winnipeg Jets'}
+
+
 def nhl_mecze(j, data):
     out = []
     for g in (j or {}).get('games', []) or []:
         h, a = g.get('homeTeam') or {}, g.get('awayTeam') or {}
         nm = lambda t: (t.get('name') or {}).get('default') if isinstance(t.get('name'), dict) else t.get('name')
         out.append({'data': data, 'id': g.get('id'), 'start_utc': g.get('startTimeUTC'), 'stan': g.get('gameState'),
-                    'gosp': h.get('abbrev'), 'gosp_nazwa': nm(h), 'gosc': a.get('abbrev'), 'gosc_nazwa': nm(a),
+                    'gosp': h.get('abbrev'), 'gosp_nazwa': NHL_PELNE.get(h.get('abbrev'), nm(h)),
+                    'gosc': a.get('abbrev'), 'gosc_nazwa': NHL_PELNE.get(a.get('abbrev'), nm(a)),
                     'wynik_g': h.get('score', ''), 'wynik_a': a.get('score', ''),
                     'koniec': (g.get('periodDescriptor') or {}).get('periodType', '')})
     return out
