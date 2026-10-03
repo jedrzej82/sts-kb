@@ -14,7 +14,8 @@ z oferty ani cel nie jest krajem (reprezentacje ma sciezka --intl), oraz nazwy s
 Sporty osobowe (tenis, dart, snooker…) — tylko nazwy podobne. Alias skracajacy z kolizja rdzenia w puli -> przeglad. Sprzecznosci (resolver wskazal INNA druzyne niz dowod)
 NIE nadpisuja niczego — ida do raportu (konflikty) do recznej oceny.
 
-Uzycie:  python3 dopasuj.py liga KURSY.csv.gz [--wyjscie aliasy_liga.csv]   (kotwica ligowa — mecze jeszcze bez wyniku)
+Uzycie:  python3 dopasuj.py auto KURSY.csv.gz   (w przebiegu po oferta.py: aliasy_auto.csv, wczytywany przez typuj/sporty)
+         python3 dopasuj.py liga KURSY.csv.gz [--wyjscie aliasy_liga.csv]   (kotwica ligowa — mecze jeszcze bez wyniku)
          python3 dopasuj.py ucz KURSY.csv.gz [--zewn KATALOG] [--wyjscie aliasy_nauczone.csv] [--konflikty PLIK.csv]
                                     [--przeglad dopasuj_przeglad.csv]
 Wynik: aliasy_nauczone.csv w formacie aliasy.csv (modul,nazwa,cel,uzasadnienie,data) — do dopisania do aliasy.csv
@@ -241,12 +242,14 @@ def ligi_druzyn(mecze):
     return out
 
 
-def kotwica_ligowa(ev, rozwiaz, pule, ligi):
+def kotwica_ligowa(ev, rozwiaz, pule, ligi, bez_kolizji=False):
     """03.10.2026: druga metoda nauki, gdy mecz z oferty nie ma jeszcze wyniku w zrodlach. Jedna strona zdarzenia jest
     rozpoznana kodem produkcyjnym; druga NIE. Kandydat = wpis z puli, ktorego znaczace czlony zawieraja sie w nazwie
     z oferty (albo odwrotnie: „Medi Bayreuth” -> „Bayreuth”, „Black Wings Linz” -> „EHC Liwest Black Wings Linz”),
     z tymi samymi znacznikami i grajacy w ostatnim roku w TEJ SAMEJ lidze co rozpoznany rywal. Alias tylko gdy kandydat
-    jest JEDEN i wszystkie zdarzenia z ta nazwa wskazuja ten sam cel. Reprezentacje pomijane (sciezka --intl)."""
+    jest JEDEN i wszystkie zdarzenia z ta nazwa wskazuja ten sam cel. Reprezentacje pomijane (sciezka --intl).
+    bez_kolizji=True (tryb auto): alias skracajacy z kolizja rdzenia w puli (kolizja()) odpada — w parze odpadaja oba
+    („Virtus Zagreb” -> „KK Zagreb”: w puli Cedevita/Dinamo/Cibona Zagreb; razem z nim „Furnir Dubrava”)."""
     dow, stat, przyk = collections.defaultdict(collections.Counter), collections.Counter(), {}
 
     def kand(S, n, L=None, bez=None):
@@ -264,6 +267,7 @@ def kotwica_ligowa(ev, rozwiaz, pule, ligi):
                     if ligi.get((r.S, a), set()) & ligi.get((r.S, b), set())]
             if len(pary) != 1: stat['para: kandydatow 0' if not pary else 'para: kilka par'] += 1; continue
             a, b = pary[0]
+            if bez_kolizji and (kolizja(r.A, a, pule[r.S]) or kolizja(r.B, b, pule[r.S])): stat['kolizja (do przegladu)'] += 1; continue
             L = ligi[(r.S, a)] & ligi[(r.S, b)]
             for n, c in ((r.A, a), (r.B, b)):
                 dow[(r.S, n)][c] += 1
@@ -273,6 +277,7 @@ def kotwica_ligowa(ev, rozwiaz, pule, ligi):
         L = ligi.get((r.S, ri), set())
         if not L: stat['brak ligi rywala'] += 1; continue
         k = kand(r.S, n, L, ri)
+        if len(k) == 1 and bez_kolizji and kolizja(n, k[0], pule[r.S]): stat['kolizja (do przegladu)'] += 1; continue
         if len(k) == 1:
             dow[(r.S, n)][k[0]] += 1
             przyk.setdefault((r.S, n), f'{r.A} - {r.B} {r.d.date()}: rywal {ri}, liga {", ".join(sorted(L & ligi[(r.S, k[0])]))[:60]}')
@@ -323,18 +328,64 @@ def _produkcja():
     return rozwiaz, pule
 
 
+def auto(kursy, zewn, wyjscie):
+    """03.10.2026 (prosba uzytkownika: nazwy maja ZAWSZE pasowac): uczenie w kazdym przebiegu, bez recznego kroku.
+    Do aliasy_auto.csv (wczytywany po aliasy.csv — reczne wpisy wygrywaja) trafiaja tylko:
+      (1) aliasy PEWNE z ucz() (ten sam mecz w zrodle wynikow; bez skrotow z kolizja),
+      (2) kotwica ligowa bez kolizji rdzenia (dwa przejscia — nowe aliasy daja kotwice kolejnym meczom).
+    Konflikty z resolverem i kolizje — tylko do raportu. Zwraca (aliasy, stat, linie raportu)."""
+    ev = zdarzenia_sts(pd.read_csv(kursy, dtype=str))
+    rozwiaz, pule = _produkcja()
+    with contextlib.redirect_stdout(io.StringIO()):
+        import typuj
+        import sporty
+    slownik = {'typuj': (typuj.ALIASES, typuj.norm), 'sporty': (sporty._ALIASY_RECZNE, sporty.norm)}
+
+    def zastosuj(df):
+        for r in df.itertuples(index=False):
+            d, kl = slownik[r.modul]
+            d.setdefault(kl(r.nazwa), r.cel)
+            if r.modul == 'sporty': sporty._ALIASY_WIELE.setdefault(kl(r.nazwa), []).append(r.cel)
+    dzis = pd.Timestamp.today().strftime('%Y-%m-%d')
+    al, kon, stat = ucz(ev, zrodla(zewn), rozwiaz, pule)
+    wynik = [jako_aliasy(al, dzis)]
+    zastosuj(wynik[0])
+    ligi = ligi_druzyn(_mecze_lig())
+    for i in (1, 2):
+        lg, st = kotwica_ligowa(ev, rozwiaz, pule, ligi, bez_kolizji=True)
+        stat.update({f'liga {k}': v for k, v in st.items()})
+        if lg.empty: break   # 03.10: pusty wynik wywracal .str na kolumnie bez napisow
+        lg = jako_aliasy(lg, dzis)
+        lg['uzasadnienie'] = [u.replace('nauka ', 'kotwica ligowa ', 1) for u in lg.uzasadnienie]
+        juz = {(m, n) for w in wynik for m, n in zip(w.modul, w.nazwa)}
+        lg = lg[[(m, n) not in juz for m, n in zip(lg.modul, lg.nazwa)]]
+        if lg.empty: break
+        wynik.append(lg); zastosuj(lg)
+    out = pd.concat(wynik, ignore_index=True)
+    out.to_csv(wyjscie, index=False)
+    linie = [f'NAZWY AUTO: {len(out)} aliasow (wyniki: {len(wynik[0])}, kotwica ligowa: {len(out) - len(wynik[0])}) -> {wyjscie}']
+    linie += [f'  do przegladu (skrot z kolizja): {r.nazwa} -> {r.cel} [{r.inne_z_rdzeniem}]' for r in al.attrs['przeglad'].itertuples()]
+    linie += [f'  KONFLIKT z resolverem: {r.nazwa} -> kod {r.kod_dal}, zrodlo {r.zrodlo_cel} ({r.zrodlo})' for r in kon.itertuples()]
+    return out, stat, linie
+
+
 def main(a):
-    if not a or a[0] not in ('ucz', 'liga'): sys.exit(__doc__)
+    if not a or a[0] not in ('ucz', 'liga', 'auto'): sys.exit(__doc__)
     arg = lambda k, d: a[a.index(k) + 1] if k in a else d
+    if a[0] == 'auto':
+        _, stat, linie = auto(a[1], arg('--zewn', os.path.join(HERE, 'zewn')), arg('--wyjscie', nazwy.ALIASY_AUTO_CSV))
+        for k, v in sorted(stat.items()): print(f'  {k}: {v}')
+        print('\n'.join(linie))
+        return
     if a[0] == 'liga':
         ev = zdarzenia_sts(pd.read_csv(a[1], dtype=str))
         rozwiaz, pule = _produkcja()
         al, stat = kotwica_ligowa(ev, rozwiaz, pule, ligi_druzyn(_mecze_lig()))
         for k, v in sorted(stat.items()): print(f'  {k}: {v}')
         print(f'ALIASY Z KOTWICY LIGOWEJ: {len(al)} (do przejrzenia przed dopisaniem do aliasy.csv)')
-        jako_aliasy(al, pd.Timestamp.today().strftime('%Y-%m-%d')).assign(
-            uzasadnienie=lambda x: x.uzasadnienie.str.replace('nauka ', 'kotwica ligowa ', regex=False)).to_csv(
-            arg('--wyjscie', 'aliasy_liga.csv'), index=False)
+        w = jako_aliasy(al, pd.Timestamp.today().strftime('%Y-%m-%d'))
+        w['uzasadnienie'] = [u.replace('nauka ', 'kotwica ligowa ', 1) for u in w.uzasadnienie]
+        w.to_csv(arg('--wyjscie', 'aliasy_liga.csv'), index=False)
         return
     ev = zdarzenia_sts(pd.read_csv(a[1], dtype=str))
     z = zrodla(arg('--zewn', os.path.join(HERE, 'zewn')))

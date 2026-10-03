@@ -200,3 +200,66 @@ def test_rdzen_pasuje():
     assert dopasuj._rdzen_pasuje(t('TuS N-Lubbecke'), t('N-Lubbecke'))
     assert not dopasuj._rdzen_pasuje(t('Polonia Leszno'), t('Polonia Warszawa'))
     assert not dopasuj._rdzen_pasuje(t('HC Bolzano'), t('HC Lugano'))
+
+
+def test_kotwica_ligowa_bez_kolizji_odrzuca_pare():
+    # 03.10 (tryb auto): „Virtus Zagreb” -> „KK Zagreb” ma kolizje rdzenia (Cedevita/Dinamo Zagreb) — odpada cala para
+    import pandas as pd
+    import dopasuj
+    ev = pd.DataFrame({'S': ['koszykówka'], 'd': pd.to_datetime(['2026-10-02']), 'A': ['Virtus Zagreb'], 'B': ['Furnir Dubrava']})
+    pule = {'koszykówka': {'KK Zagreb', 'Cedevita Zagreb', 'KK Dubrava'}}
+    ligi = dopasuj.ligi_druzyn(pd.DataFrame({'S': ['koszykówka'] * 2, 'liga': ['Croatia | Premijer'] * 2,
+                                             'A': ['KK Zagreb', 'Cedevita Zagreb'], 'B': ['KK Dubrava', 'KK Dubrava']}))
+    rozwiaz = lambda S, n: None
+    al, _ = dopasuj.kotwica_ligowa(ev, rozwiaz, pule, ligi)
+    assert dict(zip(al.nazwa, al.cel)) == {'Virtus Zagreb': 'KK Zagreb', 'Furnir Dubrava': 'KK Dubrava'}   # tryb przegladu
+    al2, st2 = dopasuj.kotwica_ligowa(ev, rozwiaz, pule, ligi, bez_kolizji=True)
+    assert al2.empty and st2['kolizja (do przegladu)'] == 1
+
+
+def test_aliasy_auto_po_recznych(tmp_path):
+    # aliasy_auto.csv wczytywany PO aliasy.csv — reczny wpis wygrywa, auto tylko dopisuje brakujace
+    import nazwy
+    r, a = tmp_path / 'r.csv', tmp_path / 'a.csv'
+    r.write_text('modul,nazwa,cel,uzasadnienie,data\ntypuj,JYP Jyvaskyla,Jyvaskyla,x,2026-10-03\n', encoding='utf-8')
+    a.write_text('modul,nazwa,cel,uzasadnienie,data\ntypuj,JYP Jyvaskyla,JYP,auto,2026-10-03\n'
+                 'typuj,Medi Bayreuth,Bayreuth,auto,2026-10-03\n', encoding='utf-8')
+    d = {}
+    nazwy.aliasy_z_pliku('typuj', str.lower, d, str(r)); nazwy.aliasy_z_pliku('typuj', str.lower, d, str(a))
+    assert d == {'jyp jyvaskyla': 'Jyvaskyla', 'medi bayreuth': 'Bayreuth'}
+    assert nazwy.ALIASY_AUTO_CSV.endswith('aliasy_auto.csv')
+
+
+def test_aliasy_wiele_celow_miedzy_sportami(tmp_path):
+    # 03.10: „Buducnost Podgorica” — pilka wodna „Buducnost”, koszykowka „KK Budućnost”; jeden klucz, dwa cele
+    import nazwy
+    import sporty
+    r = tmp_path / 'r.csv'
+    r.write_text('modul,nazwa,cel,uzasadnienie,data\nsporty,Buducnost Podgorica,Buducnost,wodna,2026-10-01\n'
+                 'sporty,Buducnost Podgorica,KK Budućnost,kosz,2026-10-03\n', encoding='utf-8')
+    w = nazwy.aliasy_wiele('sporty', sporty.norm, [str(r)])
+    assert w == {sporty.norm('Buducnost Podgorica'): ['Buducnost', 'KK Budućnost']}
+    stare = sporty._ALIASY_WIELE
+    try:
+        sporty._ALIASY_WIELE = w
+        assert sporty.resolve('Buducnost Podgorica', {'KK Budućnost', 'KK Krka'}) == 'KK Budućnost'
+        assert sporty.resolve('Buducnost Podgorica', {'Buducnost', 'VK Zemun'}) == 'Buducnost'
+    finally:
+        sporty._ALIASY_WIELE = stare
+
+
+def test_auto_bez_nowych_aliasow_nie_wywraca(tmp_path, monkeypatch):
+    # 03.10 (dane prawdziwe): gdy nauka nic nowego nie znajdzie, auto() wywracalo sie na .str pustej kolumny
+    import pandas as pd
+    import dopasuj
+    k = tmp_path / 'k.csv'
+    pd.DataFrame({'data_meczu': ['2026-10-03'], 'godzina_meczu': ['18:00'], 'sport': ['KOSZYKÓWKA'],
+                  'gospodarz': ['A'], 'gosc': ['B']}).to_csv(k, index=False)
+    pusty = pd.DataFrame(columns=['S', 'nazwa', 'cel', 'dowody', 'przyklad'])
+    pusty.attrs['przeglad'] = pd.DataFrame(columns=['S', 'nazwa', 'cel', 'dowody', 'przyklad', 'inne_z_rdzeniem'])
+    monkeypatch.setattr(dopasuj, '_produkcja', lambda: ((lambda S, n: n), {'koszykówka': {'A', 'B'}}))
+    monkeypatch.setattr(dopasuj, 'zrodla', lambda z: pd.DataFrame())
+    monkeypatch.setattr(dopasuj, 'ucz', lambda *a: (pusty, pd.DataFrame(columns=['nazwa', 'kod_dal', 'zrodlo_cel', 'zrodlo']), {}))
+    monkeypatch.setattr(dopasuj, '_mecze_lig', lambda: pd.DataFrame(columns=['S', 'liga', 'A', 'B']))
+    out, stat, linie = dopasuj.auto(str(k), 'zewn', str(tmp_path / 'auto.csv'))
+    assert out.empty and (tmp_path / 'auto.csv').exists() and linie[0].startswith('NAZWY AUTO: 0')
