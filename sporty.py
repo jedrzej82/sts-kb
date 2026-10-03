@@ -701,6 +701,8 @@ def _resolve(name, pool, sport=None):
     # Poprawka 42 (24.09.2026): nazwy sponsorskie / inna pisownia — test przynaleznosci do puli
     _al = _ALIASY_RECZNE.get(k_)
     if _al and _al in pool: return _al
+    for _al in _ALIASY_WIELE.get(k_, ()):   # 03.10.2026: inny cel tej samej nazwy w innym sporcie
+        if _al in pool: return _al
     _kr = _kraj_pl(name, pool)
     if _kr: return _kr
     # sorted(): pool to zbior, a kolejnosc iteracji zbioru zalezy od losowego ziarna
@@ -1286,6 +1288,7 @@ from nazwy import aliasy_z_pliku as _aliasy_z_pliku
 import nazwy as _nazwy
 _aliasy_z_pliku('sporty', norm, _ALIASY_RECZNE)
 _aliasy_z_pliku('sporty', norm, _ALIASY_RECZNE, _nazwy.ALIASY_AUTO_CSV)   # dopasuj.py auto (03.10.2026)
+_ALIASY_WIELE = _nazwy.aliasy_wiele('sporty', norm)
 
 if __name__ == '__main__':
     main(sys.argv[1:] or ['stan'])

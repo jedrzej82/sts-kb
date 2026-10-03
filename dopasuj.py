@@ -345,6 +345,7 @@ def auto(kursy, zewn, wyjscie):
         for r in df.itertuples(index=False):
             d, kl = slownik[r.modul]
             d.setdefault(kl(r.nazwa), r.cel)
+            if r.modul == 'sporty': sporty._ALIASY_WIELE.setdefault(kl(r.nazwa), []).append(r.cel)
     dzis = pd.Timestamp.today().strftime('%Y-%m-%d')
     al, kon, stat = ucz(ev, zrodla(zewn), rozwiaz, pule)
     wynik = [jako_aliasy(al, dzis)]
@@ -352,10 +353,12 @@ def auto(kursy, zewn, wyjscie):
     ligi = ligi_druzyn(_mecze_lig())
     for i in (1, 2):
         lg, st = kotwica_ligowa(ev, rozwiaz, pule, ligi, bez_kolizji=True)
-        lg = jako_aliasy(lg, dzis).assign(uzasadnienie=lambda x: x.uzasadnienie.str.replace('nauka ', 'kotwica ligowa ', regex=False))
+        stat.update({f'liga {k}': v for k, v in st.items()})
+        if lg.empty: break   # 03.10: pusty wynik wywracal .str na kolumnie bez napisow
+        lg = jako_aliasy(lg, dzis)
+        lg['uzasadnienie'] = [u.replace('nauka ', 'kotwica ligowa ', 1) for u in lg.uzasadnienie]
         juz = {(m, n) for w in wynik for m, n in zip(w.modul, w.nazwa)}
         lg = lg[[(m, n) not in juz for m, n in zip(lg.modul, lg.nazwa)]]
-        stat.update({f'liga {k}': v for k, v in st.items()})
         if lg.empty: break
         wynik.append(lg); zastosuj(lg)
     out = pd.concat(wynik, ignore_index=True)
@@ -380,9 +383,9 @@ def main(a):
         al, stat = kotwica_ligowa(ev, rozwiaz, pule, ligi_druzyn(_mecze_lig()))
         for k, v in sorted(stat.items()): print(f'  {k}: {v}')
         print(f'ALIASY Z KOTWICY LIGOWEJ: {len(al)} (do przejrzenia przed dopisaniem do aliasy.csv)')
-        jako_aliasy(al, pd.Timestamp.today().strftime('%Y-%m-%d')).assign(
-            uzasadnienie=lambda x: x.uzasadnienie.str.replace('nauka ', 'kotwica ligowa ', regex=False)).to_csv(
-            arg('--wyjscie', 'aliasy_liga.csv'), index=False)
+        w = jako_aliasy(al, pd.Timestamp.today().strftime('%Y-%m-%d'))
+        w['uzasadnienie'] = [u.replace('nauka ', 'kotwica ligowa ', 1) for u in w.uzasadnienie]
+        w.to_csv(arg('--wyjscie', 'aliasy_liga.csv'), index=False)
         return
     ev = zdarzenia_sts(pd.read_csv(a[1], dtype=str))
     z = zrodla(arg('--zewn', os.path.join(HERE, 'zewn')))

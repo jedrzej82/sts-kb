@@ -95,6 +95,23 @@ def aliasy_z_pliku(modul, klucz, slownik, plik=None):
     return n
 
 
+def aliasy_wiele(modul, klucz, pliki=None):
+    """03.10.2026: WSZYSTKIE cele dla nazwy (lista w kolejnosci plikow) — modul „sporty” dzieli aliasy miedzy sporty,
+    a ten sam klub ma rozne zapisy w roznych sportach („Buducnost Podgorica”: pilka wodna „Buducnost”, koszykowka
+    „KK Budućnost”). Wolajacy bierze pierwszy cel obecny w puli danego sportu."""
+    import csv
+    out = {}
+    for plik in pliki or (ALIASY_CSV, ALIASY_AUTO_CSV):
+        if not os.path.exists(plik): continue
+        with open(plik, encoding='utf-8', newline='') as fh:
+            for r in csv.DictReader(fh):
+                if (r.get('modul') or '').strip() != modul or not (r.get('nazwa') or '').strip() or not (r.get('cel') or '').strip():
+                    continue
+                k = klucz(r['nazwa'].strip())
+                if k and r['cel'].strip() not in out.setdefault(k, []): out[k].append(r['cel'].strip())
+    return out
+
+
 # Polskie nazwy miast (egzonimy) -> zapis w zrodlach wynikow. Wspolne dla typuj.py i sporty.py (29.09.2026:
 # „Hapoel Tel Awiw”, „Hapoel Beer Szewa” nie dopasowywaly sie ani w pilce, ani w koszykowce). Tylko pojedyncze
 # czlony nazwy miasta; zamiana jest probą dodatkowa — nazwa oryginalna ma pierwszenstwo.

@@ -228,3 +228,38 @@ def test_aliasy_auto_po_recznych(tmp_path):
     nazwy.aliasy_z_pliku('typuj', str.lower, d, str(r)); nazwy.aliasy_z_pliku('typuj', str.lower, d, str(a))
     assert d == {'jyp jyvaskyla': 'Jyvaskyla', 'medi bayreuth': 'Bayreuth'}
     assert nazwy.ALIASY_AUTO_CSV.endswith('aliasy_auto.csv')
+
+
+def test_aliasy_wiele_celow_miedzy_sportami(tmp_path):
+    # 03.10: „Buducnost Podgorica” — pilka wodna „Buducnost”, koszykowka „KK Budućnost”; jeden klucz, dwa cele
+    import nazwy
+    import sporty
+    r = tmp_path / 'r.csv'
+    r.write_text('modul,nazwa,cel,uzasadnienie,data\nsporty,Buducnost Podgorica,Buducnost,wodna,2026-10-01\n'
+                 'sporty,Buducnost Podgorica,KK Budućnost,kosz,2026-10-03\n', encoding='utf-8')
+    w = nazwy.aliasy_wiele('sporty', sporty.norm, [str(r)])
+    assert w == {sporty.norm('Buducnost Podgorica'): ['Buducnost', 'KK Budućnost']}
+    stare = sporty._ALIASY_WIELE
+    try:
+        sporty._ALIASY_WIELE = w
+        assert sporty.resolve('Buducnost Podgorica', {'KK Budućnost', 'KK Krka'}) == 'KK Budućnost'
+        assert sporty.resolve('Buducnost Podgorica', {'Buducnost', 'VK Zemun'}) == 'Buducnost'
+    finally:
+        sporty._ALIASY_WIELE = stare
+
+
+def test_auto_bez_nowych_aliasow_nie_wywraca(tmp_path, monkeypatch):
+    # 03.10 (dane prawdziwe): gdy nauka nic nowego nie znajdzie, auto() wywracalo sie na .str pustej kolumny
+    import pandas as pd
+    import dopasuj
+    k = tmp_path / 'k.csv'
+    pd.DataFrame({'data_meczu': ['2026-10-03'], 'godzina_meczu': ['18:00'], 'sport': ['KOSZYKÓWKA'],
+                  'gospodarz': ['A'], 'gosc': ['B']}).to_csv(k, index=False)
+    pusty = pd.DataFrame(columns=['S', 'nazwa', 'cel', 'dowody', 'przyklad'])
+    pusty.attrs['przeglad'] = pd.DataFrame(columns=['S', 'nazwa', 'cel', 'dowody', 'przyklad', 'inne_z_rdzeniem'])
+    monkeypatch.setattr(dopasuj, '_produkcja', lambda: ((lambda S, n: n), {'koszykówka': {'A', 'B'}}))
+    monkeypatch.setattr(dopasuj, 'zrodla', lambda z: pd.DataFrame())
+    monkeypatch.setattr(dopasuj, 'ucz', lambda *a: (pusty, pd.DataFrame(columns=['nazwa', 'kod_dal', 'zrodlo_cel', 'zrodlo']), {}))
+    monkeypatch.setattr(dopasuj, '_mecze_lig', lambda: pd.DataFrame(columns=['S', 'liga', 'A', 'B']))
+    out, stat, linie = dopasuj.auto(str(k), 'zewn', str(tmp_path / 'auto.csv'))
+    assert out.empty and (tmp_path / 'auto.csv').exists() and linie[0].startswith('NAZWY AUTO: 0')
