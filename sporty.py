@@ -978,18 +978,51 @@ def backtest(d, sport, od='2015-01-01', maska=None, klucz=None, do=None):
 DZ_PROG, DZ_MIN_MECZOW, DZ_OKNO = 0.10, 6, 10
 
 
+def forma_z_innej_ligi(d, sport, t, okno):
+    """(stara, nowa, ile_poza_stara) gdy druzyna zmienila lige, a okno formy jest wciaz zdominowane przez STARA
+    lige — mniej niz DZ_MIN_MECZOW meczow poza nia. Inaczej None.
+
+    03.10.2026 (Raport 21:00 KOREKTA 1, Leyma Coruna - Bilbao Basket): forma z `tail(DZ_OKNO)` bierze ostatnie
+    mecze BEZ WZGLEDU NA LIGE. Leyma Coruna awansowala z 1ª FEB do ACB i ma w bazie 38 meczow 1ª FEB wobec
+    jednego w ACB (26.09 Barcelona 119:101). Model dawal jej 60,6%, bo Elo zbudowala w drugiej lidze; „forma”
+    8/10 wygranych to te same mecze drugiej ligi, wiec werdykt ZGODNE powstawal automatycznie i niczego nie
+    potwierdzal. Rynek wycenial Corune na 46,7% (LVBET 1,96/1,72), H2H z Bilbao 0-6 — model nie zna zadnego
+    z tych szesciu meczow, bo nigdy nie grali w tej samej lidze.
+
+    To NIE jest bramka kalibracyjna (ta dla hokeja to ZMIANA_LIGI_SPORTY/P124 i zostaje bez zmian — pomiar
+    03.10 na koszykowce nie dal istotnosci: awans przy P >= 55% blad +19,3 pp, ale n=18, p=0,12). To bramka
+    DOWODOWA: A9 wymaga zrodla NIEZALEZNEGO, a forma z innych rozgrywek nie mowi nic o tym meczu — ten sam
+    argument, ktorym P130.4 zamknelo forme przestarzala w typuj.py. Bramka tylko ODRZUCA (P130.7) i zwalnia
+    sama, gdy druzyna rozegra DZ_MIN_MECZOW meczow poza stara liga."""
+    if 'liga' not in getattr(d, 'columns', ()) or 'liga' not in getattr(okno, 'columns', ()):
+        return None                                      # bez kolumny ligi nie ma na czym oprzec wnioskowania
+    z = zmiana_ligi(d, sport, t)
+    if not z: return None
+    stara, nowa, _ = z
+    poza = int((okno.liga.astype(str) != stara).sum())   # puchary i nowa liga = dowod o obecnym poziomie
+    return None if poza >= DZ_MIN_MECZOW else (stara, nowa, poza)
+
+
 def drugie_zrodlo(d, sport, h, g, p_h):
     """p_h = P modelu, ze wygra PIERWSZA druzyna (h) — przy hokeju „z dogrywka”."""
     x = d[d.sport == sport]
     def forma(t):
         m = x[(x.gosp == t) | (x.gosc == t)].tail(DZ_OKNO)
         w = int(((m.gosp == t) & (m.pg > m.pa)).sum() + ((m.gosc == t) & (m.pa > m.pg)).sum())
-        return w, len(m)
-    (wh, nh), (wg, ng) = forma(h), forma(g)
+        return w, len(m), m
+    (wh, nh, mh), (wg, ng, mg) = forma(h), forma(g)
     print(f'\nDRUGIE ZRODLO — forma z ostatnich meczow (N {nh}/{ng}), niezalezna od modelu:')
     if min(nh, ng) < DZ_MIN_MECZOW:
         print(f'  BRAK DRUGIEGO ZRODLA (mniej niz {DZ_MIN_MECZOW} meczow jednej z druzyn) — ZADNA noga z tego meczu NIE idzie na kupon.')
         return None
+    for t, okno in ((h, mh), (g, mg)):
+        zi = forma_z_innej_ligi(d, sport, t, okno)
+        if zi:
+            stara, nowa, poza = zi
+            print(f'  BRAK DRUGIEGO ZRODLA: {t} zmienil lige ({stara} -> {nowa}), a w {DZ_OKNO} ostatnich meczach ma '
+                  f'tylko {poza} poza "{stara}" — forma opisuje INNE rozgrywki, wiec nie jest zrodlem niezaleznym '
+                  f'dla tego meczu (A9 + A1c). ZADNA noga z tego meczu NIE idzie na kupon, takze papierowy.')
+            return None
     rh, rg = (wh + 1) / (nh + 2), (wg + 1) / (ng + 2)
     pf_h = rh * (1 - rg) / (rh * (1 - rg) + rg * (1 - rh))   # log5 (Bill James): P(h > g) z odsetkow zwyciestw
     fm, pm = (h, p_h) if p_h >= 0.5 else (g, 1 - p_h)
