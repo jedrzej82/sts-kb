@@ -13,7 +13,7 @@ Zrodla (D = raz dziennie, P = kazde uruchomienie):
   4  Transfermarkt     D  kontuzjowani i wartosci kadr, 25 lig                -> zrodla_transfermarkt_*
   5  Understat         D  xG meczow 6 lig (--historia: sezony od 2014)        -> zrodla_understat_*
   6  Tennis Abstract   D  Elo ATP/WTA (ogolne i wg nawierzchni)               -> zrodla_tenis_elo_*
-  7  Darty             D  ranking DartsOrakel; wyniki dartow sa w Sofascore (sport darts, wczoraj+dzis)
+  7  Darty             D  DartsOrakel /api/stats/player: srednia, % meczow, % checkout, srednia z 9, 180-ki (rok wstecz)
                                                                               -> zrodla_darty_ranking_*
   8  NHL               P  wyniki/terminarz NHL (api-web.nhle.com) + bramkarze (Daily Faceoff)
                                                                               -> zrodla_nhl_*, zrodla_nhl_bramkarze_*
@@ -460,10 +460,29 @@ def z_tenis(s, w):
     w['tenis_elo'] = out
 
 
-def z_darty(s, w):
-    # /rank = 404 (diagnoza 03.10); statystyki graczy pod /stats/player
-    kod, t = s.get('darty', 'https://dartsorakel.com/stats/player', H_HTML)
-    w['darty_ranking'] = tabela_z_naglowkiem(tabele_html(t)) if kod == 200 else []
+DARTY_STATY = (('25', 'srednia'), ('10011', 'proc_meczow'), ('1053', 'proc_checkout'), ('1029', 'srednia_9'), ('26', '180'))
+
+
+def darty_api(j, stat):
+    """DartsOrakel /api/stats/player (DataTables: {"data": [{rank, player_name, stat, ...}]}) — kolumny z kodu strony 03.10."""
+    out = []
+    for r in (j or {}).get('data', []) if isinstance(j, dict) else (j or []):
+        if not isinstance(r, dict): continue
+        out.append({'stat': stat, 'pozycja': r.get('rank', ''), 'zawodnik': tekst_html(str(r.get('player_name', ''))),
+                    'wartosc': r.get('stat', ''), 'mecze': r.get('matches', r.get('played', ''))})
+    return out
+
+
+def z_darty(s, w, dzis):
+    # /rank = 404, /stats/player = pusta tabela wypelniana przez JS z /api/stats/player (diagnoza 03.10 08:24);
+    # parametry jak w formularzu strony: rok wstecz, wszystkie turnieje, min. 10 meczow
+    out = []
+    nag = {**H_JSON, 'X-Requested-With': 'XMLHttpRequest', 'Referer': 'https://dartsorakel.com/stats/player'}
+    for klucz, nazwa in DARTY_STATY:
+        url = (f'https://dartsorakel.com/api/stats/player?dateFrom={dzis - dt.timedelta(days=365)}&dateTo={dzis + dt.timedelta(days=1)}'
+               f'&rankKey={klucz}&organStat=All&minMatches=10&tourCardYear=&showStatsBreakdown=0&excludeWGP=0')
+        out += darty_api(s.get_json('darty', url, nag, pauza=1.0), nazwa)
+    w['darty_ranking'] = out
 
 
 def z_nhl(s, w, dzis):
@@ -543,7 +562,7 @@ def main(a):
     s, w, bledy = Sesja(budzet * 60), {}, {}
     zadania = [('fotmob', lambda: z_fotmob(s, w, dzis, teraz, gotowe)), ('sofascore', lambda: z_sofa(s, w, dzis, teraz)),
                ('nhl', lambda: z_nhl(s, w, dzis)), ('pogoda', lambda: z_pogoda(s, w)),
-               ('elo', lambda: z_elo(s, w)), ('tenis', lambda: z_tenis(s, w)), ('darty', lambda: z_darty(s, w)),
+               ('elo', lambda: z_elo(s, w)), ('tenis', lambda: z_tenis(s, w)), ('darty', lambda: z_darty(s, w, dzis)),
                ('understat', lambda: z_understat(s, w, dzis, '--historia' in a)), ('transfermarkt', lambda: z_transfermarkt(s, w))]
     for nazwa, f in zadania:
         if nazwa not in tylko: continue
