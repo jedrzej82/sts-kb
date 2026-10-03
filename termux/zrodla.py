@@ -790,16 +790,41 @@ def z_setka(s, w):
         k2, js = s.get('setka_js', baza + sk, {**H_HTML, 'Accept': '*/*'}, proby=1)
         a_, p_ = setka_api(js)
         adresy += a_; sciezki += p_
-        # fragmenty kodu wokol slow match/tournament/result — do recznego odczytania ksztaltu zapytan
+        # fragmenty kodu wokol KAZDEGO wywolania API (/api/..., graphql) — ksztalt zapytan (parametry, metoda).
+        # 03.10 15:18: pierwsze 60 trafien „matches” to byl kod Reacta, a probka surowa konczy sie na 300 KB.
         w.setdefault('setka_fragmenty', []).extend(
-            {'skrypt': sk, 'fragment': js[max(0, m.start() - 150):m.end() + 150]}
-            for m in list(re.finditer(r'(?i)(matches|tournament|results|schedule|games)[\w/?=&{}$.-]{0,40}', js or ''))[:60])
+            {'skrypt': sk, 'fragment': js[max(0, m.start() - 700):m.end() + 700]}
+            for m in list(re.finditer(r'/api/[A-Za-z]+|graphql|query\s*[A-Za-z]*\s*\(|gql`', js or ''))[:120])
     w['setka_api'] = [{'adres': x} for x in sorted(set(adresy))] + [{'adres': x} for x in sorted(set(sciezki))]
     kand = [x for x in sorted(set(adresy)) if re.search(r'(?i)api|match|game|tourn|result', x)][:6]
     kand += [baza + x for x in sorted(set(sciezki)) if re.search(r'(?i)match|game|tourn|result|event', x)][:6]
     for url in kand[:8]:
         if '{' in url or '$' in url: continue
         s.get('setka', url, {**H_JSON, 'Accept': 'application/json, text/plain, */*', 'Origin': baza, 'Referer': baza + '/'}, proby=1)
+    # GraphQL: lista zapytan (introspekcja) — jesli wlaczona, pokaze, jak pobrac mecze z wynikami
+    if '/graphql' in sciezki:
+        intro = '{"query":"{__schema{queryType{fields{name args{name type{name kind ofType{name}}} type{name kind ofType{name}}}}}}"}'
+        w['setka_graphql'] = [setka_post(s, baza + '/graphql', intro)]
+    dz = dt.date.today()
+    for url in (f'/api/Matches/?date={dz}', f'/api/Matches/date/{dz}', '/api/Matches/results/', '/api/Matches/paged?page=1',
+                f'/api/DayPeriods/?date={dz}', '/api/Locations/'):
+        s.get('setka', baza + url, {**H_JSON, 'Accept': 'application/json, text/plain, */*', 'Origin': baza, 'Referer': baza + '/'}, proby=1)
+
+
+def setka_post(s, url, cialo):
+    """POST JSON (GraphQL) -> {kod, odpowiedz} i probka w surowych."""
+    try:
+        r = urllib.request.urlopen(urllib.request.Request(url, data=cialo.encode(), method='POST', headers={
+            **H_JSON, 'Content-Type': 'application/json', 'Accept': 'application/json', 'Origin': 'https://setkacup.com'}),
+            timeout=30, context=CTX)
+        kod, t = r.status, dekoduj(r.read())
+    except urllib.error.HTTPError as e:
+        kod, t = e.code, dekoduj(e.read() or b'')
+    except Exception as e:
+        kod, t = 0, f'{type(e).__name__}: {e}'
+    s.surowe.append({'zrodlo': 'setka_graphql', 'url': url, 'kod': kod, 'tekst': t[:SURowe_MAKS_B]})
+    s.kody.setdefault('setka', {}).setdefault(kod, 0); s.kody['setka'][kod] += 1
+    return {'kod': kod, 'odpowiedz': t[:2000]}
 
 
 DZIENNE = ('elo', 'transfermarkt', 'understat', 'tenis', 'darty')
