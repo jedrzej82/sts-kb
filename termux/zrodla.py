@@ -51,7 +51,7 @@ STAN = os.path.expanduser('~/.zrodla_stan.json')
 OKNO_H = 3.5            # szczegoly dla meczow zaczynajacych sie w ciagu tylu godzin
 MAKS_SZCZEGOLY = 60     # na zrodlo i uruchomienie
 SURowe_NA_ZRODLO = 4
-SUROWE_LIMIT = {'90minut': 10, 'setka': 25}   # 03.10.2026: strony lig 90minut potrzebne w calosci do sprawdzenia parsera
+SUROWE_LIMIT = {'90minut': 10}   # 03.10.2026: strony lig 90minut potrzebne w calosci do sprawdzenia parsera
 SURowe_MAKS_B = 300_000
 
 H_SOFA = {**H_JSON, 'Referer': 'https://www.sofascore.com/', 'Origin': 'https://www.sofascore.com'}
@@ -768,96 +768,54 @@ def z_90minut(s, w, teraz=None):
     w['90minut_mecze'] = mecze
 
 
-def setka_api(js):
-    """Adresy API z kodu aplikacji setkacup.com (SPA: strona to tylko „Loading application...”, dane pobiera app.*.js).
-    Zwraca posortowane, unikalne: pelne URL-e oraz sciezki zaczynajace sie od /api, /v1, /v2 itp."""
-    pelne = re.findall(r'https?://[A-Za-z0-9.-]+(?:/[^\s"\'`<>()]*)?', js or '')
-    sciezki = re.findall(r'["\'`](/(?:api|v\d|rest|graphql|socket)[^"\'`\s]*)["\'`]', js or '')
-    pelne = [u for u in pelne if not re.search(r'googletagmanager|facebook|google-analytics|w3\.org|reactjs|fb\.me|schema\.org|github', u)]
-    return sorted(set(pelne)), sorted(set(sciezki))
+SETKA = 'https://setkacup.com'
+SETKA_NAGL = {**H_JSON, 'Accept': 'application/json, text/plain, */*', 'Origin': SETKA, 'Referer': SETKA + '/'}
+SETKA_HIST_DNI, SETKA_LIMIT_S = 21, 240
 
 
-def z_setka(s, w):
-    """03.10.2026: wyniki Setka Cup z oficjalnej strony (setkacup.com) — scores24, Flashscore i 365 jej nie maja.
-    DIAGNOZA: strona to aplikacja JS; pobieramy app.*.js, wyciagamy adresy API i probujemy te o meczach/turniejach
-    (surowe odpowiedzi w zipie). Parser wynikow — po pierwszym pobraniu, jak przy 90minut."""
-    baza = 'https://setkacup.com'
-    kod, t = s.get('setka', baza + '/', H_HTML, proby=1)
-    skrypty = re.findall(r'src="(/[^"]+\.js)"', t or '')
-    w['setka_skrypty'] = [{'skrypt': x} for x in skrypty]
-    adresy, sciezki = [], []
-    for sk in skrypty[:3]:
-        k2, js = s.get('setka_js', baza + sk, {**H_HTML, 'Accept': '*/*'}, proby=1)
-        a_, p_ = setka_api(js)
-        adresy += a_; sciezki += p_
-        # fragmenty kodu wokol KAZDEGO wywolania API (/api/..., graphql) — ksztalt zapytan (parametry, metoda).
-        # 03.10 15:18: pierwsze 60 trafien „matches” to byl kod Reacta, a probka surowa konczy sie na 300 KB.
-        w.setdefault('setka_fragmenty', []).extend(
-            {'skrypt': sk, 'fragment': js[max(0, m.start() - 700):m.end() + 700]}
-            for m in list(re.finditer(r'/api/[A-Za-z]+|graphql|query\s*[A-Za-z]*\s*\(|gql`', js or ''))[:120])
-    w['setka_api'] = [{'adres': x} for x in sorted(set(adresy))] + [{'adres': x} for x in sorted(set(sciezki))]
-    kand = [x for x in sorted(set(adresy)) if re.search(r'(?i)api|match|game|tourn|result', x)][:6]
-    kand += [baza + x for x in sorted(set(sciezki)) if re.search(r'(?i)match|game|tourn|result|event', x)][:6]
-    for url in kand[:8]:
-        if '{' in url or '$' in url: continue
-        s.get('setka', url, {**H_JSON, 'Accept': 'application/json, text/plain, */*', 'Origin': baza, 'Referer': baza + '/'}, proby=1)
-    # GraphQL: lista zapytan (introspekcja) — jesli wlaczona, pokaze, jak pobrac mecze z wynikami
-    if '/graphql' in sciezki:
-        intro = '{"query":"{__schema{queryType{fields{name args{name type{name kind ofType{name}}} type{name kind ofType{name}}}}}}"}'
-        w['setka_graphql'] = [setka_post(s, baza + '/graphql', intro)]
-    setka_turnieje(s, w, dt.date.today())
+def setka_wiersze(turnieje):
+    """03.10.2026: odpowiedz /api/Tournaments/en?date=RRRR-MM-DD (oficjalne API setkacup.com, ustalone z kodu aplikacji
+    i odpowiedzi z telefonu 03.10 15:52) -> wiersze NAGL_WYNIKI. Turniej ma liste „matches”; mecz zakonczony = statusId 3
+    z wynikiem w setach (player1Score/player2Score) i punktami setow (setScores). Walkower (technicalResult != 0,
+    statusId 4) i mecze bez wyniku pomijane. Nazwa gracza „Nazwisko Imie” — tak jak w ofercie STS („Smyk Vasyl”)."""
+    out = []
+    for t in turnieje or []:
+        for m in (t.get('matches') or []) if isinstance(t, dict) else []:
+            if m.get('statusId') != 3 or m.get('technicalResult'): continue
+            g, a = str(m.get('player1Score', '')), str(m.get('player2Score', ''))
+            p1, p2 = m.get('player1') or {}, m.get('player2') or {}
+            if not (g.isdigit() and a.isdigit()) or g == a or not p1.get('lastName') or not p2.get('lastName'): continue
+            sety = sorted(m.get('setScores') or [], key=lambda x: x.get('number', 0))
+            kob = p1.get('gender') is False or p2.get('gender') is False
+            out.append({'data': str(m.get('startDate', ''))[:10], 'sport': 'table-tennis', 'kraj': 'UKRAINE',
+                        'turniej': 'Setka Cup Women' if kob else 'Setka Cup', 'runda': f"setka:{m.get('id')}",
+                        'gosp': f"{p1['lastName']} {p1.get('firstName', '')}".strip(),
+                        'gosc': f"{p2['lastName']} {p2.get('firstName', '')}".strip(),
+                        'wg': int(g), 'wa': int(a), 'okresy_g': ';'.join(str(x.get('p1Score', '')) for x in sety),
+                        'okresy_a': ';'.join(str(x.get('p2Score', '')) for x in sety),
+                        'zwyciezca': 1 if int(g) > int(a) else 2, 'nawierzchnia': ''})
+    return out
 
 
-SETKA_NAGL = {**H_JSON, 'Accept': 'application/json, text/plain, */*', 'Origin': 'https://setkacup.com', 'Referer': 'https://setkacup.com/'}
-
-
-def setka_turnieje(s, w, dzien):
-    """03.10.2026 (kod aplikacji z telefonu 15:41): adresy to „/api/<Zasob>/” + jezyk (js.locale), parametry w query:
-    getTournaments -> /api/Tournaments/<jez>?<query> (lista: id, locationId, dayPeriodToken, startDate),
-    getTournamentDetails -> /api/Matches/<jez>?<query z tournamentId>, getLocations -> /api/Locations/<jez>,
-    getDayPeriods -> /api/DayPeriods/<jez>. Nazwy parametrow daty nieznane — probujemy warianty i zapisujemy
-    PELNE odpowiedzi (surowe), parser wynikow na ich podstawie."""
-    baza = 'https://setkacup.com'
-    for jez in ('en', 'ru'):
-        for zas in ('Locations', 'DayPeriods'):
-            s.get('setka', f'{baza}/api/{zas}/{jez}', SETKA_NAGL, proby=1)
-    wczoraj = dzien - dt.timedelta(days=1)
-    warianty = [f'date={wczoraj}', f'date={wczoraj}T00:00:00', f'startDate={wczoraj}', f'from={wczoraj}&to={dzien}',
-                f'dateFrom={wczoraj}&dateTo={dzien}', f'day={wczoraj}', '']
-    proby = []
-    for q in warianty:
-        url = f'{baza}/api/Tournaments/en' + (f'?{q}' if q else '')
-        j = s.get_json('setka', url, SETKA_NAGL, proby=1)
-        n = len(j) if isinstance(j, list) else (len(j.get('data') or []) if isinstance(j, dict) else -1)
-        proby.append({'url': url, 'elementow': n, 'probka': json.dumps(j, ensure_ascii=False)[:1500] if j is not None else ''})
-        if n > 0:
-            t0 = j if isinstance(j, list) else j.get('data')
-            for t in t0[:2]:
-                tid = t.get('id') if isinstance(t, dict) else None
-                if tid is None: continue
-                for q2 in (f'tournamentId={tid}', f'id={tid}'):
-                    u2 = f'{baza}/api/Matches/en?{q2}'
-                    j2 = s.get_json('setka', u2, SETKA_NAGL, proby=1)
-                    proby.append({'url': u2, 'elementow': len(j2) if isinstance(j2, (list, dict)) else -1,
-                                  'probka': json.dumps(j2, ensure_ascii=False)[:3000] if j2 is not None else ''})
-            break
-    w['setka_proby'] = proby
-
-
-def setka_post(s, url, cialo):
-    """POST JSON (GraphQL) -> {kod, odpowiedz} i probka w surowych."""
-    try:
-        r = urllib.request.urlopen(urllib.request.Request(url, data=cialo.encode(), method='POST', headers={
-            **H_JSON, 'Content-Type': 'application/json', 'Accept': 'application/json', 'Origin': 'https://setkacup.com'}),
-            timeout=30, context=CTX)
-        kod, t = r.status, dekoduj(r.read())
-    except urllib.error.HTTPError as e:
-        kod, t = e.code, dekoduj(e.read() or b'')
-    except Exception as e:
-        kod, t = 0, f'{type(e).__name__}: {e}'
-    s.surowe.append({'zrodlo': 'setka_graphql', 'url': url, 'kod': kod, 'tekst': t[:SURowe_MAKS_B]})
-    s.kody.setdefault('setka', {}).setdefault(kod, 0); s.kody['setka'][kod] += 1
-    return {'kod': kod, 'odpowiedz': t[:2000]}
+def z_setka(s, w, teraz, stan, kat):
+    """Wyniki Setka Cup z oficjalnego API (scores24, Flashscore i 365 jej nie maja): jedno zapytanie na dzien.
+    Pierwsze uruchomienie: SETKA_HIST_DNI wstecz; kolejne: od ostatniego pelnego dnia (dzisiejszy pobierany zawsze
+    ponownie, bo turnieje trwaja). Limit SETKA_LIMIT_S na uruchomienie — zaleglosci dociaga nastepne."""
+    dzis = teraz.date()
+    od = dt.date.fromisoformat(stan['setka_do']) if stan.get('setka_do') else dzis - dt.timedelta(days=SETKA_HIST_DNI)
+    wiersze, d, koniec = [], od, time.time() + SETKA_LIMIT_S
+    stat = []
+    while d <= dzis and s.czas() and time.time() < koniec:
+        j = s.get_json('setka', f'{SETKA}/api/Tournaments/en?date={d}', SETKA_NAGL, proby=2)
+        r = setka_wiersze(j if isinstance(j, list) else [])
+        stat.append({'dzien': str(d), 'turnieje': len(j) if isinstance(j, list) else -1, 'mecze': len(r)})
+        if j is None: break                                   # blad sieci/HTTP — ten dzien sprobuje nastepne uruchomienie
+        wiersze += r
+        if d < dzis: stan['setka_do'] = str(d + dt.timedelta(days=1))
+        d += dt.timedelta(days=1)
+    w['setka_dni'] = stat
+    w['setka_mecze'] = wiersze
+    w.setdefault('_pliki_wynikow', []).extend(scal_miesiace(wiersze, 'wyniki_setka_inne', kat))
 
 
 DZIENNE = ('elo', 'transfermarkt', 'understat', 'tenis', 'darty')
@@ -901,7 +859,7 @@ def main(a):
     except (OSError, ValueError): stan = {}
     gotowe = set(stan.get('gotowe', []))
     s, w, bledy = Sesja(budzet * 60), {}, {}
-    zadania = [('setka', lambda: z_setka(s, w)),
+    zadania = [('setka', lambda: z_setka(s, w, teraz, stan, kat)),
                ('s24', lambda: z_s24(s, w, teraz, stan, int(a[a.index('--historia-s24') + 1]) if '--historia-s24' in a else 0, kat)),
                ('90minut', lambda: z_90minut(s, w, teraz)),
                ('fotmob', lambda: z_fotmob(s, w, dzis, teraz, gotowe)), ('sofascore', lambda: z_sofa(s, w, dzis, teraz)),
