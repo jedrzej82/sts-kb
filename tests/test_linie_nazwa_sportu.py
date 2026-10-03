@@ -74,3 +74,35 @@ def test_nieznany_sport_mowi_wprost():
     r = _linie('typuj', 'quidditch', 'A', 'B')
     assert r.returncode != 0
     assert 'BRAK W BAZIE' in (r.stdout + r.stderr)
+
+
+# --- 03.10.2026 (przebieg probny 20:00): brak historii to NIE jest usterka nazwy ---
+
+def test_rozroznia_brak_historii_od_bledu_nazwy():
+    src = open(os.path.join(KORZEN, 'linie.py'), encoding='utf-8').read()
+    assert 'BRAK HISTORII MECZOW' in src, 'linie.py nie rozroznia braku historii od bledu nazwy'
+    assert 'To NIE jest usterka nazwy' in src
+
+
+@pytest.mark.skipif(not os.path.exists(os.path.join(KORZEN, 'sporty_hist.csv')),
+                    reason='wymaga zbudowanej bazy (sporty_hist.csv)')
+def test_klub_bez_historii_nie_jest_zglaszany_jako_zla_nazwa():
+    """„Bàsquet Manresa” jest w tabelach ligi, ale nie ma meczu z wynikiem w bazie.
+    Pula rate_pass zawiera tylko druzyny Z HISTORIA, wiec resolve przeciw niej zawodzil
+    i komunikat sugerowal blad nazwy — przebieg szukalby aliasu, ktory juz dziala."""
+    r = _linie('typuj', 'koszykowka', 'Basquet Manresa', 'CB Breogan')
+    out = r.stdout + r.stderr
+    assert r.returncode != 0
+    assert 'BRAK HISTORII MECZOW' in out
+    assert 'NIE DOPASOWANO NAZWY' not in out
+
+
+@pytest.mark.skipif(not os.path.exists(os.path.join(KORZEN, 'sporty_hist.csv')),
+                    reason='wymaga zbudowanej bazy (sporty_hist.csv)')
+def test_nieznana_nazwa_dalej_jest_bledem_nazwy():
+    """Rozroznienie nie moze przykryc prawdziwego problemu z nazwa."""
+    r = _linie('typuj', 'koszykowka', 'Zupelnie Nieistniejacy Klub XYZ', 'CB Breogan')
+    out = r.stdout + r.stderr
+    assert r.returncode != 0
+    assert 'NIE DOPASOWANO NAZWY' in out
+    assert 'BRAK HISTORII MECZOW' not in out

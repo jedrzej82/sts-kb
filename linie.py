@@ -252,12 +252,29 @@ def main(a):
         if not T:
             sys.exit(f'BRAK W BAZIE: sport „{a[1]}” (po normalizacji „{sport}”) nie ma zadnych wynikow.\n'
                      f'Sprawdz nazwe sportu — dostepne sa te same formy co w sporty.py typuj.')
+        # „nie zgadujemy nazw”: dotad `or a[2]` podstawialo surowa nazwe z oferty i blad wygladal jak brak historii.
+        sp._KANDYDAT.clear()
         rh, rg = sp.resolve(a[2], set(T), sport), sp.resolve(a[3], set(T), sport)
-        # „nie zgadujemy nazw”: dotad `or a[2]` podstawialo surowa nazwe z oferty i blad wygladal jak brak historii
-        brak = [n for n, r in ((a[2], rh), (a[3], rg)) if r is None]
-        if brak:
-            sys.exit('NIE DOPASOWANO NAZWY: ' + ', '.join(repr(x) for x in brak) + ' — noga MNIEJ.\n'
-                     f'Sprawdz nazwe: python3 sporty.py druzyny {sport} FRAGMENT')
+        if rh is None or rg is None:
+            # 03.10.2026 (przebieg probny 20:00): pula rate_pass zawiera tylko druzyny Z HISTORIA meczow, wiec klub
+            # obecny w tabelach ligi, ale bez rozegranego meczu w bazie („Bàsquet Manresa”), dostawal komunikat
+            # NIE DOPASOWANO NAZWY — czyli wygladal na usterke nazwy, a byl brakiem danych. Rozrozniamy oba przypadki:
+            # dopiero gdy nazwy nie ma TAKZE w pelnej puli sportu, jest to naprawde problem z nazwa.
+            try:
+                R, *_ = sp.elo(d, sport); pula = set(R)
+            except Exception:
+                pula = set()
+            bez_historii, nieznane = [], []
+            for nm, r in ((a[2], rh), (a[3], rg)):
+                if r is not None: continue
+                sp._KANDYDAT.clear()
+                (bez_historii if sp.resolve(nm, pula, sport) is not None else nieznane).append(nm)
+            if nieznane:
+                sys.exit('NIE DOPASOWANO NAZWY: ' + ', '.join(repr(x) for x in nieznane) + ' — noga MNIEJ.\n'
+                         f'Sprawdz nazwe: python3 sporty.py druzyny {sport} FRAGMENT')
+            sys.exit('BRAK HISTORII MECZOW: ' + ', '.join(repr(x) for x in bez_historii) + ' — noga MNIEJ.\n'
+                     'Nazwa jest dopasowana poprawnie; ta druzyna nie ma w bazie zadnego meczu z wynikiem,\n'
+                     'a linie licza sie wylacznie z historii. To NIE jest usterka nazwy — nie szukaj aliasu.')
         h, g = rh, rg
         if h not in T or g not in T: sys.exit(f'Brak drużyny w bazie wyników ({h if h not in T else g}) — linie liczone tylko dla drużyn z historią meczów.')
         ds = d[(d.sport == sport) & ((d.gosp == h) | (d.gosc == h))]; liga = ds.liga.iloc[-1]
