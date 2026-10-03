@@ -70,7 +70,8 @@ def test_tabele_html_i_nhl_i_bramkarze():
     g = {'games': [{'id': 1, 'startTimeUTC': '2026-10-08T23:00:00Z', 'gameState': 'FUT',
                     'homeTeam': {'abbrev': 'DAL', 'name': {'default': 'Stars'}}, 'awayTeam': {'abbrev': 'STL', 'name': {'default': 'Blues'}}}]}
     n = z.nhl_mecze(g, '2026-10-08')
-    assert n[0]['gosp'] == 'DAL' and n[0]['gosc_nazwa'] == 'Blues' and n[0]['wynik_g'] == ''
+    assert n[0]['gosp'] == 'DAL' and n[0]['gosp_nazwa'] == 'Dallas Stars' and n[0]['gosc_nazwa'] == 'St. Louis Blues'
+    assert n[0]['wynik_g'] == '' and len(z.NHL_PELNE) == 32
     nd = {'props': {'pageProps': {'date': '2026-10-02', 'data': [
         {'dateGmt': '2026-10-02T22:30:00.000Z', 'homeTeamName': 'Detroit Red Wings', 'homeGoalieName': 'John Gibson',
          'homeNewsStrengthName': 'Confirmed', 'homeGoalieSavePercentage': '0.95', 'awayTeamName': 'New York Rangers',
@@ -119,7 +120,7 @@ def test_tabela_zagniezdzona_tennis_abstract():
          '<th>Elo</th><th>&nbsp;</th><th>hElo</th></tr><tr><td>1</td><td>Jannik&nbsp;Sinner</td><td>2296.9</td><td></td>'
          '<td>2234.3</td></tr></table></td></tr></table>')
     w = z.tabela_z_naglowkiem(z.tabele_html(t, 'reportable'))
-    assert w == [{'Elo Rank': '1', 'Player': 'Jannik Sinner', 'Elo': '2296.9', 'k3': '', 'hElo': '2234.3'}]
+    assert w == [{'Elo Rank': '1', 'Player': 'Jannik Sinner', 'Elo': '2296.9', 'hElo': '2234.3'}]   # pusta kolumna-odstep usunieta
 
 
 def test_transfermarkt_wiersze():
@@ -130,11 +131,12 @@ def test_transfermarkt_wiersze():
          'href="/afc-bournemouth/startseite/verein/989"><img/></a></td><td class="links">Foot injury</td><td></td></tr>'
          '<tr class="even"><td class="zentriert"><a title="Arsenal FC" href="/fc-arsenal/startseite/verein/11/saison_id/2026"></a></td>'
          '<td class="hauptlink no-border-links"><a title="Arsenal FC" href="/fc-arsenal/startseite/verein/11">Arsenal</a></td>'
-         '<td class="rechts">&euro;1.33bn</td></tr></tbody></table>')
+         '<td class="rechts">&euro;1.33bn</td></tr><tr class="odd"><td>25</td><td>3</td></tr></tbody></table>')
     w = z.tm_wiersze(t)
     assert w[0] == {'nazwa': 'Junior Kroupi', 'pozycja': 'Centre-Forward', 'klub': 'AFC Bournemouth', 'klub_id': '989',
                     'komorki': 'Foot injury'}
     assert (w[1]['nazwa'], w[1]['klub_id'], w[1]['komorki']) == ('Arsenal FC', '11', 'Arsenal | €1.33bn')
+    assert len(w) == 2   # wiersz bez nazwy (inna tabela "items") pominiety
     assert z.tm_wiersze('brak tabeli') == []
 
 
