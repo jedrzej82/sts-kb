@@ -758,6 +758,10 @@ def z_90minut(s, w, teraz=None):
         # sezon jesien-wiosna: mecze z „przyszlych” miesiecy naleza do poprzedniego roku
         for x in r:
             if x['data'] > str((teraz + dt.timedelta(days=2)).date()): x['data'] = str(int(x['data'][:4]) - 1) + x['data'][4:]
+        # 03.10.2026 (cron 14:40): mecze z dzisiejsza data maja wynik, ktory moze byc z TRAKCIE meczu (Unia Swarzedz -
+        # Kotwica Kornik 7:0 o 14:40) — bierzemy tylko do wczoraj; dzisiejsze dociagnie jutrzejsze uruchomienie
+        dzis_pl = str((teraz + dt.timedelta(hours=2)).date())
+        r = [x for x in r if x['data'] < dzis_pl]
         mecze += r
         stat.append({'turniej': turniej, 'link': href, 'kod': kod, 'mecze': len(r)})
     w['90minut_ligi'] = stat
