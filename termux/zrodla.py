@@ -52,6 +52,7 @@ MAKS_SZCZEGOLY = 60     # na zrodlo i uruchomienie
 SURowe_NA_ZRODLO = 4
 SURowe_MAKS_B = 300_000
 
+H_SOFA = {**H_JSON, 'Referer': 'https://www.sofascore.com/', 'Origin': 'https://www.sofascore.com'}
 SOFA = ('https://api.sofascore.com/api/v1', 'https://www.sofascore.com/api/v1')
 SOFA_SPORTY = ('football', 'basketball', 'ice-hockey', 'handball', 'volleyball', 'darts', 'tennis')
 TM_LIGI = ('GB1', 'GB2', 'ES1', 'ES2', 'IT1', 'IT2', 'L1', 'L2', 'FR1', 'FR2', 'NL1', 'PO1', 'BE1', 'TR1', 'PL1',
@@ -123,13 +124,45 @@ def tekst_html(s):
 
 def tabele_html(s, klasa=None):
     """Wiersze tabel HTML jako listy komorek (tekst). klasa = fragment atrybutu class/id tabeli."""
-    out = []
-    for m in re.finditer(r'<table([^>]*)>(.*?)</table>', s or '', re.S | re.I):
+    # tresc = od znacznika otwierajacego do NAJBLIZSZEGO </table> — tabela zagniezdzona w innej (Tennis Abstract:
+    # #reportable wewnatrz <table width=1000px>) nie moze byc pochlonieta przez zewnetrzna (diagnoza 03.10 07:50)
+    out, s = [], s or ''
+    for m in re.finditer(r'<table([^>]*)>', s, re.I):
         if klasa and klasa not in m.group(1): continue
-        for tr in re.findall(r'<tr[^>]*>(.*?)</tr>', m.group(2), re.S | re.I):
+        k = s.find('</table>', m.end())
+        for tr in re.findall(r'<tr[^>]*>(.*?)</tr>', s[m.end():k if k >= 0 else len(s)], re.S | re.I):
             kom = [tekst_html(c) for c in re.findall(r'<t[dh][^>]*>(.*?)</t[dh]>', tr, re.S | re.I)]
             if any(kom): out.append(kom)
     return out
+
+
+def tm_wiersze(s):
+    """Transfermarkt, tabela class="items": wiersz odd/even -> nazwa (gracz albo klub), klub, komorki (tekst).
+    Komorka gracza ma wewnetrzna tabele (zdjecie, nazwisko, pozycja) — dlatego nie tabele_html (diagnoza 03.10)."""
+    i = (s or '').find('class="items"')
+    if i < 0: return []
+    out = []
+    for b in re.findall(r'<tr class="(?:odd|even)"[^>]*>(.*?)(?=<tr class="(?:odd|even)"|</tbody>|$)', s[i:], re.S):
+        nazwa = re.search(r'class="hauptlink[^"]*">\s*<a title="([^"]+)"', b)
+        poz = re.search(r'inline-table">.*?</tr>\s*<tr>\s*<td>([^<]*)</td>', b, re.S)
+        reszta = b.rsplit('</table>', 1)[-1]
+        klub = re.search(r'<a title="([^"]+)" href="/[^"]*/(?:startseite|spielplan)/verein/(\d+)', reszta)
+        kom = [tekst_html(c) for c in re.findall(r'<td[^>]*>(.*?)</td>', reszta, re.S)]
+        out.append({'nazwa': _html.unescape(nazwa.group(1)) if nazwa else '', 'pozycja': (poz.group(1).strip() if poz else ''),
+                    'klub': _html.unescape(klub.group(1)) if klub else '', 'klub_id': klub.group(2) if klub else '',
+                    'komorki': ' | '.join(c for c in kom if c)})
+    return out
+
+
+def tabela_z_naglowkiem(wiersze):
+    """Pierwszy wiersz = naglowek; puste i powtorzone nazwy kolumn dostaja numer."""
+    if not wiersze: return []
+    nag, uzyte = [], {}
+    for i, n in enumerate(wiersze[0]):
+        n = n.strip() or f'k{i}'
+        uzyte[n] = uzyte.get(n, 0) + 1
+        nag.append(n if uzyte[n] == 1 else f'{n}_{uzyte[n]}')
+    return [dict(zip(nag, w)) for w in wiersze[1:] if len(w) == len(nag)]
 
 
 def elo_reprezentacji(world_tsv, teams_tsv):
@@ -261,16 +294,23 @@ def nhl_mecze(j, data):
     return out
 
 
+BR_POLA = (('TeamName', 'druzyna'), ('GoalieName', 'bramkarz'), ('NewsStrengthName', 'status'),
+           ('GoalieSavePercentage', 'sv_proc'), ('GoalieGoalsAgainstAvg', 'gaa'), ('GoalieWins', 'w'),
+           ('GoalieLosses', 'l'), ('GoalieRating', 'ocena'), ('NewsCreatedAt', 'wiadomosc_utc'))
+
+
 def bramkarze(tekst):
-    """Daily Faceoff: __NEXT_DATA__ -> slowniki z polami bramkarzy (zapis wszystkich pol *oalie*/*News*/*Team*)."""
+    """Daily Faceoff: __NEXT_DATA__ -> props.pageProps.data (lista meczow, pola home*/away*) — uklad z diagnozy 03.10."""
     m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', tekst or '', re.S)
     if not m: return []
-    try: j = json.loads(m.group(1))
-    except ValueError: return []
+    try: pp = json.loads(m.group(1))['props']['pageProps']
+    except (ValueError, KeyError, TypeError): return []
     out = []
-    for d in chodz(j):
-        if any('oalie' in k for k in d) and any('Team' in k or 'team' in k for k in d):
-            out.append({'dane': json.dumps({k: v for k, v in d.items() if not isinstance(v, (dict, list))}, ensure_ascii=False)})
+    for g in pp.get('data') or []:
+        w = {'data': pp.get('date', ''), 'start_utc': g.get('dateGmt', g.get('date', ''))}
+        for strona, s in (('gosp', 'home'), ('gosc', 'away')):
+            for k, n in BR_POLA: w[f'{n}_{strona}'] = g.get(s + k, '')
+        out.append(w)
     return out
 
 
@@ -295,7 +335,8 @@ def utc_z(x):
     """ISO / znacznik czasu -> datetime UTC (naive) albo None."""
     if x in (None, ''): return None
     try:
-        if isinstance(x, (int, float)) or str(x).isdigit(): return dt.datetime.utcfromtimestamp(int(x))
+        if isinstance(x, (int, float)) or str(x).isdigit():
+            return dt.datetime.fromtimestamp(int(x), dt.timezone.utc).replace(tzinfo=None)
         t = dt.datetime.fromisoformat(str(x).replace('Z', '+00:00'))
         return t.astimezone(dt.timezone.utc).replace(tzinfo=None) if t.tzinfo else t
     except (ValueError, OverflowError, OSError):
@@ -336,8 +377,11 @@ def z_sofa(s, w, dzis, teraz):
     for sport in SOFA_SPORTY:
         for d in (dzis - dt.timedelta(days=1), dzis):
             for b in ([baza] if baza else SOFA):
-                j = s.get_json('sofascore', f'{b}/sport/{sport}/scheduled-events/{d}')
+                j = s.get_json('sofascore', f'{b}/sport/{sport}/scheduled-events/{d}', H_SOFA)
                 if j is not None: baza = b; mecze += sofa_mecze(j, sport, str(d)); break
+            if not baza:   # 403 "challenge" na obu adresach (telefon 03.10) — nie ponawiamy 28 razy
+                w['sofascore_mecze'] = []
+                return
     w['sofascore_mecze'] = mecze
     if not baza: return
     out = []
@@ -356,8 +400,7 @@ def z_transfermarkt(s, w):
         for typ, sciezka in (('kontuzje', 'verletztespieler'), ('wartosci', 'startseite')):
             kod, t = s.get('transfermarkt', f'https://www.transfermarkt.com/liga/{sciezka}/wettbewerb/{lg}', H_HTML, pauza=2.0)
             if kod != 200: continue
-            for kom in tabele_html(t, 'items'):
-                out.append({'liga': lg, 'typ': typ, 'komorki': ' | '.join(kom)})
+            out += [{'liga': lg, 'typ': typ, **r} for r in tm_wiersze(t)]
     w['transfermarkt'] = out
 
 
@@ -376,17 +419,16 @@ def z_understat(s, w, dzis, historia):
 def z_tenis(s, w):
     out = []
     for tura in ('atp', 'wta'):
-        kod, t = s.get('tenis_elo', f'https://tennisabstract.com/reports/{tura}_elo_ratings.html', H_HTML, pauza=1.0)
+        kod, t = s.get('tenis', f'https://tennisabstract.com/reports/{tura}_elo_ratings.html', H_HTML, pauza=1.0)
         if kod != 200: continue
-        tab = tabele_html(t, 'reportable') or tabele_html(t)
-        for kom in tab:
-            out.append({'tura': tura, 'pozycja': kom[0], 'zawodnik': kom[1] if len(kom) > 1 else '', 'komorki': ' | '.join(kom)})
+        out += [{'tura': tura, **r} for r in tabela_z_naglowkiem(tabele_html(t, 'reportable'))]
     w['tenis_elo'] = out
 
 
 def z_darty(s, w):
-    kod, t = s.get('darty', 'https://dartsorakel.com/rank', H_HTML)
-    w['darty_ranking'] = [{'komorki': ' | '.join(k)} for k in tabele_html(t)] if kod == 200 else []
+    # /rank = 404 (diagnoza 03.10); statystyki graczy pod /stats/player
+    kod, t = s.get('darty', 'https://dartsorakel.com/stats/player', H_HTML)
+    w['darty_ranking'] = tabela_z_naglowkiem(tabele_html(t)) if kod == 200 else []
 
 
 def z_nhl(s, w, dzis):
@@ -394,8 +436,11 @@ def z_nhl(s, w, dzis):
     for d in (dzis - dt.timedelta(days=1), dzis, dzis + dt.timedelta(days=1)):
         out += nhl_mecze(s.get_json('nhl', f'https://api-web.nhle.com/v1/score/{d}'), str(d))
     w['nhl'] = out
-    kod, t = s.get('nhl', 'https://www.dailyfaceoff.com/starting-goalies/', H_HTML)
-    w['nhl_bramkarze'] = bramkarze(t) if kod == 200 else []
+    br = []
+    for d in (dzis, dzis + dt.timedelta(days=1)):   # strona bez daty pokazuje wczorajsze mecze (diagnoza 03.10)
+        kod, t = s.get('nhl', f'https://www.dailyfaceoff.com/starting-goalies/{d}', H_HTML)
+        if kod == 200: br += bramkarze(t)
+    w['nhl_bramkarze'] = br
 
 
 def z_pogoda(s, w):
@@ -455,7 +500,7 @@ def main(a):
     kat = a[a.index('--katalog') + 1] if '--katalog' in a else '/sdcard/Download'
     budzet = float(a[a.index('--budzet-min') + 1]) if '--budzet-min' in a else 12.0
     tylko = set(a[a.index('--tylko') + 1].split(',')) if '--tylko' in a else set(WSZYSTKIE)
-    teraz = dt.datetime.utcnow()
+    teraz = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
     dzis = (teraz + dt.timedelta(hours=2)).date()
     try: stan = json.load(open(STAN))
     except (OSError, ValueError): stan = {}

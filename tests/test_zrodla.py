@@ -71,10 +71,13 @@ def test_tabele_html_i_nhl_i_bramkarze():
                     'homeTeam': {'abbrev': 'DAL', 'name': {'default': 'Stars'}}, 'awayTeam': {'abbrev': 'STL', 'name': {'default': 'Blues'}}}]}
     n = z.nhl_mecze(g, '2026-10-08')
     assert n[0]['gosp'] == 'DAL' and n[0]['gosc_nazwa'] == 'Blues' and n[0]['wynik_g'] == ''
-    nd = {'props': {'pageProps': {'data': [{'homeTeamName': 'Dallas', 'homeGoalieName': 'Oettinger',
-                                            'homeNewsStrengthName': 'Confirmed', 'x': {'y': 1}}]}}}
+    nd = {'props': {'pageProps': {'date': '2026-10-02', 'data': [
+        {'dateGmt': '2026-10-02T22:30:00.000Z', 'homeTeamName': 'Detroit Red Wings', 'homeGoalieName': 'John Gibson',
+         'homeNewsStrengthName': 'Confirmed', 'homeGoalieSavePercentage': '0.95', 'awayTeamName': 'New York Rangers',
+         'awayGoalieName': 'Dylan Garand', 'awayNewsStrengthName': 'Likely'}]}}}
     b = z.bramkarze(f'<script id="__NEXT_DATA__" type="application/json">{json.dumps(nd)}</script>')
-    assert json.loads(b[0]['dane']) == {'homeTeamName': 'Dallas', 'homeGoalieName': 'Oettinger', 'homeNewsStrengthName': 'Confirmed'}
+    assert (b[0]['data'], b[0]['bramkarz_gosp'], b[0]['status_gosp'], b[0]['sv_proc_gosp']) == ('2026-10-02', 'John Gibson', 'Confirmed', '0.95')
+    assert (b[0]['druzyna_gosc'], b[0]['status_gosc'], b[0]['gaa_gosc']) == ('New York Rangers', 'Likely', '')
     assert z.bramkarze('brak') == []
 
 
@@ -108,3 +111,39 @@ def test_zapisz(tmp_path):
     with gzip.open(p, 'rt') as f:
         assert f.read().splitlines() == ['a,b', '1,', '2,3']
     assert z.zapisz(str(tmp_path), 'y', [], 'T') is None
+
+
+def test_tabela_zagniezdzona_tennis_abstract():
+    # 03.10 07:50 (telefon): #reportable siedzi w <table width=1000px> — wczesniej parser bral zewnetrzna tabele
+    t = ('<table width="1000px"><tr><td><table id="reportable" class="tablesorter"><tr><th>Elo&nbsp;Rank</th><th>Player</th>'
+         '<th>Elo</th><th>&nbsp;</th><th>hElo</th></tr><tr><td>1</td><td>Jannik&nbsp;Sinner</td><td>2296.9</td><td></td>'
+         '<td>2234.3</td></tr></table></td></tr></table>')
+    w = z.tabela_z_naglowkiem(z.tabele_html(t, 'reportable'))
+    assert w == [{'Elo Rank': '1', 'Player': 'Jannik Sinner', 'Elo': '2296.9', 'k3': '', 'hElo': '2234.3'}]
+
+
+def test_transfermarkt_wiersze():
+    # uklad z odpowiedzi 03.10: komorka gracza z wewnetrzna tabela (zdjecie, nazwisko, pozycja)
+    t = ('<table class="items"><tbody><tr class="odd"><td><table class="inline-table"><tr><td rowspan="2"><img title="X"/></td>'
+         '<td class="hauptlink"><a title="Junior Kroupi" href="/junior-kroupi/profil/spieler/955357">Junior Kroupi</a></td></tr>'
+         '<tr><td>Centre-Forward</td></tr></table></td><td class="zentriert"><a title="AFC Bournemouth" '
+         'href="/afc-bournemouth/startseite/verein/989"><img/></a></td><td class="links">Foot injury</td><td></td></tr>'
+         '<tr class="even"><td class="zentriert"><a title="Arsenal FC" href="/fc-arsenal/startseite/verein/11/saison_id/2026"></a></td>'
+         '<td class="hauptlink no-border-links"><a title="Arsenal FC" href="/fc-arsenal/startseite/verein/11">Arsenal</a></td>'
+         '<td class="rechts">&euro;1.33bn</td></tr></tbody></table>')
+    w = z.tm_wiersze(t)
+    assert w[0] == {'nazwa': 'Junior Kroupi', 'pozycja': 'Centre-Forward', 'klub': 'AFC Bournemouth', 'klub_id': '989',
+                    'komorki': 'Foot injury'}
+    assert (w[1]['nazwa'], w[1]['klub_id'], w[1]['komorki']) == ('Arsenal FC', '11', 'Arsenal | €1.33bn')
+    assert z.tm_wiersze('brak tabeli') == []
+
+
+def test_sofascore_blokada_przerywa_po_pierwszym_dniu():
+    # 03.10: 403 "challenge" na obu adresach — 28 prob z rzedu; teraz po pierwszej parze adresow koniec
+    s = z.Sesja(60)
+    proby = []
+    s.get_json = lambda zr, url, *a, **k: proby.append(url)
+    w = {}
+    import datetime as dt
+    z.z_sofa(s, w, dt.date(2026, 10, 3), dt.datetime(2026, 10, 3, 6))
+    assert w['sofascore_mecze'] == [] and len(proby) == 2
