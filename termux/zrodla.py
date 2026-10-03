@@ -615,16 +615,36 @@ def scal_miesiace(wiersze, prefiks, kat):
 
 
 S24_HIST_DNI, S24_LIMIT_S = 21, 240
+S24_STRONY = ('/en/table-tennis', '/en/table-tennis/c-ukraine', '/en/table-tennis/c-international', '/en/table-tennis/c-world',
+              '/en/table-tennis/c-russia', '/en/table-tennis/c-europe')
+S24_KANDYDACI = ('setka-cup', 'setka-cup-1', 'ukraine-setka-cup', 'ukraine-setka-cup-1', 'international-setka-cup',
+                 'international-setka-cup-1', 'world-setka-cup', 'world-setka-cup-1', 'setka-cup-men', 'setka-cup-ukraine',
+                 'europe-setka-cup', 'europe-setka-cup-1', 'russia-setka-cup', 'russia-setka-cup-1')
 
 
 def z_s24(s, w, teraz, stan, dni_hist, kat):
     """Setka Cup ze scores24 (jak Liga Pro w ligapro.gs, ale z telefonu): slug znajdowany na liscie lig, mecze zakonczone
     w oknach 1 h (API: max 50 meczow na odpowiedz) od ostatniego pobrania; --historia-s24 DNI = pobranie wstecz."""
-    kod, t = s.get('s24', S24 + '/en/table-tennis', H_HTML)
-    wszystkie = s24_slugi(t)
-    w['s24_ligi'] = [{'slug': x} for x in wszystkie]
-    cele = [(x, v) for x in wszystkie for k, v in S24_LIGI.items() if k in x]
+    # 03.10.2026 (przebieg 10:19): strona glowna tenisa stolowego pokazala 3 ligi, bez Setka Cup, a slug „setka-cup”
+    # w ligapro.gs daje 0 meczow — slug jest inny (Liga Pro to „czech-liga-pro-1”). Szukamy na kilku stronach
+    # i sprawdzamy kandydatow przez API; znaleziony slug zostaje w stanie (kolejne uruchomienia go uzywaja).
+    wszystkie = set()
+    if stan.get('s24_slug'): wszystkie.add(stan['s24_slug'])
+    for strona in S24_STRONY:
+        kod, t = s.get('s24', S24 + strona, H_HTML)
+        wszystkie |= set(s24_slugi(t))
+    cele = [(x, v) for x in sorted(wszystkie) for k, v in S24_LIGI.items() if k in x]
+    if not cele:
+        od_ = teraz - dt.timedelta(days=2)
+        for slug in S24_KANDYDACI:
+            url = (f'{S24}/rapi/leagues/table-tennis/{slug}/matches?lang=en&audience=en&first=5&status=ended&with_statistics=false'
+                   f'&date_between%5B%5D={od_:%Y-%m-%d+%H:%M:%S}&date_between%5B%5D={teraz:%Y-%m-%d+%H:%M:%S}')
+            j = s.get_json('s24', url, {**H_JSON, 'Accept': 'application/json'}, proby=1, pauza=0.2)
+            if ((j or {}).get('data') or {}).get('edges') or (j or {}).get('edges'):
+                cele = [(slug, S24_LIGI['setka'])]; break
+    w['s24_ligi'] = [{'slug': x, 'cel': any(x == c for c, _ in cele)} for x in sorted(wszystkie | {c for c, _ in cele})]
     if not cele: return
+    stan['s24_slug'] = cele[0][0]
     # 03.10.2026: wszystko z crona, bez recznych komend — pierwsze uruchomienie (brak stanu) pobiera S24_HIST_DNI wstecz,
     # kazde nastepne dociaga od miejsca, w ktorym poprzednie skonczylo (limit S24_LIMIT_S na uruchomienie, zeby
     # zaleglosci nie zjadly budzetu pozostalych zrodel).
@@ -648,11 +668,15 @@ def z_s24(s, w, teraz, stan, dni_hist, kat):
 def z_90minut(s, w):
     """90minut.pl (polskie ligi II-IV, CLJ, kobiety): na razie DIAGNOZA — strona glowna i linki do lig w surowych
     odpowiedziach; parser po pierwszym pobraniu (jak przy pozostalych zrodlach 03.10)."""
-    kod, t = s.get('90minut', 'https://www.90minut.pl/', H_HTML)
+    baza, curl = 'https://www.90minut.pl/', None
+    kod, t = s.get('90minut', baza, H_HTML)
+    if kod != 200:   # 03.10.2026 (przebieg 10:19): HTTP 0 z Pythona — druga proba zwyklym http i curlem (inny TLS)
+        baza, curl = 'http://www.90minut.pl/', []
+        kod, t = s.get('90minut', baza, H_HTML, curl=curl)
     linki = sorted(set(re.findall(r'href="(/?(?:liga|archsezon|skarb)[^"]+)"', t or '')))
     w['90minut_linki'] = [{'link': x} for x in linki[:400]]
     for l in linki[:3]:
-        s.get('90minut', 'https://www.90minut.pl/' + l.lstrip('/'), H_HTML)
+        s.get('90minut', baza + l.lstrip('/'), H_HTML, curl=curl)
 
 
 DZIENNE = ('elo', 'transfermarkt', 'understat', 'tenis', 'darty')
