@@ -54,4 +54,8 @@ Użytkownik liczy w czasie polskim (UTC+2 latem): 10:00 UTC = 12:00 PL. Przebieg
   `dopasuj.py auto KURSY` (w KAZDYM przebiegu po oferta.py): pewne aliasy z wynikow + kotwica ligowa bez kolizji ->
   `aliasy_auto.csv` (nie w repo), wczytywany po aliasy.csv (reczne wygrywaja); modul „sporty” dopuszcza kilka celow
   jednej nazwy (rozne sporty) — `nazwy.aliasy_wiele`.
+- Zdarzenia (TRYB OBSERWACJI, nic w typowaniu jeszcze z tego nie korzysta): `zdarzenia.py KURSY` — kazde zdarzenie z oferty
+  -> MATCH / UNKNOWN / CONFLICT + dowody (PARA_W_ZRODLE, GODZINA, WSPOLNA_LIGA, H2H; konflikt RYWAL_INNY, TA_SAMA_DRUZYNA;
+  ROZBITA = ten sam klub pod dwiema nazwami w bazie). Cel: 100% zdarzen sklasyfikowanych, 0 blednych MATCH; blokada
+  typowania CONFLICT/UNKNOWN dopiero po przegladzie na prawdziwych danych i decyzji uzytkownika.
 - Apps Script (wkleja użytkownik): `apps_script/terminarz.gs`, `apps_script/ligapro.gs`, `apps_script/arkusze.gs` (arkusze statystyk jako .csv.gz), `apps_script/dzienniki.gs` (wszystkie dzienniki w jednym dzienniki.zip; `python3 przebieg.py --dzienniki`), `apps_script/paczka.gs` (wszystkie dane przebiegu w jednym paczka.zip — przebieg.py rozpakowuje ja sam).
