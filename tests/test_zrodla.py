@@ -176,3 +176,13 @@ def test_curl_get_parsuje_kod(monkeypatch):
     monkeypatch.setattr(z.shutil, 'which', lambda x: '/usr/bin/curl')
     monkeypatch.setattr(z.subprocess, 'run', lambda cmd, **k: R())
     assert z.curl_get('https://x', {'A': 'b'}) == (403, '{"a":1}')
+
+
+def test_darty_api():
+    # kolumny DataTables z kodu strony dartsorakel.com/stats/player (03.10): rank, player_name, stat
+    j = {'data': [{'rank': 1, 'player_name': 'Luke Humphries', 'stat': 99.12, 'matches': 120},
+                  {'rank': 2, 'player_name': '<b>Luke&nbsp;Littler</b>', 'stat': 98.7}]}
+    w = z.darty_api(j, 'srednia')
+    assert w[0] == {'stat': 'srednia', 'pozycja': 1, 'zawodnik': 'Luke Humphries', 'wartosc': 99.12, 'mecze': 120}
+    assert w[1]['zawodnik'] == 'Luke Littler' and w[1]['mecze'] == ''
+    assert z.darty_api(None, 'x') == [] and z.darty_api([{'rank': 3, 'player_name': 'A', 'stat': 1}], 'x')[0]['pozycja'] == 3
