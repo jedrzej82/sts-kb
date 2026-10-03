@@ -241,8 +241,24 @@ def main(a):
         print('zapisano', SIG, CAL)
     elif a[0] == 'typuj':
         import sporty as sp
-        sport = a[1].lower(); d = sp.load(); T, L, last = rate_pass(d, sport)
-        h, g = sp.resolve(a[2], set(T), sport) or a[2], sp.resolve(a[3], set(T), sport) or a[3]   # sport: reguly nazw zalezne od sportu
+        # 03.10.2026: dotad bylo `a[1].lower()`, wiec „reczna” nie trafialo w „piłka ręczna” — rate_pass zwracal
+        # PUSTY stan, resolve dostawal pusta pule i spadal na `or a[2]`, a skrypt konczyl sie „Brak druzyny w bazie
+        # wynikow”. Efekt: linie (handicapy, sumy) byly w przebiegu NIEOSIAGALNE dla kazdego sportu, ktorego nazwa
+        # w ofercie rozni sie od nazwy w bazie — czyli dla wszystkich poza hokejem i baseballem. Przebiegi ocenialy
+        # wylacznie rynek zwyciezcy, gdzie faworyci chodza po 1,02-1,18, czyli ponizej progu 1,137, przy ktorym
+        # podatek 12% w ogole pozwala wyjsc na zero. Stad brak AKO przy 23 zdarzeniach (03.10), ktore mialy
+        # i dane, i >= 2 typy rynkow. Ta sama normalizacja co w sporty.py typuj (P61/P65).
+        sport = sp.nazwa_sportu(a[1]); d = sp.load(); T, L, last = rate_pass(d, sport)
+        if not T:
+            sys.exit(f'BRAK W BAZIE: sport „{a[1]}” (po normalizacji „{sport}”) nie ma zadnych wynikow.\n'
+                     f'Sprawdz nazwe sportu — dostepne sa te same formy co w sporty.py typuj.')
+        rh, rg = sp.resolve(a[2], set(T), sport), sp.resolve(a[3], set(T), sport)
+        # „nie zgadujemy nazw”: dotad `or a[2]` podstawialo surowa nazwe z oferty i blad wygladal jak brak historii
+        brak = [n for n, r in ((a[2], rh), (a[3], rg)) if r is None]
+        if brak:
+            sys.exit('NIE DOPASOWANO NAZWY: ' + ', '.join(repr(x) for x in brak) + ' — noga MNIEJ.\n'
+                     f'Sprawdz nazwe: python3 sporty.py druzyny {sport} FRAGMENT')
+        h, g = rh, rg
         if h not in T or g not in T: sys.exit(f'Brak drużyny w bazie wyników ({h if h not in T else g}) — linie liczone tylko dla drużyn z historią meczów.')
         ds = d[(d.sport == sport) & ((d.gosp == h) | (d.gosc == h))]; liga = ds.liga.iloc[-1]
         lg = L[liga]; sh = lambda s, i: (s[i] * s[2] + PRIOR) / (s[2] + PRIOR)
@@ -276,7 +292,8 @@ def main(a):
         if not os.path.exists(CAL) or pd.read_csv(CAL).query('sport == @sport').empty: print('  BRAK KALIBRACJI linii dla tego sportu — traktuj jak „szacunek”.')
     elif a[0] == 'mapy':   # python3 linie.py mapy esport_cs2|esport_lol "A" "B" [--bo5]
         import sporty as sp
-        sport = a[1]; d = sp.load(); R, N, *_ = sp.elo(d, sport); A, B = sp.resolve(a[2], set(R), sport), sp.resolve(a[3], set(R), sport)
+        sport = sp.nazwa_sportu(a[1]); d = sp.load(); R, N, *_ = sp.elo(d, sport)   # 03.10.2026: ta sama normalizacja co wyzej
+        A, B = sp.resolve(a[2], set(R), sport), sp.resolve(a[3], set(R), sport)
         # 30.09.2026 (przeglad): brak druzyny dawal Elo 1500 i pelna tabele P (potem TypeError) — nie zgadujemy
         if not A or not B: sys.exit('Brak drużyny w bazie — noga MNIEJ.')
         e = 1 / (1 + 10 ** ((R.get(B, 1500) - R.get(A, 1500)) / 400)); bo = 5 if '--bo5' in a else 3
