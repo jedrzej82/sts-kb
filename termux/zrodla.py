@@ -51,7 +51,7 @@ STAN = os.path.expanduser('~/.zrodla_stan.json')
 OKNO_H = 3.5            # szczegoly dla meczow zaczynajacych sie w ciagu tylu godzin
 MAKS_SZCZEGOLY = 60     # na zrodlo i uruchomienie
 SURowe_NA_ZRODLO = 4
-SUROWE_LIMIT = {'90minut': 10}   # 03.10.2026: strony lig 90minut potrzebne w calosci do sprawdzenia parsera
+SUROWE_LIMIT = {'90minut': 10, 'setka': 12}   # 03.10.2026: strony lig 90minut potrzebne w calosci do sprawdzenia parsera
 SURowe_MAKS_B = 300_000
 
 H_SOFA = {**H_JSON, 'Referer': 'https://www.sofascore.com/', 'Origin': 'https://www.sofascore.com'}
@@ -768,8 +768,42 @@ def z_90minut(s, w, teraz=None):
     w['90minut_mecze'] = mecze
 
 
+def setka_api(js):
+    """Adresy API z kodu aplikacji setkacup.com (SPA: strona to tylko „Loading application...”, dane pobiera app.*.js).
+    Zwraca posortowane, unikalne: pelne URL-e oraz sciezki zaczynajace sie od /api, /v1, /v2 itp."""
+    pelne = re.findall(r'https?://[A-Za-z0-9.-]+(?:/[^\s"\'`<>()]*)?', js or '')
+    sciezki = re.findall(r'["\'`](/(?:api|v\d|rest|graphql|socket)[^"\'`\s]*)["\'`]', js or '')
+    pelne = [u for u in pelne if not re.search(r'googletagmanager|facebook|google-analytics|w3\.org|reactjs|fb\.me|schema\.org|github', u)]
+    return sorted(set(pelne)), sorted(set(sciezki))
+
+
+def z_setka(s, w):
+    """03.10.2026: wyniki Setka Cup z oficjalnej strony (setkacup.com) — scores24, Flashscore i 365 jej nie maja.
+    DIAGNOZA: strona to aplikacja JS; pobieramy app.*.js, wyciagamy adresy API i probujemy te o meczach/turniejach
+    (surowe odpowiedzi w zipie). Parser wynikow — po pierwszym pobraniu, jak przy 90minut."""
+    baza = 'https://setkacup.com'
+    kod, t = s.get('setka', baza + '/', H_HTML, proby=1)
+    skrypty = re.findall(r'src="(/[^"]+\.js)"', t or '')
+    w['setka_skrypty'] = [{'skrypt': x} for x in skrypty]
+    adresy, sciezki = [], []
+    for sk in skrypty[:3]:
+        k2, js = s.get('setka_js', baza + sk, {**H_HTML, 'Accept': '*/*'}, proby=1)
+        a_, p_ = setka_api(js)
+        adresy += a_; sciezki += p_
+        # fragmenty kodu wokol slow match/tournament/result — do recznego odczytania ksztaltu zapytan
+        w.setdefault('setka_fragmenty', []).extend(
+            {'skrypt': sk, 'fragment': js[max(0, m.start() - 150):m.end() + 150]}
+            for m in list(re.finditer(r'(?i)(matches|tournament|results|schedule|games)[\w/?=&{}$.-]{0,40}', js or ''))[:60])
+    w['setka_api'] = [{'adres': x} for x in sorted(set(adresy))] + [{'adres': x} for x in sorted(set(sciezki))]
+    kand = [x for x in sorted(set(adresy)) if re.search(r'(?i)api|match|game|tourn|result', x)][:6]
+    kand += [baza + x for x in sorted(set(sciezki)) if re.search(r'(?i)match|game|tourn|result|event', x)][:6]
+    for url in kand[:8]:
+        if '{' in url or '$' in url: continue
+        s.get('setka', url, {**H_JSON, 'Accept': 'application/json, text/plain, */*', 'Origin': baza, 'Referer': baza + '/'}, proby=1)
+
+
 DZIENNE = ('elo', 'transfermarkt', 'understat', 'tenis', 'darty')
-WSZYSTKIE = DZIENNE + ('fotmob', 'sofascore', 'nhl', 'pogoda', 's24', '90minut')
+WSZYSTKIE = DZIENNE + ('fotmob', 'sofascore', 'nhl', 'pogoda', 's24', '90minut', 'setka')
 
 
 def zapisz(kat, nazwa, wiersze, znacznik):
@@ -809,7 +843,8 @@ def main(a):
     except (OSError, ValueError): stan = {}
     gotowe = set(stan.get('gotowe', []))
     s, w, bledy = Sesja(budzet * 60), {}, {}
-    zadania = [('s24', lambda: z_s24(s, w, teraz, stan, int(a[a.index('--historia-s24') + 1]) if '--historia-s24' in a else 0, kat)),
+    zadania = [('setka', lambda: z_setka(s, w)),
+               ('s24', lambda: z_s24(s, w, teraz, stan, int(a[a.index('--historia-s24') + 1]) if '--historia-s24' in a else 0, kat)),
                ('90minut', lambda: z_90minut(s, w, teraz)),
                ('fotmob', lambda: z_fotmob(s, w, dzis, teraz, gotowe)), ('sofascore', lambda: z_sofa(s, w, dzis, teraz)),
                ('nhl', lambda: z_nhl(s, w, dzis)), ('pogoda', lambda: z_pogoda(s, w)),

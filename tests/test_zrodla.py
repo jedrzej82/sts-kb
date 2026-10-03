@@ -318,3 +318,21 @@ def test_90minut_bez_dzisiejszych_wynikow():
     w = {}
     z.z_90minut(s, w, dt.datetime(2026, 10, 3, 12, 40))
     assert [(x['gosp'], x['data']) for x in w['90minut_mecze']] == [('A', '2026-10-02')]
+
+
+def test_setka_api_z_kodu_aplikacji():
+    # 03.10: setkacup.com to aplikacja JS („Loading application...”) — adresy API szukane w app.*.js
+    js = ('var a="https://api.setkacup.com/v1",b="/api/matches?date="+d,c=`/api/tournaments/${id}`;'
+          'x("https://www.googletagmanager.com/gtm.js");y.get("/v2/results/list")')
+    pelne, sciezki = z.setka_api(js)
+    assert pelne == ['https://api.setkacup.com/v1']
+    assert sciezki == ['/api/matches?date=', '/api/tournaments/${id}', '/v2/results/list']
+    s = z.Sesja(600)
+    adresy = []
+    s.get = lambda zr, url, *a, **k: adresy.append((zr, url)) or ((200, '<script src="/app.x.js"></script>') if url.endswith('.com/') else (200, js))
+    w = {}
+    z.z_setka(s, w)
+    assert ('setka_js', 'https://setkacup.com/app.x.js') in adresy
+    assert ('setka', 'https://setkacup.com/api/matches?date=') in adresy        # kandydat o meczach sprawdzony
+    assert not any('${' in u for _, u in adresy)                              # szablonow nie wolamy
+    assert {'adres': '/v2/results/list'} in w['setka_api']
