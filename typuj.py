@@ -1047,6 +1047,33 @@ def club(home, away, kursy, live=None):
 # niezalezna od modelu (Elo/DC/pi). Noga wchodzi na kupon TYLKO gdy oba zrodla sa zgodne (roznica <= 10 pp)
 # i kazda druzyna ma >= 6 meczow; do kuponu idzie MNIEJSZE z dwoch P (ostroznie). Wygladzanie (k+1)/(n+2),
 # zeby 6/6 nie dawalo 100%. To NIE zastepuje sprawdzenia nieobecnosci w sieci — to drugi, liczbowy filtr.
+# 03.10.2026 (naprawa po Raportach 15:00 i 18:00): A1(a) mowi, ze druzyna bez meczu od > 60 dni to SZACUNEK,
+# ale "drugie zrodlo — forma" liczylo sie z DOKLADNIE TYCH SAMYCH meczow, z ktorych liczy model. Przy druzynie
+# nieswiezej oba "zrodla" powtarzaly ten sam przestarzaly obraz i zawsze wychodzilo ZGODNE — A9 bylo spelnione
+# formalnie, nie merytorycznie. Przyklady z 03.10: Lusitanos (ostatni mecz 2026-05-16, 140 dni: model X2 69,3%,
+# forma 70,8% -> ZGODNE -> NOGA DOPUSZCZONA, EV +12,9%, przy P rynku 48,4%) i Salisbury (ostatni mecz 2014-04-26,
+# 4543 dni: X2 66,2%, EV +19,5%). Od teraz nieswieza druzyna = BRAK DRUGIEGO ZRODLA.
+MAX_WIEK_FORMY_DNI = 60
+
+
+def _ostatni_mecz(w, t):
+    """Data ostatniego meczu druzyny t w zbiorze w (None, gdy brak)."""
+    x = [r[0] for r in w if r[1] == t or r[2] == t]
+    return max(x) if x else None
+
+
+def _na_date(d):
+    """Normalizuje date meczu (datetime / date / tekst) do datetime.date albo None."""
+    import datetime as _dt
+    if d is None: return None
+    if isinstance(d, _dt.datetime): return d.date()
+    if isinstance(d, _dt.date): return d
+    try: return _dt.date.fromisoformat(str(d)[:10])
+    except Exception:
+        try: return d.to_pydatetime().date()        # pandas.Timestamp
+        except Exception: return None
+
+
 def _forma_druzyny(w, t, n=10):
     x = [r for r in w if r[1] == t or r[2] == t][-n:]
     out = []
@@ -1063,6 +1090,20 @@ def drugie_zrodlo(w, h, a, rows, n=10):
     if min(len(fh), len(fa)) < 6:
         print('  BRAK DRUGIEGO ZRODLA (mniej niz 6 meczow jednej z druzyn) — ZADNA noga z tego meczu NIE idzie na kupon.')
         return {}
+    # 03.10.2026: niezaleznosc drugiego zrodla wymaga, zeby forma byla ze SWIEZYCH meczow. Forma z tego samego
+    # przestarzalego okna co model nie jest druga opinia (A1c), tylko powtorzeniem pierwszej.
+    import datetime as _dt
+    dzis = _dt.date.today()
+    for t in (h, a):
+        od = _na_date(_ostatni_mecz(w, t))
+        if od is None: continue
+        wiek = (dzis - od).days
+        if wiek > MAX_WIEK_FORMY_DNI:
+            print(f'  BRAK DRUGIEGO ZRODLA: forma druzyny "{t}" liczy sie z meczow sprzed {wiek} dni '
+                  f'(ostatni {od}, prog {MAX_WIEK_FORMY_DNI} dni z A1a) — to TE SAME nieswieze dane, '
+                  f'z ktorych liczy model, wiec nie jest zrodlem niezaleznym (A9 + A1c).')
+            print('  ZADNA noga z tego meczu NIE idzie na kupon.')
+            return {}
     r = lambda k, m: (k + 1) / (m + 2)
     def cz(f, war): return sum(1 for g in f if war(*g)), len(f)
     wh, nh = cz(fh, lambda z, s: z > s); dh, _ = cz(fh, lambda z, s: z == s); lh, _ = cz(fh, lambda z, s: z < s)
@@ -1096,6 +1137,48 @@ def ev_kelly(p, o):
     """EV po podatku 12% i pelny Kelly (0, gdy kurs po podatku nie przekracza 1)."""
     ev = p * o * TAX - 1
     return ev, (max(0.0, ev / (o * TAX - 1)) if o * TAX > 1 else 0.0)
+
+
+# 03.10.2026: FILTR MODEL-RYNEK (KROK 6.4 instrukcji v7) — do tej pory istnial WYLACZNIE jako krok reczny
+# w instrukcji ("P do kuponu vs P z kursu; rozbieznosc > 15 pp utrzymana -> odrzuc") i w zadnym przebiegu nie byl
+# wykonywany przez kod: --kurs sluzylo tylko do EV, kursu sprawiedliwego i Kelly'ego. Kazda noga z Raportow 03.10,
+# ktora okazala sie artefaktem danych, lamala ten prog:
+#   Le Puy - Lusitanos X2: model 69,3% vs rynek 48,4% (20,9 pp) — gosc bez meczu od 140 dni;
+#   Salisbury - Dulwich Hamlet X2: model 66,2%, dane goscia z 2014 r.;
+#   hokej na rynku 1X2: P modelu jest "z dogrywka", wiec kontra czasowi regulaminowemu dawala +22...+23%.
+# Filtr tylko ODRZUCA nogi — nie jest w stanie zadnej dopuscic (A2: progi wolno zaostrzac, nie luzowac).
+MAX_ROZBIEZNOSC_RYNEK = 0.15
+
+# Rynki dopelniajace sie do 1 — po nich liczymy ksiege (overround) i zdejmujemy marze.
+_DOPELNIENIA = {'1': ('X', '2'), 'X': ('1', '2'), '2': ('1', 'X'),
+                '1X': ('2',), 'X2': ('1',), '12': ('X',),
+                'O0.5': ('U0.5',), 'U0.5': ('O0.5',), 'O1.5': ('U1.5',), 'U1.5': ('O1.5',),
+                'O2.5': ('U2.5',), 'U2.5': ('O2.5',), 'O3.5': ('U3.5',), 'U3.5': ('O3.5',),
+                'O4.5': ('U4.5',), 'U4.5': ('O4.5',),
+                'BTTS_tak': ('BTTS_nie',), 'BTTS_nie': ('BTTS_tak',),
+                'DNB_1': ('DNB_2',), 'DNB_2': ('DNB_1',)}
+
+
+def p_rynku(k, kursy):
+    """P rynku po zdjeciu marzy. None, gdy nie da sie policzyc ksiegi (brak kursu dopelnienia)."""
+    reszta = _DOPELNIENIA.get(k)
+    if reszta is None or k not in kursy: return None
+    try:
+        if not all(x in kursy and float(kursy[x]) > 1 for x in reszta) or float(kursy[k]) <= 1: return None
+        ksiega = 1 / float(kursy[k]) + sum(1 / float(kursy[x]) for x in reszta)
+    except (TypeError, ValueError, ZeroDivisionError):
+        return None
+    return (1 / float(kursy[k])) / ksiega if ksiega > 0 else None
+
+
+def filtr_model_rynek(k, p, kursy):
+    """KROK 6.4. Zwraca powod odrzucenia albo None. Brak kursu dopelnienia = brak filtra (nie blokujemy w ciemno)."""
+    pr = p_rynku(k, kursy)
+    if pr is None: return None
+    d = p - pr
+    if abs(d) <= MAX_ROZBIEZNOSC_RYNEK: return None
+    return (f'FILTR MODEL-RYNEK (6.4): P do kuponu {p:.1%} vs P rynku {pr:.1%} po zdjeciu marzy '
+            f'— rozbieznosc {d * 100:+.1f} pp, prog {MAX_ROZBIEZNOSC_RYNEK * 100:.0f} pp')
 
 
 # 29.09.2026 (Poprawka 58.5, docs/BACKTEST_P48.md): rynki, na ktorych model przy P >= 70% mocno ZAWYZA.
@@ -1172,6 +1255,8 @@ def value(rows, kursy, dz=None, mecz=None, szacunek=False, polski=False):
         pk, powod = werdykt_nogi(k, dz)
         if powod:
             print(f'      → NIE NA KUPON: {powod} (Poprawka 48)')
+        elif (pow_r := filtr_model_rynek(k, pk, kursy)):
+            print(f'      → NIE NA KUPON: {pow_r}')
         else:
             evk, kk = ev_kelly(pk, o)
             print(f'      → P do kuponu {pk:.1%}: EV={evk:+.1%}, ¼ Kelly={kk / 4:.1%}'
