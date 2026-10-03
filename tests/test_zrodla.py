@@ -178,11 +178,23 @@ def test_curl_get_parsuje_kod(monkeypatch):
     assert z.curl_get('https://x', {'A': 'b'}) == (403, '{"a":1}')
 
 
-def test_darty_api():
-    # kolumny DataTables z kodu strony dartsorakel.com/stats/player (03.10): rank, player_name, stat
-    j = {'data': [{'rank': 1, 'player_name': 'Luke Humphries', 'stat': 99.12, 'matches': 120},
-                  {'rank': 2, 'player_name': '<b>Luke&nbsp;Littler</b>', 'stat': 98.7}]}
-    w = z.darty_api(j, 'srednia')
-    assert w[0] == {'stat': 'srednia', 'pozycja': 1, 'zawodnik': 'Luke Humphries', 'wartosc': 99.12, 'mecze': 120}
-    assert w[1]['zawodnik'] == 'Luke Littler' and w[1]['mecze'] == ''
-    assert z.darty_api(None, 'x') == [] and z.darty_api([{'rank': 3, 'player_name': 'A', 'stat': 1}], 'x')[0]['pozycja'] == 3
+def test_darty_api_i_scalanie():
+    # uklad z prawdziwej odpowiedzi 03.10 08:35 (srednia: sumField1/2; % meczow: total_matches/wins)
+    sr = {'recordsTotal': 3, 'data': [
+        {'player_key': 5403, 'player_name': 'Luke Littler', 'country': 'ENG', 'sumField1': 810748, 'sumField2': 24059,
+         'stat': '101.09', 'rank': 1},
+        {'player_key': 34, 'player_name': 'Luke Humphries', 'country': 'ENG', 'sumField1': 767928, 'sumField2': 23153,
+         'stat': '99.50', 'rank': 2},
+        {'player_key': 9, 'player_name': 'Ee Kai', 'country': None, 'sumField1': 0, 'sumField2': 3, 'stat': '0.00', 'rank': 3}]}
+    pm = {'data': [{'player_key': 5403, 'player_name': 'Luke Littler', 'country': 'ENG', 'total_matches': 120, 'wins': 95,
+                    'stat': '95/120', 'rank': 5},
+                   {'player_key': 34, 'player_name': 'Luke Humphries', 'country': 'ENG', 'total_matches': 110, 'wins': 80,
+                    'stat': '80/110', 'rank': 9},
+                   {'player_key': 9, 'player_name': 'Ee Kai', 'country': None, 'total_matches': 2, 'wins': 0, 'stat': '0/2', 'rank': 900}]}
+    w = z.darty_api(sr, 'srednia') + z.darty_api(pm, 'proc_meczow')
+    assert w[0]['kraj'] == 'ENG' and w[2]['kraj'] == '' and w[3]['mianownik'] == 120 and w[3]['licznik'] == 95
+    sc = z.darty_scal(w)
+    assert [x['zawodnik'] for x in sc] == ['Luke Littler', 'Luke Humphries']      # Ee Kai: 2 mecze < 10
+    assert sc[0] == {'klucz': 5403, 'zawodnik': 'Luke Littler', 'kraj': 'ENG', 'srednia': '101.09', 'srednia_n': 24059,
+                     'mecze': 120, 'wygrane': 95}
+    assert z.darty_api(None, 'x') == [] and z.darty_scal([]) == []
