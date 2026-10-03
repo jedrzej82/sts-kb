@@ -200,3 +200,41 @@ def test_darty_api_i_scalanie():
     assert sc[0] == {'klucz': 5403, 'zawodnik': 'Luke Littler', 'kraj': 'ENG', 'srednia': '101.09', 'srednia_n': 24059,
                      'mecze': 120, 'wygrane': 95}
     assert z.darty_api(None, 'x') == [] and z.darty_scal([]) == []
+
+
+def test_s24_setka_cup(tmp_path, monkeypatch):
+    # 03.10: Setka Cup (93 nazwy z oferty bez gracza w bazie) — slug z listy lig scores24, wiersze jak ligaproWiersz
+    assert z.s24_slugi('<a href="/en/table-tennis/l-setka-cup-ukraine">x</a><a href="/en/table-tennis/l-czech-liga-pro">') == \
+        ['czech-liga-pro', 'setka-cup-ukraine']
+    n = {'id': 77, 'teams': [{'name': 'Smyk Vasyl'}, {'name': 'Dubinin Ihor'}], 'match_date': '2026-10-02T21:15:00Z',
+         'result_score': '3:1', 'result_scores': [{'type': '1', 'value': '11:7'}, {'type': '2', 'value': '9:11'},
+                                                  {'type': 'final', 'value': '3:1'}, {'type': '3', 'value': '11:5'}, {'type': '4', 'value': '11:8'}]}
+    r = z.s24_wiersz(n, 'UKRAINE', 'Setka Cup')
+    assert r == {'data': '2026-10-02', 'sport': 'table-tennis', 'kraj': 'UKRAINE', 'turniej': 'Setka Cup', 'runda': 'sc24:77',
+                 'gosp': 'Smyk Vasyl', 'gosc': 'Dubinin Ihor', 'wg': 3, 'wa': 1, 'okresy_g': '11;9;11;11', 'okresy_a': '7;11;5;8',
+                 'zwyciezca': 1, 'nawierzchnia': ''}
+    assert z.s24_wiersz({**n, 'result_score': ''}, 'U', 'S') is None
+    # scalanie miesiaca po id: drugi zapis tego samego meczu nie dubluje
+    monkeypatch.setattr(z, 'WYNIKI_DIR', str(tmp_path / 'w'))
+    kat = tmp_path / 'k'; kat.mkdir()
+    z.scal_miesiace([r], 'wyniki_s24_inne', str(kat))
+    p = z.scal_miesiace([r, {**r, 'runda': 'sc24:78'}], 'wyniki_s24_inne', str(kat))
+    with gzip.open(p[0], 'rt') as f:
+        linie = f.read().splitlines()
+    assert os.path.basename(p[0]) == 'wyniki_s24_inne_2026-10.csv.gz' and len(linie) == 3
+    assert linie[0] == ','.join(z.NAGL_WYNIKI)
+
+
+def test_s24_okna_i_stan(monkeypatch):
+    import datetime as dt
+    s = z.Sesja(60)
+    adresy = []
+    s.get = lambda zr, url, *a, **k: (200, '<a href="/en/table-tennis/l-setka-cup">')
+    s.get_json = lambda zr, url, *a, **k: adresy.append(url) or {'data': {'edges': []}}
+    w, stan = {}, {}
+    teraz = dt.datetime(2026, 10, 3, 10, 0)
+    z.z_s24(s, w, teraz, stan, 0, '/tmp')
+    assert len(adresy) == 48 and 'setka-cup/matches' in adresy[0]          # pierwsze uruchomienie: 2 dni wstecz
+    assert stan['s24_do'] == '2026-10-03T09:40:00'
+    adresy.clear(); z.z_s24(s, w, dt.datetime(2026, 10, 3, 13, 0), stan, 0, '/tmp')
+    assert len(adresy) == 3                                                  # kolejne: tylko od ostatniego pobrania

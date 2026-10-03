@@ -25,7 +25,8 @@ Wszystko z jednego uruchomienia w JEDNYM pliku zrodla_RRRR-MM-DD_GG-MM.zip, wysy
 baza-wiedzy/zrodla/ (nie do folderu przebiegu). W zipie tez zrodla_diag_*.txt (status kazdego zrodla) i
 zrodla_surowe_*.jsonl.gz (do 4 surowych odpowiedzi na zrodlo, przyciete) — z nich poprawiamy parsery bez zrzutow ekranu.
 
-Uzycie:  python zrodla.py [--katalog /sdcard/Download] [--tylko fotmob,nhl] [--historia] [--budzet-min 12] [--wszystkie-dzienne] [--bez-wysylki]"""
+Uzycie:  python zrodla.py [--katalog /sdcard/Download] [--tylko fotmob,nhl] [--historia] [--budzet-min 12] [--wszystkie-dzienne] [--bez-wysylki]
+         python zrodla.py --tylko s24 --historia-s24 21 --budzet-min 30   (jednorazowo: Setka Cup 21 dni wstecz)"""
 import csv
 import datetime as dt
 import gzip
@@ -560,8 +561,96 @@ def sedziowie(w):
     return out
 
 
+# ---------- WYNIKI dla bazy przebiegu (03.10.2026: 876 nazw z ofert bez druzyny w bazie) ----------
+# Te zrodla NIE sa obserwacja: zapisuja wyniki_<zrodlo>_<rodzaj>_RRRR-MM.csv.gz w formacie Apps Script (jak wyniki_lp_inne)
+# do GLOWNEGO folderu baza-wiedzy — paczka.gs dolacza je do paczki, zewn.py czyta wyniki_*_inne_* / wyniki_*_pilka_*.
+S24 = 'https://scores24.live'
+S24_LIGI = {'setka': ('UKRAINE', 'Setka Cup')}   # fragment sluga scores24 -> (kraj, turniej); Liga Pro i TT Cup ma ligapro.gs
+NAGL_WYNIKI = ['data', 'sport', 'kraj', 'turniej', 'runda', 'gosp', 'gosc', 'wg', 'wa', 'okresy_g', 'okresy_a', 'zwyciezca', 'nawierzchnia']
+WYNIKI_DIR = os.path.expanduser('~/.zrodla_wyniki')   # skumulowane pliki miesiaca na telefonie (scalane po id)
+
+
+def s24_slugi(html):
+    """Slugi lig tenisa stolowego ze strony scores24 (/en/table-tennis/l-<slug>)."""
+    return sorted(set(re.findall(r'/table-tennis/l-([a-z0-9-]+)', html or '')))
+
+
+def s24_wiersz(n, kraj, turniej):
+    """Wezel scores24 -> wiersz wynikow (jak ligaproWiersz w apps_script/ligapro.gs) albo None (bez wyniku / remis)."""
+    t = n.get('teams') or []
+    data = n.get('match_date') or n.get('matchDate')
+    wyn = str(n.get('result_score') or n.get('resultScore') or '').split(':')
+    if len(t) != 2 or len(wyn) != 2 or not data: return None
+    try: wg, wa = int(wyn[0]), int(wyn[1])
+    except ValueError: return None
+    if wg == wa: return None
+    sety = sorted((x for x in (n.get('result_scores') or n.get('resultScores') or []) if str(x.get('type', '')).isdigit()),
+                  key=lambda x: int(x['type']))
+    sety = [str(x.get('value', '')).split(':') + [''] for x in sety]
+    return {'data': str(data)[:10], 'sport': 'table-tennis', 'kraj': kraj, 'turniej': turniej, 'runda': f"sc24:{n.get('id')}",
+            'gosp': t[0].get('name', ''), 'gosc': t[1].get('name', ''), 'wg': wg, 'wa': wa,
+            'okresy_g': ';'.join(x[0] for x in sety), 'okresy_a': ';'.join(x[1] for x in sety),
+            'zwyciezca': 1 if wg > wa else 2, 'nawierzchnia': ''}
+
+
+def scal_miesiace(wiersze, prefiks, kat):
+    """Dopisuje wiersze do skumulowanych plikow miesiaca (po kolumnie runda = id) i kopiuje je do kat. Zwraca sciezki."""
+    os.makedirs(WYNIKI_DIR, exist_ok=True)
+    mies = {}
+    for r in wiersze: mies.setdefault(r['data'][:7], {})[r['runda']] = r
+    out = []
+    for m, nowe in sorted(mies.items()):
+        nazwa = f'{prefiks}_{m}.csv.gz'
+        p = os.path.join(WYNIKI_DIR, nazwa)
+        stare = {}
+        if os.path.exists(p):
+            with gzip.open(p, 'rt', encoding='utf-8', newline='') as f:
+                stare = {r['runda']: r for r in csv.DictReader(f)}
+        stare.update(nowe)
+        with gzip.open(p, 'wt', encoding='utf-8', newline='') as f:
+            cw = csv.DictWriter(f, NAGL_WYNIKI); cw.writeheader()
+            cw.writerows(sorted(stare.values(), key=lambda r: (r['data'], r['runda'])))
+        shutil.copy(p, os.path.join(kat, nazwa)); out.append(os.path.join(kat, nazwa))
+    return out
+
+
+def z_s24(s, w, teraz, stan, dni_hist, kat):
+    """Setka Cup ze scores24 (jak Liga Pro w ligapro.gs, ale z telefonu): slug znajdowany na liscie lig, mecze zakonczone
+    w oknach 1 h (API: max 50 meczow na odpowiedz) od ostatniego pobrania; --historia-s24 DNI = pobranie wstecz."""
+    kod, t = s.get('s24', S24 + '/en/table-tennis', H_HTML)
+    wszystkie = s24_slugi(t)
+    w['s24_ligi'] = [{'slug': x} for x in wszystkie]
+    cele = [(x, v) for x in wszystkie for k, v in S24_LIGI.items() if k in x]
+    if not cele: return
+    od = dt.datetime.fromisoformat(stan['s24_do']) if stan.get('s24_do') and not dni_hist else teraz - dt.timedelta(days=dni_hist or 2)
+    do = teraz - dt.timedelta(minutes=20)
+    wiersze, a = [], od
+    while a < do and s.czas():
+        b = min(a + dt.timedelta(hours=1), do)
+        for slug, (kraj, turniej) in cele:
+            url = (f'{S24}/rapi/leagues/table-tennis/{slug}/matches?lang=en&audience=en&first=50&status=ended&with_statistics=false'
+                   f'&date_between%5B%5D={a:%Y-%m-%d+%H:%M:%S}&date_between%5B%5D={b:%Y-%m-%d+%H:%M:%S}')
+            j = s.get_json('s24', url, {**H_JSON, 'Accept': 'application/json'}, pauza=0.2)
+            e = ((j or {}).get('data') or {}).get('edges') or (j or {}).get('edges') or []
+            wiersze += [x for x in (s24_wiersz(z.get('node', z), kraj, turniej) for z in e) if x]
+        a = b
+    stan['s24_do'] = a.isoformat()
+    w['s24_mecze'] = wiersze
+    w.setdefault('_pliki_wynikow', []).extend(scal_miesiace(wiersze, 'wyniki_s24_inne', kat))
+
+
+def z_90minut(s, w):
+    """90minut.pl (polskie ligi II-IV, CLJ, kobiety): na razie DIAGNOZA — strona glowna i linki do lig w surowych
+    odpowiedziach; parser po pierwszym pobraniu (jak przy pozostalych zrodlach 03.10)."""
+    kod, t = s.get('90minut', 'https://www.90minut.pl/', H_HTML)
+    linki = sorted(set(re.findall(r'href="(/?(?:liga|archsezon|skarb)[^"]+)"', t or '')))
+    w['90minut_linki'] = [{'link': x} for x in linki[:400]]
+    for l in linki[:3]:
+        s.get('90minut', 'https://www.90minut.pl/' + l.lstrip('/'), H_HTML)
+
+
 DZIENNE = ('elo', 'transfermarkt', 'understat', 'tenis', 'darty')
-WSZYSTKIE = DZIENNE + ('fotmob', 'sofascore', 'nhl', 'pogoda')
+WSZYSTKIE = DZIENNE + ('fotmob', 'sofascore', 'nhl', 'pogoda', 's24', '90minut')
 
 
 def zapisz(kat, nazwa, wiersze, znacznik):
@@ -572,6 +661,15 @@ def zapisz(kat, nazwa, wiersze, znacznik):
         cw = csv.DictWriter(f, kol)
         cw.writeheader(); cw.writerows(wiersze)
     return p
+
+
+def wyslij_wyniki(pliki, a):
+    """Pliki wynikow (wyniki_*_RRRR-MM.csv.gz) do GLOWNEGO folderu baza-wiedzy (gdrive:), nadpisujac poprzednia wersje —
+    tam szuka ich paczka.gs. Kopia skumulowana zostaje w ~/.zrodla_wyniki."""
+    if not pliki or '--bez-wysylki' in a or not os.path.isdir('/data/data/com.termux') or not shutil.which('rclone'): return
+    for p in pliki:
+        r = subprocess.run(['rclone', 'moveto', p, 'gdrive:' + os.path.basename(p)], capture_output=True, text=True)
+        print('rclone ->', os.path.basename(p), 'OK' if r.returncode == 0 else f'BLAD {r.returncode}: {r.stderr[-300:]}')
 
 
 def wyslij(zp, a):
@@ -595,7 +693,9 @@ def main(a):
     zadania = [('fotmob', lambda: z_fotmob(s, w, dzis, teraz, gotowe)), ('sofascore', lambda: z_sofa(s, w, dzis, teraz)),
                ('nhl', lambda: z_nhl(s, w, dzis)), ('pogoda', lambda: z_pogoda(s, w)),
                ('elo', lambda: z_elo(s, w)), ('tenis', lambda: z_tenis(s, w)), ('darty', lambda: z_darty(s, w, dzis)),
-               ('understat', lambda: z_understat(s, w, dzis, '--historia' in a)), ('transfermarkt', lambda: z_transfermarkt(s, w))]
+               ('understat', lambda: z_understat(s, w, dzis, '--historia' in a)), ('transfermarkt', lambda: z_transfermarkt(s, w)),
+               ('s24', lambda: z_s24(s, w, teraz, stan, int(a[a.index('--historia-s24') + 1]) if '--historia-s24' in a else 0, kat)),
+               ('90minut', lambda: z_90minut(s, w))]
     for nazwa, f in zadania:
         if nazwa not in tylko: continue
         if nazwa in DZIENNE and stan.get(nazwa) == str(dzis) and '--wszystkie-dzienne' not in a and '--tylko' not in a:
@@ -607,6 +707,7 @@ def main(a):
         except Exception as e:
             bledy[nazwa] = f'{type(e).__name__}: {e}'
     w['sedziowie'] = sedziowie(w)
+    pliki_wynikow = w.pop('_pliki_wynikow', [])
     zn = (teraz + dt.timedelta(hours=2)).strftime('%Y-%m-%d_%H-%M')
     tmp = os.path.join(kat, f'.zrodla_{zn}')
     os.makedirs(tmp, exist_ok=True)
@@ -635,6 +736,8 @@ def main(a):
     print('\n'.join(linie))
     print(f'Zapisano {zp} ({len(pliki)} plikow danych + diag + surowe)')
     wyslij(zp, a)
+    if pliki_wynikow: print('Pliki wynikow dla przebiegu:', ', '.join(os.path.basename(x) for x in pliki_wynikow))
+    wyslij_wyniki(pliki_wynikow, a)
     return 0
 
 
