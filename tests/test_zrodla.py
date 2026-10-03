@@ -234,7 +234,22 @@ def test_s24_okna_i_stan(monkeypatch):
     w, stan = {}, {}
     teraz = dt.datetime(2026, 10, 3, 10, 0)
     z.z_s24(s, w, teraz, stan, 0, '/tmp')
-    assert len(adresy) == 48 and 'setka-cup/matches' in adresy[0]          # pierwsze uruchomienie: 2 dni wstecz
+    assert len(adresy) == 21 * 24 and 'setka-cup/matches' in adresy[0]     # pierwsze uruchomienie (cron): 21 dni wstecz
     assert stan['s24_do'] == '2026-10-03T09:40:00'
     adresy.clear(); z.z_s24(s, w, dt.datetime(2026, 10, 3, 13, 0), stan, 0, '/tmp')
     assert len(adresy) == 3                                                  # kolejne: tylko od ostatniego pobrania
+
+
+def test_s24_limit_i_kolejnosc(monkeypatch):
+    # 03.10: wszystko z crona — zaleglosci s24 nie zjadaja budzetu (limit na uruchomienie, dociaganie w kolejnym)
+    import datetime as dt
+    s = z.Sesja(600)
+    adresy = []
+    s.get = lambda zr, url, *a, **k: (200, '<a href="/en/table-tennis/l-setka-cup">')
+    s.get_json = lambda zr, url, *a, **k: adresy.append(url) or {'data': {'edges': []}}
+    monkeypatch.setattr(z, 'S24_LIMIT_S', -1)
+    stan = {}
+    z.z_s24(s, {}, dt.datetime(2026, 10, 3, 10, 0), stan, 0, '/tmp')
+    assert adresy == [] and stan['s24_do'] == '2026-09-12T10:00:00'       # nic nie pobrane, start zapamietany
+    src = open(z.__file__, encoding='utf-8').read()
+    assert src.index("('s24', lambda") < src.index("('fotmob', lambda")      # s24 przed dlugimi zrodlami

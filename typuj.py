@@ -502,6 +502,24 @@ def resolve(name, pool):
                 print(f'  ODRZUCONO: "{name}" pasuje do {len(c)} klubow ({", ".join(sorted(c)[:5])}) — '
                       f'nie zgadujemy, noga MNIEJ.')
                 return None
+        # 03.10.2026: „Dukla Praga” -> „Praga” (maly klub z Prazsky prebor, nowy w bazie), a cala nazwa po zamianie
+        # miasta to „Dukla Prague”. Pelna nazwa (egzonim) wygrywa z dopasowaniem do czesci nazwy.
+        if len(_tokeny(name)) > len(_tokeny(wyn)):
+            alt = ' '.join(EGZONIMY.get(norm(x), x) for x in str(name).split())
+            if alt != name:
+                r2 = resolve(alt, pool)
+                if r2 and r2 != wyn and len(_tokeny(r2)) > len(_tokeny(wyn)): return _przez_egzonim(name, pool)
+        # 03.10.2026: „Wisła II Płock” -> „Wisla II” (Flashscore: rezerwy Wisly KRAKOW, III liga gr. IV). Odpadl czlon
+        # rozrozniajacy („plock”), a w bazie jest INNY klub z rdzeniem i tym czlonem („Wisla Plock”) — skrot nalezy
+        # do innego klubu tej samej nazwy. Nie zgadujemy: noga MNIEJ.
+        _rdz = {t for t in _tokeny(wyn) if not _znaczniki(t) and t not in _OGOLNE}
+        _odp = {t for t in _tokeny(name) if t not in _tokeny(wyn) and not _znaczniki(t) and t not in _OGOLNE}
+        if _rdz and _odp:
+            inny = [p for p in pool if p != wyn and (_rdz | _odp) <= set(_tokeny(p)) and set(_znaczniki(p)) <= set(_znaczniki(name))]
+            if inny:
+                print(f'  ODRZUCONO: "{name}" -> "{wyn}", ale w bazie jest "{sorted(inny)[0]}" (czlon {", ".join(sorted(_odp))}) — '
+                      f'skrot moze nalezec do innego klubu, noga MNIEJ.')
+                return None
         return _skrot_albo_nic(name, wyn, by.values())
     # prog 0.55 byl za luzny: "RC Warwick" trafialo na "RKC Waalwijk", a "Virtus Ciserano Bergamo"
     # na "Virtus Lanciano". Lepiej zwrocic None i zatrzymac analize, niz policzyc nie ten mecz.
@@ -1087,6 +1105,11 @@ def liga_bez_testu(m, ligi):
         if '|' in l and zewn.INNE_DRUZYNY.search(l.split('|', 1)[1]):
             return f'liga {l} (kobiety/mlodziez/rezerwy/amatorzy) bez testu wstecznego'
         n = int((m.Division == l).sum())
+        # 03.10.2026: liga z Flashscore bez slowa „Women/U19” w nazwie („Japan | WE League”), ale z druzynami „X W”
+        if n and 'HomeTeam' in m.columns:
+            zn = [_znaczniki(x) for x in m.HomeTeam[m.Division == l]]
+            if sum(any(z == 'kobiety' or z == 'mlodziez' or re.match(r'u\d+$', z) for z in t) for t in zn) > n / 2:
+                return f'liga {l} (druzyny kobiet/mlodziezowe) bez testu wstecznego'
         if n < MIN_MECZOW_NA_KUPON:
             return f'liga {l}: {n} meczow w bazie (< {MIN_MECZOW_NA_KUPON}) — za malo historii'
     return None

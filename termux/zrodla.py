@@ -26,7 +26,7 @@ baza-wiedzy/zrodla/ (nie do folderu przebiegu). W zipie tez zrodla_diag_*.txt (s
 zrodla_surowe_*.jsonl.gz (do 4 surowych odpowiedzi na zrodlo, przyciete) — z nich poprawiamy parsery bez zrzutow ekranu.
 
 Uzycie:  python zrodla.py [--katalog /sdcard/Download] [--tylko fotmob,nhl] [--historia] [--budzet-min 12] [--wszystkie-dzienne] [--bez-wysylki]
-         python zrodla.py --tylko s24 --historia-s24 21 --budzet-min 30   (jednorazowo: Setka Cup 21 dni wstecz)"""
+         Setka Cup (s24): cron sam pobiera 21 dni wstecz przy pierwszym uruchomieniu i dociaga zaleglosci w kolejnych."""
 import csv
 import datetime as dt
 import gzip
@@ -614,6 +614,9 @@ def scal_miesiace(wiersze, prefiks, kat):
     return out
 
 
+S24_HIST_DNI, S24_LIMIT_S = 21, 240
+
+
 def z_s24(s, w, teraz, stan, dni_hist, kat):
     """Setka Cup ze scores24 (jak Liga Pro w ligapro.gs, ale z telefonu): slug znajdowany na liscie lig, mecze zakonczone
     w oknach 1 h (API: max 50 meczow na odpowiedz) od ostatniego pobrania; --historia-s24 DNI = pobranie wstecz."""
@@ -622,10 +625,13 @@ def z_s24(s, w, teraz, stan, dni_hist, kat):
     w['s24_ligi'] = [{'slug': x} for x in wszystkie]
     cele = [(x, v) for x in wszystkie for k, v in S24_LIGI.items() if k in x]
     if not cele: return
-    od = dt.datetime.fromisoformat(stan['s24_do']) if stan.get('s24_do') and not dni_hist else teraz - dt.timedelta(days=dni_hist or 2)
+    # 03.10.2026: wszystko z crona, bez recznych komend — pierwsze uruchomienie (brak stanu) pobiera S24_HIST_DNI wstecz,
+    # kazde nastepne dociaga od miejsca, w ktorym poprzednie skonczylo (limit S24_LIMIT_S na uruchomienie, zeby
+    # zaleglosci nie zjadly budzetu pozostalych zrodel).
+    od = dt.datetime.fromisoformat(stan['s24_do']) if stan.get('s24_do') and not dni_hist else teraz - dt.timedelta(days=dni_hist or S24_HIST_DNI)
     do = teraz - dt.timedelta(minutes=20)
-    wiersze, a = [], od
-    while a < do and s.czas():
+    wiersze, a, koniec = [], od, time.time() + S24_LIMIT_S
+    while a < do and s.czas() and time.time() < koniec:
         b = min(a + dt.timedelta(hours=1), do)
         for slug, (kraj, turniej) in cele:
             url = (f'{S24}/rapi/leagues/table-tennis/{slug}/matches?lang=en&audience=en&first=50&status=ended&with_statistics=false'
@@ -690,12 +696,12 @@ def main(a):
     except (OSError, ValueError): stan = {}
     gotowe = set(stan.get('gotowe', []))
     s, w, bledy = Sesja(budzet * 60), {}, {}
-    zadania = [('fotmob', lambda: z_fotmob(s, w, dzis, teraz, gotowe)), ('sofascore', lambda: z_sofa(s, w, dzis, teraz)),
+    zadania = [('s24', lambda: z_s24(s, w, teraz, stan, int(a[a.index('--historia-s24') + 1]) if '--historia-s24' in a else 0, kat)),
+               ('90minut', lambda: z_90minut(s, w)),
+               ('fotmob', lambda: z_fotmob(s, w, dzis, teraz, gotowe)), ('sofascore', lambda: z_sofa(s, w, dzis, teraz)),
                ('nhl', lambda: z_nhl(s, w, dzis)), ('pogoda', lambda: z_pogoda(s, w)),
                ('elo', lambda: z_elo(s, w)), ('tenis', lambda: z_tenis(s, w)), ('darty', lambda: z_darty(s, w, dzis)),
-               ('understat', lambda: z_understat(s, w, dzis, '--historia' in a)), ('transfermarkt', lambda: z_transfermarkt(s, w)),
-               ('s24', lambda: z_s24(s, w, teraz, stan, int(a[a.index('--historia-s24') + 1]) if '--historia-s24' in a else 0, kat)),
-               ('90minut', lambda: z_90minut(s, w))]
+               ('understat', lambda: z_understat(s, w, dzis, '--historia' in a)), ('transfermarkt', lambda: z_transfermarkt(s, w))]
     for nazwa, f in zadania:
         if nazwa not in tylko: continue
         if nazwa in DZIENNE and stan.get(nazwa) == str(dzis) and '--wszystkie-dzienne' not in a and '--tylko' not in a:
