@@ -253,3 +253,22 @@ def test_s24_limit_i_kolejnosc(monkeypatch):
     assert adresy == [] and stan['s24_do'] == '2026-09-12T10:00:00'       # nic nie pobrane, start zapamietany
     src = open(z.__file__, encoding='utf-8').read()
     assert src.index("('s24', lambda") < src.index("('fotmob', lambda")      # s24 przed dlugimi zrodlami
+
+
+def test_s24_slug_przez_api_i_90minut_curl(monkeypatch):
+    # 03.10 (przebieg 10:19): strony bez Setka Cup -> slug szukany przez API wsrod kandydatow i zapamietany w stanie;
+    # 90minut HTTP 0 z Pythona -> druga proba http + curl
+    import datetime as dt
+    s = z.Sesja(600)
+    s.get = lambda zr, url, *a, **k: (200, '<a href="/en/table-tennis/l-czech-liga-pro-1">')
+    traf = 'ukraine-setka-cup-1'
+    s.get_json = lambda zr, url, *a, **k: {'data': {'edges': [{'node': {}}] if f'/{traf}/' in url else []}}
+    stan, w = {}, {}
+    z.z_s24(s, w, dt.datetime(2026, 10, 3, 10, 0), stan, 1, '/tmp')
+    assert stan['s24_slug'] == traf and any(x['cel'] for x in w['s24_ligi'])
+    proby = []
+    def get(zr, url, *a, curl=None, **k):
+        proby.append((url, curl)); return (0, '') if curl is None else (200, '<a href="/liga/1/liga1.html">')
+    s.get = get
+    z.z_90minut(s, w)
+    assert proby[1] == ('http://www.90minut.pl/', []) and proby[2] == ('http://www.90minut.pl/liga/1/liga1.html', [])
