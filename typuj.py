@@ -790,10 +790,24 @@ def elo_aktualne(elo, dzis):
     return ost, stare
 
 
+_BAZA = {}   # 03.10.2026: tryb wsadowy (typuj_wsad.py) — baza wczytana RAZ na proces, kazdy mecz dostaje kopie
+
+
+def _baza(con):
+    """(mecze, clubelo) z kb.sqlite; w jednym procesie czytane raz na stan bazy (wczytanie = ok. 4 s z 7 s wywolania)."""
+    k = stan_bazy()
+    if k not in _BAZA:
+        _BAZA.clear()
+        _BAZA[k] = (pd.read_sql('select * from matches', con, parse_dates=['MatchDate']),
+                    pd.read_sql('select club, country, elo, date from clubelo', con))
+    m, e = _BAZA[k]
+    return m.copy(), e.copy()
+
+
 def club(home, away, kursy, live=None):
     con = db()
-    m = pd.read_sql('select * from matches', con, parse_dates=['MatchDate'])
-    elo, elo_stare = elo_aktualne(pd.read_sql('select club, country, elo, date from clubelo', con), dt.date.today())
+    m, _elo = _baza(con)
+    elo, elo_stare = elo_aktualne(_elo, dt.date.today())
     pool = set(m.HomeTeam) | set(m.AwayTeam) | set(elo.index)
     wczytaj_warianty(con)
     jh, ja = _jawny_kraj(home, pool, m), _jawny_kraj(away, pool, m)
@@ -1297,8 +1311,12 @@ import nazwy as _nazwy
 _aliasy_z_pliku('typuj', norm, ALIASES)
 _aliasy_z_pliku('typuj', norm, ALIASES, _nazwy.ALIASY_AUTO_CSV)   # dopasuj.py auto (03.10.2026)
 
-if __name__ == '__main__':
-    args = [x for x in sys.argv[1:]]
+def main(argv):
+    """Jedno wywolanie typuj.py (argumenty jak w wierszu polecen). Wolane tez przez typuj_wsad.py dla wielu meczow."""
+    global NOGI_PLIK, LIGA_BEZ_TESTU
+    NOGI_PLIK, LIGA_BEZ_TESTU = None, None
+    PARY.clear()
+    args = list(argv)
     kursy = {}
     if '--nogi' in args:
         i = args.index('--nogi'); NOGI_PLIK = args[i + 1]; del args[i:i + 2]
@@ -1316,3 +1334,7 @@ if __name__ == '__main__':
     if len(names) != 2: sys.exit(__doc__)
     if '--intl' in flags: intl(names[0], names[1], '--neutral' in flags, kursy)
     else: club(names[0], names[1], kursy, live)
+
+
+if __name__ == '__main__':
+    main(sys.argv[1:])
