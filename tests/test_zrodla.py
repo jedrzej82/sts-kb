@@ -336,3 +336,24 @@ def test_setka_api_z_kodu_aplikacji():
     assert ('setka', 'https://setkacup.com/api/matches?date=') in adresy        # kandydat o meczach sprawdzony
     assert not any('${' in u for _, u in adresy)                              # szablonow nie wolamy
     assert {'adres': '/v2/results/list'} in w['setka_api']
+
+
+def test_setka_turnieje_warianty_i_mecze():
+    # 03.10 15:41: /api/<Zasob>/<jezyk>?query — pierwszy wariant daty z niepusta lista turniejow, potem mecze turnieju
+    import datetime as dt
+    s = z.Sesja(600)
+    pyt = []
+    s.get = lambda zr, url, *a, **k: pyt.append(url) or (200, '[]')
+    def gj(zr, url, *a, **k):
+        pyt.append(url)
+        if 'Tournaments/en?startDate=' in url: return [{'id': 77, 'locationId': 1, 'startDate': '2026-10-02T08:00:00'}]
+        if 'Matches/en?tournamentId=77' in url: return [{'player1': 'A', 'player2': 'B'}]
+        return []
+    s.get_json = gj
+    w = {}
+    z.setka_turnieje(s, w, dt.date(2026, 10, 3))
+    assert 'https://setkacup.com/api/Locations/en' in pyt
+    udane = [p for p in w['setka_proby'] if p['elementow'] > 0]
+    assert udane[0]['url'] == 'https://setkacup.com/api/Tournaments/en?startDate=2026-10-02'
+    assert udane[1]['url'] == 'https://setkacup.com/api/Matches/en?tournamentId=77'
+    assert not any('Tournaments/en?day=' in u for u in pyt)              # po trafieniu dalsze warianty pominiete
