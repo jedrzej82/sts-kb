@@ -21,10 +21,11 @@ Zrodla (D = raz dziennie, P = kazde uruchomienie):
                                                                               -> zrodla_pogoda_*
   10 Sedziowie         P  sedzia meczu + jego srednie kartek (Sofascore), sedzia z FotMob -> zrodla_sedziowie_*
 
-Diagnostyka kazdego uruchomienia: zrodla_diag_*.txt (status kazdego zrodla) i zrodla_surowe_*.jsonl.gz (do 4 surowych
-odpowiedzi na zrodlo, przyciete) — z nich poprawiamy parsery bez zrzutow ekranu z telefonu.
+Wszystko z jednego uruchomienia w JEDNYM pliku zrodla_RRRR-MM-DD_GG-MM.zip, wysylanym przez rclone do podfolderu
+baza-wiedzy/zrodla/ (nie do folderu przebiegu). W zipie tez zrodla_diag_*.txt (status kazdego zrodla) i
+zrodla_surowe_*.jsonl.gz (do 4 surowych odpowiedzi na zrodlo, przyciete) — z nich poprawiamy parsery bez zrzutow ekranu.
 
-Uzycie:  python zrodla.py [--katalog /sdcard/Download] [--tylko fotmob,nhl] [--historia] [--budzet-min 12] [--wszystkie-dzienne]"""
+Uzycie:  python zrodla.py [--katalog /sdcard/Download] [--tylko fotmob,nhl] [--historia] [--budzet-min 12] [--wszystkie-dzienne] [--bez-wysylki]"""
 import csv
 import datetime as dt
 import gzip
@@ -32,11 +33,14 @@ import html as _html
 import json
 import os
 import re
+import shutil
 import ssl
+import subprocess
 import sys
 import time
 import urllib.error
 import urllib.request
+import zipfile
 
 UA = 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Mobile Safari/537.36'
 H_JSON = {'User-Agent': UA, 'Accept': 'application/json, text/plain, */*', 'Accept-Language': 'en-GB,en;q=0.9'}
@@ -439,6 +443,14 @@ def zapisz(kat, nazwa, wiersze, znacznik):
     return p
 
 
+def wyslij(zp, a):
+    """Na telefonie: rclone do PODFOLDERU zrodla/ (gdrive: = baza-wiedzy), zeby nie zasmiecac folderu przebiegu.
+    Poza Termuxem albo z --bez-wysylki — plik zostaje lokalnie."""
+    if '--bez-wysylki' in a or not os.path.isdir('/data/data/com.termux') or not shutil.which('rclone'): return
+    r = subprocess.run(['rclone', 'move', zp, 'gdrive:zrodla/'], capture_output=True, text=True)
+    print('rclone -> gdrive:zrodla/', 'OK' if r.returncode == 0 else f'BLAD {r.returncode}: {r.stderr[-300:]}')
+
+
 def main(a):
     kat = a[a.index('--katalog') + 1] if '--katalog' in a else '/sdcard/Download'
     budzet = float(a[a.index('--budzet-min') + 1]) if '--budzet-min' in a else 12.0
@@ -465,23 +477,33 @@ def main(a):
             bledy[nazwa] = f'{type(e).__name__}: {e}'
     w['sedziowie'] = sedziowie(w)
     zn = (teraz + dt.timedelta(hours=2)).strftime('%Y-%m-%d_%H-%M')
-    os.makedirs(kat, exist_ok=True)
-    pliki = [p for p in (zapisz(kat, n, r, zn) for n, r in w.items()) if p]
+    tmp = os.path.join(kat, f'.zrodla_{zn}')
+    os.makedirs(tmp, exist_ok=True)
+    pliki = [p for p in (zapisz(tmp, n, r, zn) for n, r in w.items()) if p]
     linie = [f'ZRODLA {zn} (czas PL), budzet {budzet:.0f} min, zuzyto {budzet * 60 - (s.koniec - time.time()):.0f} s']
     for nazwa in WSZYSTKIE:
         if nazwa not in tylko: continue
         linie.append(f'{nazwa:<14} HTTP {json.dumps(s.kody.get(nazwa, {}))} {bledy.get(nazwa, "")}')
     for n, r in w.items():
         linie.append(f'  {n:<22} {len(r)} wierszy')
-    with open(os.path.join(kat, f'zrodla_diag_{zn}.txt'), 'w', encoding='utf-8') as f:
+    with open(os.path.join(tmp, f'zrodla_diag_{zn}.txt'), 'w', encoding='utf-8') as f:
         f.write('\n'.join(linie) + '\n')
-    with gzip.open(os.path.join(kat, f'zrodla_surowe_{zn}.jsonl.gz'), 'wt', encoding='utf-8') as f:
+    with gzip.open(os.path.join(tmp, f'zrodla_surowe_{zn}.jsonl.gz'), 'wt', encoding='utf-8') as f:
         for x in s.surowe: f.write(json.dumps(x, ensure_ascii=False) + '\n')
+    # JEDEN plik na uruchomienie (03.10.2026): skrypty Apps Script (paczka, dzienniki, push_github) przegladaja caly
+    # folder baza-wiedzy — kilkanascie plikow co przebieg spowalnialoby je z kazdym dniem.
+    zp = os.path.join(kat, f'zrodla_{zn}.zip')
+    with zipfile.ZipFile(zp, 'w', zipfile.ZIP_STORED) as zf:
+        for n in sorted(os.listdir(tmp)):
+            zf.write(os.path.join(tmp, n), n)
+            os.remove(os.path.join(tmp, n))
+    os.rmdir(tmp)
     stan['gotowe'] = sorted(gotowe)[-3000:]
     try: json.dump(stan, open(STAN, 'w'))
     except OSError: pass
     print('\n'.join(linie))
-    print(f'Zapisano {len(pliki)} plikow danych + diag + surowe w {kat}')
+    print(f'Zapisano {zp} ({len(pliki)} plikow danych + diag + surowe)')
+    wyslij(zp, a)
     return 0
 
 

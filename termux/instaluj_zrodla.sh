@@ -11,7 +11,7 @@ export PATH=/data/data/com.termux/files/usr/bin:/system/bin:$PATH
 cd /data/data/com.termux/files/home
 curl -fsSL https://raw.githubusercontent.com/jedrzej82/sts-kb/main/termux/zrodla.py -o zrodla.py
 python zrodla.py "$@"
-rclone move /sdcard/Download/ gdrive: --include "zrodla_*"
+rclone move /sdcard/Download/ gdrive:zrodla/ --include "zrodla_*.zip"   # zapas, gdy zrodla.py nie wyslal sam
 SKRYPT
 chmod +x "$H/zrodla.sh"
 LINIA="40 11,14,17,20 * * * PATH=/data/data/com.termux/files/usr/bin:/system/bin $H/zrodla.sh >> $H/zrodla.log 2>&1"

@@ -4,6 +4,7 @@ import gzip
 import json
 import os
 import sys
+import zipfile
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'termux'))
 import zrodla as z  # noqa: E402
@@ -92,10 +93,14 @@ def test_main_bez_sieci_zapisuje_diag(tmp_path, monkeypatch):
     monkeypatch.setattr(z, 'STAN', str(tmp_path / 'stan.json'))
     monkeypatch.setattr(z.Sesja, 'get', lambda self, zr, url, *a, **k: (self.kody.setdefault(zr, {}).setdefault(0, 0), (0, ''))[1])
     assert z.main(['--katalog', str(tmp_path), '--budzet-min', '1']) == 0
-    diag = list(tmp_path.glob('zrodla_diag_*.txt'))
-    assert len(diag) == 1 and 'fotmob' in diag[0].read_text() and 'transfermarkt' in diag[0].read_text()
-    assert list(tmp_path.glob('zrodla_surowe_*.jsonl.gz'))
-    assert not list(tmp_path.glob('zrodla_fotmob_*.csv.gz'))
+    zipy = list(tmp_path.glob('zrodla_*.zip'))
+    assert len(zipy) == 1 and [p.name for p in tmp_path.iterdir() if p.name != 'stan.json'] == [zipy[0].name]
+    with zipfile.ZipFile(zipy[0]) as zf:
+        nazwy = zf.namelist()
+        diag = [n for n in nazwy if n.startswith('zrodla_diag_')]
+        assert len(diag) == 1 and 'transfermarkt' in zf.read(diag[0]).decode()
+        assert any(n.startswith('zrodla_surowe_') for n in nazwy)
+        assert not any(n.startswith('zrodla_fotmob_') for n in nazwy)
 
 
 def test_zapisz(tmp_path):

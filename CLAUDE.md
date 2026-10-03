@@ -44,7 +44,8 @@ Użytkownik liczy w czasie polskim (UTC+2 latem): 10:00 UTC = 12:00 PL. Przebieg
   STS/LVBET/Superbet — gdy sa wpisy dnia, pieniadze Bilansu tylko z nich, kupony systemu = zalecenia; plik tylko na Dysku); CLV: `clv.py`; porownanie kursow STS/SUPERBET/LVBET i linia „GRAJ U:” kazdego kuponu (Telegram): `kursy3.py kupon` (dane z telefonu: `termux/kursy_bukmacherow.py` -> `kursy_bukmacherow_*.csv.gz` na Dysku; mecz tylko jednoznaczny, roznica >35% = podejrzany); kursy z PDF oferty i kurs_zamkniecia: `oferta.py`.
 - Dodatkowe zrodla statystyk (TRYB OBSERWACJI, nic w przebiegu ich nie uzywa do czasu backtestu i decyzji uzytkownika):
   `termux/zrodla.py` na telefonie (Elo reprezentacji, FotMob xG/sklady, Sofascore, Transfermarkt, Understat, Tennis Abstract,
-  darty, NHL+bramkarze, pogoda, sedziowie) -> `zrodla_*` na Dysku; diagnoza z `zrodla_diag_*.txt` i `zrodla_surowe_*.jsonl.gz`;
+  darty, NHL+bramkarze, pogoda, sedziowie) -> jeden `zrodla_*.zip` na uruchomienie w podfolderze baza-wiedzy/zrodla/
+  (NIE w folderze przebiegu); w zipie diagnoza `zrodla_diag_*.txt` i probki `zrodla_surowe_*.jsonl.gz`;
   instalacja: `termux/instaluj_zrodla.sh`.
 - Nazwy: `nazwy.py` (wspólne znaczniki), `aliasy.csv` (aliasy jako dane; działają tylko, gdy cel jest w puli),
   `dopasuj.py` (nauka aliasów STS -> baza z dowodów w źródłach: kotwica = jedyny mecz rozpoznanej drużyny w dniu meczu,
