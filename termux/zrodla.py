@@ -53,11 +53,34 @@ SURowe_NA_ZRODLO = 4
 SURowe_MAKS_B = 300_000
 
 H_SOFA = {**H_JSON, 'Referer': 'https://www.sofascore.com/', 'Origin': 'https://www.sofascore.com'}
+# 03.10: 403 {"reason": "challenge"} z urllib — warianty probowane po kolei, pierwszy dzialajacy obsluguje cale uruchomienie;
+# kazda proba zapisana w zrodla_sofascore_proby_* (Playwright dopiero, gdy wszystkie odpadna — w Termuxie wymaga proot)
+H_SOFA_PELNE = {'User-Agent': UA, 'Accept': '*/*', 'Accept-Language': 'pl-PL,pl;q=0.9,en-US;q=0.8,en;q=0.7',
+                'Referer': 'https://www.sofascore.com/', 'Origin': 'https://www.sofascore.com', 'Cache-Control': 'no-cache',
+                'sec-ch-ua': '"Chromium";v="128", "Not;A=Brand";v="24", "Google Chrome";v="128"', 'sec-ch-ua-mobile': '?1',
+                'sec-ch-ua-platform': '"Android"', 'sec-fetch-dest': 'empty', 'sec-fetch-mode': 'cors', 'sec-fetch-site': 'same-site'}
+SOFA_WARIANTY = (('urllib', H_SOFA, None), ('urllib_pelne', H_SOFA_PELNE, None), ('curl', H_SOFA_PELNE, ['--http1.1']),
+                 ('curl_http2', H_SOFA_PELNE, ['--http2']))
 SOFA = ('https://api.sofascore.com/api/v1', 'https://www.sofascore.com/api/v1')
 SOFA_SPORTY = ('football', 'basketball', 'ice-hockey', 'handball', 'volleyball', 'darts', 'tennis')
 TM_LIGI = ('GB1', 'GB2', 'ES1', 'ES2', 'IT1', 'IT2', 'L1', 'L2', 'FR1', 'FR2', 'NL1', 'PO1', 'BE1', 'TR1', 'PL1',
            'A1', 'C1', 'SC1', 'DK1', 'SE1', 'NO1', 'GR1', 'TS1', 'UKR1', 'RU1')
 US_LIGI = ('EPL', 'La_liga', 'Bundesliga', 'Serie_A', 'Ligue_1', 'RFPL')
+
+
+def curl_get(url, naglowki, opcje=()):
+    """Systemowy curl (Termux: OpenSSL + nghttp2) -> (kod, tekst); (0, opis) gdy brak curla albo blad."""
+    if not shutil.which('curl'): return 0, 'brak curl'
+    cmd = ['curl', '-sS', '--compressed', '-m', '30', '-o', '-', '-w', '\n__KOD__%{http_code}', *opcje]
+    for k, v in naglowki.items():
+        if k.lower() != 'accept-encoding': cmd += ['-H', f'{k}: {v}']
+    try:
+        r = subprocess.run(cmd + [url], capture_output=True, timeout=40)
+    except (OSError, subprocess.SubprocessError) as e:
+        return 0, f'{type(e).__name__}: {e}'
+    out = r.stdout.decode('utf-8', 'replace')
+    tekst, _, kod = out.rpartition('\n__KOD__')
+    return (int(kod) if kod.strip().isdigit() else 0), (tekst if kod.strip().isdigit() else r.stderr.decode('utf-8', 'replace'))
 
 
 class Sesja:
@@ -70,11 +93,16 @@ class Sesja:
     def czas(self):
         return time.time() < self.koniec
 
-    def get(self, zrodlo, url, naglowki=H_JSON, proby=2, pauza=0.4):
-        """(kod HTTP, tekst) — nigdy nie rzuca; kod 0 = blad sieci, -1 = koniec budzetu czasu."""
+    def get(self, zrodlo, url, naglowki=H_JSON, proby=2, pauza=0.4, curl=None):
+        """(kod HTTP, tekst) — nigdy nie rzuca; kod 0 = blad sieci, -1 = koniec budzetu czasu.
+        curl = lista opcji -> zapytanie systemowym curlem (inny odcisk TLS niz Python; dla Sofascore)."""
         if not self.czas(): return -1, ''
         kod, tekst = 0, ''
         for i in range(proby):
+            if curl is not None:
+                kod, tekst = curl_get(url, naglowki, curl)
+                if kod == 200 or kod in (401, 403, 404): break
+                time.sleep(1.5 * (i + 1)); continue
             try:
                 r = urllib.request.urlopen(urllib.request.Request(url, headers=naglowki), timeout=30, context=CTX)
                 b = r.read()
@@ -372,23 +400,30 @@ def z_fotmob(s, w, dzis, teraz, gotowe):
 
 
 def z_sofa(s, w, dzis, teraz):
-    baza = None
+    proby, baza, war = [], None, None
+    for nazwa, nag, opc in SOFA_WARIANTY:
+        for b in SOFA:
+            kod, t = s.get('sofascore', f'{b}/sport/football/scheduled-events/{dzis}', nag, proby=1, curl=opc)
+            proby.append({'wariant': nazwa, 'adres': b, 'kod': kod, 'odpowiedz': t[:120].replace('\n', ' ')})
+            if kod == 200: baza, war = b, (nag, opc); break
+        if baza: break
+    w['sofascore_proby'] = proby
+    if not baza:   # wszystkie warianty zablokowane — nie ponawiamy dla kazdego sportu
+        w['sofascore_mecze'] = []
+        return
+    nag, opc = war
+    jget = lambda url: (lambda kt: json.loads(kt[1]) if kt[0] == 200 and kt[1][:1] in '{[' else None)(
+        s.get('sofascore', url, nag, curl=opc))
     mecze = []
     for sport in SOFA_SPORTY:
         for d in (dzis - dt.timedelta(days=1), dzis):
-            for b in ([baza] if baza else SOFA):
-                j = s.get_json('sofascore', f'{b}/sport/{sport}/scheduled-events/{d}', H_SOFA)
-                if j is not None: baza = b; mecze += sofa_mecze(j, sport, str(d)); break
-            if not baza:   # 403 "challenge" na obu adresach (telefon 03.10) — nie ponawiamy 28 razy
-                w['sofascore_mecze'] = []
-                return
+            mecze += sofa_mecze(jget(f'{baza}/sport/{sport}/scheduled-events/{d}'), sport, str(d))
     w['sofascore_mecze'] = mecze
-    if not baza: return
     out = []
     for m in [m for m in mecze if m['sport'] == 'football' and m['status'] == 'notstarted'
               and (lambda t: t and teraz <= t <= teraz + dt.timedelta(hours=OKNO_H))(utc_z(m['start_ts']))][:MAKS_SZCZEGOLY]:
-        lu = s.get_json('sofascore', f"{baza}/event/{m['id']}/lineups")
-        ev = s.get_json('sofascore', f"{baza}/event/{m['id']}")
+        lu = jget(f"{baza}/event/{m['id']}/lineups")
+        ev = jget(f"{baza}/event/{m['id']}")
         out.append({'id': m['id'], 'turniej': m['turniej'], 'kategoria': m['kategoria'], 'gosp': m['gosp'], 'gosc': m['gosc'],
                     'start_utc': utc_z(m['start_ts']).isoformat(), **sofa_sklad(lu, ev)})
     w['sofascore_sklady'] = out

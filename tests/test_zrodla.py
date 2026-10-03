@@ -138,12 +138,41 @@ def test_transfermarkt_wiersze():
     assert z.tm_wiersze('brak tabeli') == []
 
 
-def test_sofascore_blokada_przerywa_po_pierwszym_dniu():
-    # 03.10: 403 "challenge" na obu adresach — 28 prob z rzedu; teraz po pierwszej parze adresow koniec
+def test_sofascore_blokada_probuje_wariantow_i_przerywa():
+    # 03.10: 403 "challenge" na obu adresach — kazdy wariant (urllib, pelne naglowki, curl, curl http2) raz na adres,
+    # potem koniec zamiast 28 prob; proby zapisane do diagnozy
+    import datetime as dt
     s = z.Sesja(60)
     proby = []
-    s.get_json = lambda zr, url, *a, **k: proby.append(url)
+    s.get = lambda zr, url, nag=None, proby_=None, **k: (proby.append((url, k.get('curl'))), (403, '{"error":{"reason":"challenge"}}'))[1]
     w = {}
-    import datetime as dt
     z.z_sofa(s, w, dt.date(2026, 10, 3), dt.datetime(2026, 10, 3, 6))
-    assert w['sofascore_mecze'] == [] and len(proby) == 2
+    assert w['sofascore_mecze'] == [] and len(proby) == 2 * len(z.SOFA_WARIANTY)
+    assert [p['wariant'] for p in w['sofascore_proby']][::2] == [n for n, _, _ in z.SOFA_WARIANTY]
+    assert w['sofascore_proby'][0]['odpowiedz'].startswith('{"error"')
+
+
+def test_sofascore_pierwszy_dzialajacy_wariant_obsluguje_reszte():
+    import datetime as dt
+    s = z.Sesja(60)
+    uzyte = []
+
+    def get(zr, url, nag=None, proby=2, curl=None, **k):
+        uzyte.append(curl)
+        if curl is None: return 403, 'challenge'
+        return 200, json.dumps({'events': [{'id': 1, 'homeTeam': {'name': 'A'}, 'awayTeam': {'name': 'B'},
+                                            'status': {'type': 'finished'}}]})
+    s.get = get
+    w = {}
+    z.z_sofa(s, w, dt.date(2026, 10, 3), dt.datetime(2026, 10, 3, 6))
+    assert [p['wariant'] for p in w['sofascore_proby']] == ['urllib', 'urllib', 'urllib_pelne', 'urllib_pelne', 'curl']
+    assert len(w['sofascore_mecze']) == 2 * len(z.SOFA_SPORTY) and all(c == ['--http1.1'] for c in uzyte[5:])
+
+
+def test_curl_get_parsuje_kod(monkeypatch):
+    class R:
+        stdout = b'{"a":1}\n__KOD__403'
+        stderr = b''
+    monkeypatch.setattr(z.shutil, 'which', lambda x: '/usr/bin/curl')
+    monkeypatch.setattr(z.subprocess, 'run', lambda cmd, **k: R())
+    assert z.curl_get('https://x', {'A': 'b'}) == (403, '{"a":1}')
