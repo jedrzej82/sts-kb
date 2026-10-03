@@ -110,6 +110,23 @@ def scal_warianty(d, cicho=False):
     return d
 
 
+# 03.10.2026 (zdarzenia.py, MOZLIWY_DUBEL przejrzany recznie): TEN SAM klub pod dwiema nazwami z dwoch zrodel —
+# historia rozbita na dwa wpisy. Scalane tylko pary sprawdzone (ta sama liga/kraj, zmiana nazwy ligi albo spadek):
+# Zemgale (LHL -> Optibet Hokeja Liga), Troja/Ljungby (HockeyAllsvenskan -> HockeyEttan), Dinamo Bukareszt (pilka
+# reczna: Liga Mistrzow / Liga Nationala), Czechy (K) w hokeju. NIE scalamy par, ktore okazaly sie roznymi klubami
+# („Zaglebie Lubin W” z I ligi i „Zaglebie W” z Superligi).
+SCAL_SPORTY = {('hokej', 'Zemgale'): 'HK Zemgale/Jlss', ('hokej', 'Troja/Ljungby'): 'If Troja/Ljungby',
+               ('piłka ręczna', 'Din. Bucuresti'): 'Dinamo Bucuresti', ('hokej', 'Czech Republic W'): 'Czechia (W)'}
+
+
+def scal_recznie(d):
+    """Pary z SCAL_SPORTY (w obrebie sportu) -> jedna nazwa."""
+    if not len(d): return d
+    for c in ('gosp', 'gosc'):
+        d[c] = [SCAL_SPORTY.get((sp, n), n) for sp, n in zip(d.sport, d[c])]
+    return d
+
+
 def load():
     cols = ['data', 'sport', 'liga', 'gosp', 'gosc', 'pg', 'pa', 'dogrywka']
     h = pd.read_csv(HIST) if os.path.exists(HIST) else pd.DataFrame(columns=cols)
@@ -121,7 +138,7 @@ def load():
     d = pd.concat([h, x], ignore_index=True); d['data'] = pd.to_datetime(d.data)
     for liga, m in (('NFL', NFL), ('MLB', MLB)):
         i = d.liga == liga; d.loc[i, 'gosp'] = d.loc[i, 'gosp'].replace(m); d.loc[i, 'gosc'] = d.loc[i, 'gosc'].replace(m)
-    d = scal_warianty(d)
+    d = scal_recznie(scal_warianty(d))
     return d.sort_values('data', kind='stable')
 
 

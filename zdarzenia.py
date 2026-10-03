@@ -18,8 +18,8 @@ Dowody (kody):
   H2H             — para grala ze soba wczesniej (puchary, mecze miedzynarodowe),
   RYWAL_INNY      — (konflikt) rozpoznana druzyna gra tego dnia w zrodle z KIMS INNYM (jedyny mecz tej druzyny w dniu),
                     a pary z oferty w zrodle nie ma — jedna z nazw wskazuje zly klub,
-  ROZBITA         — rywal z mecza w zrodle to TEN SAM klub co druga strona, ale pod inna nazwa w bazie (rozbita
-                    historia klubu: do scalenia, nie konflikt nazw z oferty),
+  MOZLIWY_DUBEL   — rywal z meczu w zrodle ma nazwe podobna do drugiej strony, ale to INNY wpis w bazie: ten sam klub
+                    pod dwiema nazwami ALBO pomylony klub; bez WSPOLNA_LIGA/H2H -> CONFLICT,
   TA_SAMA_DRUZYNA — (konflikt) obie nazwy rozpoznane jako ten sam wpis.
 Stan: UNKNOWN gdy ktorakolwiek strona BRAK; CONFLICT gdy jest dowod konfliktu; MATCH gdy jest dowod pary;
 inaczej UNKNOWN (BRAK_DOWODU_PARY).
@@ -27,6 +27,7 @@ inaczej UNKNOWN (BRAK_DOWODU_PARY).
 Uzycie:  python3 zdarzenia.py KURSY.csv.gz [--zewn zewn] [--csv wynik.csv]"""
 import collections
 import contextlib
+import functools
 import io
 import os
 import sys
@@ -42,6 +43,11 @@ STANY = ('MATCH', 'UNKNOWN', 'CONFLICT')
 
 def _klucz(n):
     return ''.join(dopasuj.tokeny(n)) or str(n).lower()
+
+
+@functools.lru_cache(maxsize=None)
+def _czlony(n):
+    return frozenset(w for w in dopasuj.tokeny(n) if len(w) >= 3)
 
 
 def _sposob(S, n, e, jest_alias):
@@ -74,7 +80,10 @@ def klasyfikuj(ev, z, rozwiaz, pule, ligi=None, h2h=None, jest_alias=lambda S, n
             out.append((r.S, r.d, r.A, r.B, eA, eB, 'UNKNOWN', ';'.join(dow))); continue
         if eA == eB:
             out.append((r.S, r.d, r.A, r.B, eA, eB, 'CONFLICT', ';'.join(dow + ['TA_SAMA_DRUZYNA']))); continue
-        mecze = [x for d in r.dni for x in pod_dniu.get((r.S, d), [])]
+        # tylko mecze, w ktorych ktoras strona ma wspolny czlon z nazwami zdarzenia — resolver dla tysiecy nazw
+        # ze zrodel z calego dnia to ok. 5 min na przebieg; pozostale mecze i tak nie moga byc dowodem
+        cz = {w for n in (r.A, r.B, eA, eB) for w in _czlony(n)}
+        mecze = [x for d in r.dni for x in pod_dniu.get((r.S, d), []) if cz & (_czlony(x.gosp) | _czlony(x.gosc))]
         para = {eA, eB}
         w_zrodle = [x for x in mecze if {ent(r.S, x.gosp), ent(r.S, x.gosc)} == para]
         if w_zrodle:
@@ -90,18 +99,21 @@ def klasyfikuj(ev, z, rozwiaz, pule, ligi=None, h2h=None, jest_alias=lambda S, n
                     rywal = ent(r.S, x.gosc) if ent(r.S, x.gosp) == e else ent(r.S, x.gosp)
                     if rywal is not None and rywal not in para:
                         drugi = eB if e == eA else eA
-                        # ten sam klub pod DWIEMA nazwami w bazie (365 i Flashscore: „Llanelli Town” / „Llanelli”,
-                        # „RWD Molenbeek” / „RWDM Brussels”) — to ten sam mecz, a w bazie rozbita historia klubu
+                        # MOZE to byc ten sam klub pod dwiema nazwami w bazie („Troja/Ljungby” / „If Troja/Ljungby”),
+                        # ale rownie dobrze INNY klub o podobnej nazwie (przeglad 03.10: „San Antonio FC” z USA zamiast
+                        # ekwadorskiego San Antonio; „Zaglebie Lubin W” z I ligi zamiast „Zaglebie W” z Superligi).
+                        # Bez wspolnej ligi ani H2H to CONFLICT, nie MATCH.
                         if nazwy.znaczniki(rywal) == nazwy.znaczniki(drugi) and (
                                 dopasuj._rdzen_pasuje(dopasuj.tokeny(rywal), dopasuj.tokeny(drugi)) or dopasuj.podobne(rywal, drugi)):
-                            dow.append(f'ROZBITA:{drugi}={rywal}')
+                            dow.append(f'MOZLIWY_DUBEL:{drugi}={rywal}')
                         else:
                             dow.append(f'RYWAL_INNY:{e}~{rywal}')
                         break
         if ligi.get((r.S, eA), set()) & ligi.get((r.S, eB), set()): dow.append('WSPOLNA_LIGA')
         if (r.S, frozenset(para)) in h2h: dow.append('H2H')
         if any(d.startswith('RYWAL_INNY') for d in dow) and 'PARA_W_ZRODLE' not in dow: stan = 'CONFLICT'
-        elif {'PARA_W_ZRODLE', 'WSPOLNA_LIGA', 'H2H'} & set(dow) or any(d.startswith('ROZBITA') for d in dow): stan = 'MATCH'
+        elif any(d.startswith('MOZLIWY_DUBEL') for d in dow) and not {'WSPOLNA_LIGA', 'H2H'} & set(dow): stan = 'CONFLICT'
+        elif {'PARA_W_ZRODLE', 'WSPOLNA_LIGA', 'H2H'} & set(dow): stan = 'MATCH'
         else: stan, dow = 'UNKNOWN', dow + ['BRAK_DOWODU_PARY']
         out.append((r.S, r.d, r.A, r.B, eA, eB, stan, ';'.join(dow)))
     return pd.DataFrame(out, columns=['S', 'd', 'A', 'B', 'eA', 'eB', 'stan', 'dowody'])
@@ -131,8 +143,9 @@ def raport(k):
         linie.append(f'  {S:<14} ' + ', '.join(f'{s} {int((g.stan == s).sum())}' for s in STANY))
     for r in k[k.stan == 'CONFLICT'].itertuples(index=False):
         linie.append(f'  CONFLICT {r.S} {r.d.date()} {r.A} - {r.B} -> {r.eA} - {r.eB} [{r.dowody}]')
-    roz = sorted({d.split(':', 1)[1] for x in k.dowody for d in x.split(';') if d.startswith('ROZBITA:')})
-    if roz: linie.append(f'  ROZBITE KLUBY w bazie (ta sama druzyna pod dwiema nazwami, do scalenia): {len(roz)} — ' + '; '.join(roz[:30]))
+    roz = sorted({d.split(':', 1)[1] for x in k.dowody for d in x.split(';') if d.startswith('MOZLIWY_DUBEL:')})
+    if roz: linie.append(f'  MOZLIWE DUBLE w bazie (ten sam klub pod dwiema nazwami albo pomylony klub — do przegladu): {len(roz)} — '
+                         + '; '.join(roz[:30]))
     return linie
 
 

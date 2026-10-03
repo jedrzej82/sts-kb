@@ -10,8 +10,10 @@
  *   runda = id meczu scores24 (klucz bez duplikatów); ligapro_log.txt — ile meczów na ligę i okno, stan historii.
  * HISTORIA: każde uruchomienie dociąga też wstecz kolejne dni (do LIGAPRO_DNI_WSTECZ), aż do limitu czasu.
  */
-var LIGAPRO_LIGI = {'czech-liga-pro-1': ['CZECH REPUBLIC', 'Liga Pro'], 'tt-cup': ['CZECH REPUBLIC', 'TT Cup'],
-  'setka-cup': ['UKRAINE', 'Setka Cup']};   // slug scores24 -> [kraj, turniej]; nieistniejący slug = 0 meczów w logu
+// 03.10.2026 (telefon, zrodla.py): scores24 ma 3 ligi tenisa stołowego — czech-liga-pro-1, international-tt-cup,
+// tt-elite-series-1. Slugi 'tt-cup' i 'setka-cup' dawały zawsze 0 meczów (Setka Cup w scores24 nie ma wcale).
+var LIGAPRO_LIGI = {'czech-liga-pro-1': ['CZECH REPUBLIC', 'Liga Pro'], 'international-tt-cup': ['CZECH REPUBLIC', 'TT Cup']};
+// slug scores24 -> [kraj, turniej]; nieistniejący slug = 0 meczów w logu
 var LIGAPRO_DNI_WSTECZ = 60;
 var LIGAPRO_OKNO_H = 1;          // okno zapytania w godzinach (API: first <= 50 meczów na odpowiedź)
 var LIGAPRO_LIMIT_MS = 4.5 * 60 * 1000;

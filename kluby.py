@@ -145,6 +145,14 @@ SCAL_RECZNIE = {
     # football-data krotka; bez sklejenia sezon 2025/26 wisial pod martwa nazwa ("CD Eldense NIESWIEZA").
     ('Spain | Primera Division RFEF', 'CD Eldense'): 'Eldense',
     ('Spain | Primera Division RFEF', 'Celta Vigo B'): 'Celta B',
+    # 03.10.2026 (zdarzenia.py, CONFLICT MOZLIWY_DUBEL przejrzany recznie): Flashscore zapisuje obecny klub inaczej niz
+    # historia z football-data/365 — nazwa z oferty trafiala w MARTWY wpis (KSK Heist 2014-16), a mecze tego sezonu
+    # wisialy pod nazwa z FS. Ten sam klub: RWDM (RWD Molenbeek -> RWDM Brussels FC 2024), KSK Heist, KFC Dessel Sport,
+    # Llanelli Town (spadek do Cymru South). NIE: Roeselare (KSV upadl 2020, obecny SK Roeselare to inny podmiot).
+    ('Belgium | National Division 1 - ACFF', 'RWDM Brussels'): 'RWD Molenbeek',
+    ('Belgium | National Division 1 - VV', 'Heist'): 'KSK Heist',
+    ('Belgium | National Division 1 - VV', 'Dessel'): 'Dessel Sport',
+    ('Wales | Cymru South', 'Llanelli'): 'Llanelli Town',
     ('Switzerland | Challenge League', 'FC Winterthur'): 'Winterthur',
     ('Turkiye | 1. Lig', 'Corum FK'): 'Corum',
     # "Erzurumspor" w T1 2000-01 to dawny, INNY klub; BB Erzurumspor (2018-21) i Erzurumspor FK to jeden klub

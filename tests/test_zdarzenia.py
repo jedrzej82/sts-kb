@@ -53,15 +53,18 @@ def test_rywal_inny_to_conflict():
     assert stan == 'CONFLICT' and 'RYWAL_INNY:Lech Poznan~Rakow' in dow
 
 
-def test_rozbity_klub_to_nie_konflikt():
-    # „Llanelli Town” (365) i „Llanelli” (Flashscore) to ten sam klub pod dwiema nazwami w bazie
+def test_mozliwy_dubel_bez_ligi_to_conflict():
+    # przeglad 03.10: podobna nazwa rywala w zrodle bywa INNYM klubem („San Antonio FC” USA vs San Antonio z Ekwadoru)
     MAPA.update({'Baglan Dragons': 'Baglan Dragons', 'Llanelli Town': 'Llanelli Town'})
     try:
         (stan, dow), = _stan(_ev(('Llanelli Town', 'Baglan Dragons')), _z(('Baglan Dragons', 'Llanelli')))
+        ligi = {('pilka', 'Llanelli Town'): {'WAL'}, ('pilka', 'Baglan Dragons'): {'WAL'}}
+        (stan2, _), = _stan(_ev(('Llanelli Town', 'Baglan Dragons')), _z(('Baglan Dragons', 'Llanelli')), ligi=ligi)
     finally:
         del MAPA['Baglan Dragons'], MAPA['Llanelli Town']
-    assert stan == 'MATCH' and 'ROZBITA:Llanelli Town=Llanelli' in dow
-    assert any('ROZBITE KLUBY' in x for x in zdarzenia.raport(pd.DataFrame(
+    assert stan == 'CONFLICT' and 'MOZLIWY_DUBEL:Llanelli Town=Llanelli' in dow
+    assert stan2 == 'MATCH'                                     # wspolna liga potwierdza pare
+    assert any('MOZLIWE DUBLE' in x for x in zdarzenia.raport(pd.DataFrame(
         [dict(S='pilka', d=pd.Timestamp('2026-10-03'), A='a', B='b', eA='x', eB='y', stan=stan, dowody=dow)])))
 
 
