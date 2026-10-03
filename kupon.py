@@ -42,11 +42,22 @@ def poziom(kryteria):
     return 'A' if k >= 6 else 'B' if k >= 4 else 'C' if k >= 2 else 'D'
 
 
+# 03.10.2026 (A1 b): "P jako PRZEDZIAL, EV od DOLNEGO krańca; ujemne → nogi nie ma".
+# Raport 2026-10-03 15:00 (usterka 2): kupon.py dawal "DO GRY, stawka 2 zl" dla K3 na nodze SS Monopoli
+# (szacunek, przedzial 53%-73%) i dla K5b (SaiPa, "SZACUNEK: < 10 meczow"), bo liczyl EV z P punktowego.
+# Dla Monopoli EV od dolnego krania to -11,4%, nie +5,3%. typuj.py drukuje przedzialy o szerokosci ok. +-10 pp,
+# wiec przy braku jawnej kolumny p_min bierzemy p - 0,10 dla kazdej nogi oznaczonej jako szacunek.
+MARGINES_SZACUNKU = 0.10
+
+
 def wczytaj(plik):
     d = pd.read_csv(plik)
     for c, v in (('sport', ''), ('szacunek', 0), ('polski', 0), ('marza', 1.0), ('kryteria', 0)):
         d[c] = d[c].fillna(v) if c in d else v   # pusta komorka = wartosc domyslna (NaN psul filtr polski == 0)
     d['p'] = d.p.astype(float); d['kurs'] = d.kurs.astype(float)
+    # p_min: dolny kraniec przedzialu P. Jawna kolumna wygrywa; inaczej p - margines dla nog "szacunek".
+    jawne = d['p_min'].astype(float) if 'p_min' in d else pd.Series([float('nan')] * len(d), index=d.index)
+    d['p_min'] = jawne.fillna(d.p - d.szacunek.astype(float) * MARGINES_SZACUNKU).clip(lower=0.0, upper=1.0)
     return d[(d.p > 0) & (d.kurs > 1)].reset_index(drop=True)
 
 
@@ -61,7 +72,11 @@ def _kombinacje(d, nmin, nmax):
 def _opis(d, c):   # indeksy c pochodza z d (ramki bez resetu indeksu — .loc dziala na filtrowanej ramce)
     x = d.loc[list(c)]
     p = float(x.p.prod()); k = float(x.kurs.prod())
+    # p_min dolicza wczytaj(); ramki budowane wprost (testy, starsze wywolania) go nie maja — liczymy w locie.
+    p_dol = float(x.p_min.prod() if 'p_min' in x else
+                  (x.p - x.szacunek.astype(float) * MARGINES_SZACUNKU).clip(lower=0.0).prod())
     return dict(nogi=list(c), p=p, kurs=k, ev=ev(p, k), szacunki=int(x.szacunek.sum()),
+                p_dol=p_dol, ev_dol=ev(p_dol, k),
                 polski=bool(x.polski.any()), marza_max=float(x.marza.max()), poziom=poziom(list(x.kryteria)))
 
 
@@ -112,6 +127,9 @@ def za_pieniadze(o, rodzaj, a, wydane_dzis, kupony_dzis):
     if o['ev'] <= 0: return 0, 'EV <= 0'
     if o['polski']: return 0, 'polski klub/puchar (A1 d)'
     if o['szacunki'] > 1: return 0, 'dwie nogi „szacunek” (A1 e)'
+    if o['szacunki'] and o.get('ev_dol', o['ev']) <= 0:
+        return 0, (f'EV od DOLNEGO krania przedzialu {o["ev_dol"]:+.1%} <= 0 '
+                   f'(P {o["p"]:.1%} -> {o["p_dol"]:.1%}; A1 b)')
     if o['marza_max'] > 1.10: return 0, f'marza {o["marza_max"]:.1%} > 110% (6.3)'
     if o['poziom'] == 'D': return 0, 'poziom D (A4.3)'
     lacznie = getattr(a, 'lacznie', a.wydane_lacznie)   # 29.09.2026: z kuponami tego przebiegu (main)
