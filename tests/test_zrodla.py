@@ -305,3 +305,16 @@ def test_s24_kandydaci_raz_na_tydzien():
     assert len(adresy) == 1                                         # 2 dni pozniej: tylko strona glowna
     adresy.clear(); z.z_s24(s, {}, dt.datetime(2026, 10, 10, 10, 0), stan, 0, '/tmp')
     assert len(adresy) == n1                                        # po tygodniu znowu pelne szukanie
+
+
+def test_90minut_bez_dzisiejszych_wynikow():
+    # 03.10 (cron 14:40): wynik meczu z dzisiejsza data moze byc z trakcie gry — tylko mecze do wczoraj
+    import datetime as dt
+    s = z.Sesja(600)
+    strona = ('<tr><td colspan=4>Kolejka 11 - 2 października 2026</td></tr>'
+              '<tr><td>A</td><td>1-0</td><td>B</td><td>2 października</td></tr>'
+              '<tr><td>C</td><td>7-0</td><td>D</td><td>3 października</td></tr>')
+    s.get = lambda zr, url, *a, **k: (200, '<a href="/liga/1/liga1.html">CLJ</a>') if url.endswith('pl/') else (200, strona)
+    w = {}
+    z.z_90minut(s, w, dt.datetime(2026, 10, 3, 12, 40))
+    assert [(x['gosp'], x['data']) for x in w['90minut_mecze']] == [('A', '2026-10-02')]
