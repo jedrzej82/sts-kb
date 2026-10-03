@@ -162,3 +162,41 @@ def test_skrot_z_kolizja_rdzenia_idzie_do_przegladu():
     assert a[['nazwa', 'cel']].values.tolist() == [['Torpedo Ust-Kamenogorsk', 'Torpedo']]
     # skrot bez zgubionego czlonu znaczacego (tylko forma prawna) — bez przegladu
     assert dopasuj.kolizja('Lugi HF', 'Lugi', {'Lugi', 'Lugi Lund'}) == []
+
+
+def test_kotwica_ligowa_rywal_i_para():
+    # 03.10: mecze z oferty bez wyniku w zrodlach — alias z ligi rozpoznanego rywala albo z jedynej pary ze wspolna liga
+    import pandas as pd
+    import dopasuj
+    ev = pd.DataFrame({'S': ['koszykówka', 'piłka ręczna', 'koszykówka'], 'd': pd.to_datetime(['2026-10-02'] * 3),
+                       'A': ['Medi Bayreuth', 'Eulen Ludwigshafen', 'Polonia Leszno'],
+                       'B': ['Rasta Vechta', 'HSG Nordhorn-Lingen', 'Polonia Warszawa']})
+    pule = {'koszykówka': {'Bayreuth', 'Rasta Vechta', 'Polonia Warszawa', 'Leszno', 'Polonia Gdansk'},
+            'piłka ręczna': {'Ludwigshafen', 'Nordhorn-Lingen', 'Nordhorn'}}
+    ligi = dopasuj.ligi_druzyn(pd.DataFrame({
+        'S': ['koszykówka', 'koszykówka', 'piłka ręczna', 'piłka ręczna', 'koszykówka'],
+        'liga': ['Germany | Pro A', 'Germany | Pro A', 'Germany | 2. Bundesliga', 'Germany | 3. Liga', 'Poland | 1. Liga'],
+        'A': ['Bayreuth', 'Bayreuth', 'Ludwigshafen', 'Nordhorn', 'Leszno'],
+        'B': ['Rasta Vechta', 'Karlsruhe', 'Nordhorn-Lingen', 'Essen', 'Polonia Warszawa']}))
+    znane = {'Rasta Vechta', 'Polonia Warszawa'}
+    rozwiaz = lambda S, n: n if n in znane else None
+    al, stat = dopasuj.kotwica_ligowa(ev, rozwiaz, pule, ligi)
+    wyn = dict(zip(al.nazwa, al.cel))
+    assert wyn['Medi Bayreuth'] == 'Bayreuth'                       # rywal rozpoznany, ta sama liga
+    assert wyn['Polonia Leszno'] == 'Leszno'                        # „Polonia Gdansk” ma wspolny czlon, ale nie liga
+    # para: Ludwigshafen + Nordhorn-Lingen (wspolna liga); „Nordhorn” tez pasuje do nazwy, ale nie dzieli ligi z Ludwigshafen
+    assert wyn['Eulen Ludwigshafen'] == 'Ludwigshafen' and wyn['HSG Nordhorn-Lingen'] == 'Nordhorn-Lingen'
+    # gdy „Nordhorn” gra w tej samej lidze, par jest dwie — nie zgadujemy
+    ligi[('piłka ręczna', 'Nordhorn')].add('Germany | 2. Bundesliga')
+    al2, stat2 = dopasuj.kotwica_ligowa(ev, rozwiaz, pule, ligi)
+    assert 'Eulen Ludwigshafen' not in set(al2.nazwa) and stat2['para: kilka par'] == 1
+
+
+def test_rdzen_pasuje():
+    import dopasuj
+    t = dopasuj.tokeny
+    assert dopasuj._rdzen_pasuje(t('Black Wings Linz'), t('EHC Liwest Black Wings Linz'))
+    assert dopasuj._rdzen_pasuje(t('Orange Academy'), t('OrangeAcademy'))
+    assert dopasuj._rdzen_pasuje(t('TuS N-Lubbecke'), t('N-Lubbecke'))
+    assert not dopasuj._rdzen_pasuje(t('Polonia Leszno'), t('Polonia Warszawa'))
+    assert not dopasuj._rdzen_pasuje(t('HC Bolzano'), t('HC Lugano'))

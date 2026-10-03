@@ -325,7 +325,7 @@ sporty,Sparta Grodzisk Mazowiecki,Sparta Grodzisk,"nauka siatkówka: 1 dowod(y),
 sporty,Carter Allister,Ali Carter,"nauka snooker: 1 dowod(y), np. Carter Allister - Walden Ricky 2026-09-30 (terminarz_fs: Carter A. - Walden R.)",2026-10-01
 sporty,HC Pilzno,HC Plzeň 1929,Raport 02.10 15:00 usterka 1 (Extraliga CZ; w bazie HC Plzeň 1929),2026-10-02
 sporty,HPK Hameenlinna,HPK,Raport 02.10 15:00 usterka 2 (Liiga; w bazie HPK),2026-10-02
-sporty,JYP Jyvaskyla,JYP,Raport 02.10 15:00 usterka 2 (Liiga; w bazie przebiegu JYP),2026-10-02
+sporty,JYP Jyvaskyla,Jyvaskyla,Raport 02.10 15:00 usterka 2 (Liiga); 03.10: w bazie zbudowanej przebiegiem jest „Jyvaskyla” (nie „JYP”) — kotwica ligowa HPK - JYP Jyvaskyla 02.10,2026-10-02
 sporty,HC Presov,Presov 07,Raport 02.10 15:00 usterka 3 (Extraliga SK; w bazie Presov 07),2026-10-02
 sporty,Lahti Basketball,Namika Lahti,Raport 02.10 15:00 usterka 4 (Korisliiga; w bazie Namika Lahti),2026-10-02
 sporty,Sporting Lizbona,Sporting Cp,Raport 02.10 15:00 usterka 5 (reczna; w bazie Sporting Cp),2026-10-02
@@ -337,3 +337,116 @@ typuj,FC Barcelona,Barcelona,03.10 audyt nazw: resolver dawal "FC Barcelona Atl�
 typuj,Grasshopper Club Zurich,Grasshoppers,03.10 audyt nazw: resolver dawal "Zurich" (inny klub — FC Zurich),2026-10-03
 typuj,Atletico-GO,Atl Goianiense,03.10 audyt nazw: resolver dawal "Atletico-MG" (Mineiro),2026-10-03
 typuj,Al Jazira,Jazira Abu Dhabi,03.10 audyt nazw: resolver dawal "Al Jazira Al Hamra" (inny klub ZEA),2026-10-03
+sporty,Constract Olsztyn,Olsztyn,03.10 nauka z dowodow (dopasuj.py): Śląsk Wrocław - Constract Olsztyn 2026-10-03 (terminarz_fs: Slask Wroclaw - Olsztyn),2026-10-03
+sporty,Interobal Pilzno,SK Interobal Plzen,03.10 nauka z dowodow (dopasuj.py): Interobal Pilzno - Slavia Praga 2026-10-02 (wyniki_fs_inne_2026-10: SK Interobal Plzen - Slavia Prague),2026-10-03
+sporty,KKF Kazimierza Wielka,Kazimierza Wielka,03.10 nauka z dowodow (dopasuj.py): KKF Kazimierza Wielka - FC Toruń 2026-10-03 (terminarz_fs: Kazimierza Wielka - Torun),2026-10-03
+sporty,Red Dragons Pniewy,Pniewy,03.10 nauka z dowodow (dopasuj.py): Red Dragons Pniewy - Legia Warszawa 2026-10-03 (terminarz_fs: Pniewy - Legia Warszawa),2026-10-03
+sporty,Berani Zlin,Zlin,03.10 nauka z dowodow (dopasuj.py): Berani Zlin - Horacka Slavia Trebic 2026-09-30 (wyniki_fs_inne_2026-09: Zlin - Trebic),2026-10-03
+sporty,CVUT Engineers Praga,Engineers Prague,03.10 nauka z dowodow (dopasuj.py): CZU Farmers Praga - CVUT Engineers Praga 2026-09-30 (wyniki_fs_inne_2026-09: CZU Farmers Prague - Engineers Prague),2026-10-03
+sporty,Dusseldorfer EG,Dusseldorf,03.10 nauka z dowodow (dopasuj.py): Starbulls Rosenheim - Dusseldorfer EG 2026-10-02 (wyniki_fs_inne_2026-10: Starbulls Rosenheim - Dusseldorf),2026-10-03
+sporty,Dynamo Pardubice B,Pardubice B,03.10 nauka z dowodow (dopasuj.py): Dukla Jihlava - Dynamo Pardubice B 2026-09-30 (wyniki_fs_inne_2026-09: Jihlava - Pardubice B),2026-10-03
+sporty,HKM Zvolen,Zvolen,03.10 nauka z dowodow (dopasuj.py): HKM Zvolen - HC Presov 2026-10-02 (wyniki_365_inne_2026-10: Zvolen - Presov 07),2026-10-03
+sporty,KalPa Kuopio,Kalpa,03.10 nauka z dowodow (dopasuj.py): KalPa Kuopio - SaiPa Lappeenranta 2026-10-02 (wyniki_fs_inne_2026-10: KalPa - SaiPa),2026-10-03
+sporty,Memmingen Indians,Memmingen,03.10 nauka z dowodow (dopasuj.py): Memmingen Indians - Lausitzer Fuchse 2026-10-02 (wyniki_fs_inne_2026-10: Memmingen - Lausitzer Fuchse),2026-10-03
+sporty,Spartak Dubnica,Dubnica,03.10 nauka z dowodow (dopasuj.py): Spartak Dubnica - HK Skalica 2026-09-30 (wyniki_fs_inne_2026-09: Dubnica - Skalica),2026-10-03
+sporty,Vlci Zilina,Zilina,03.10 nauka z dowodow (dopasuj.py): Vlci Zilina - Slovan Bratysława 2026-10-02 (wyniki_365_inne_2026-10: Zilina - Slovan Bratislava),2026-10-03
+sporty,Yertis Pavlodar,Pavlodar,03.10 nauka z dowodow (dopasuj.py): Saryarka Karaganda - Yertis Pavlodar 2026-10-02 (wyniki_fs_inne_2026-10: Karaganda - Pavlodar),2026-10-03
+sporty,Alkar Sinj,Alkar,03.10 nauka z dowodow (dopasuj.py): Zrinjski Mostar - Alkar Sinj 2026-09-30 (wyniki_fsx_inne_2026-09: Zrinjski Mostar - Alkar),2026-10-03
+sporty,Alvark Tokio,Toyota Alvark,03.10 nauka z dowodow (dopasuj.py): Chiba Jets Funabashi - Alvark Tokio 2026-10-02 (wyniki_365_inne_2026-10: Chiba Jets - Toyota Alvark),2026-10-03
+sporty,Artego Bydgoszcz [K],Basket 25 Bydgoszcz W,03.10 nauka z dowodow (dopasuj.py): Ślęza Wrocław [K] - Artego Bydgoszcz [K] 2026-10-03 (terminarz_fs: Sleza Wroclaw W - Basket 25 Bydgoszcz W),2026-10-03
+sporty,BBC Nord Dragonz,BBC Nord,03.10 nauka z dowodow (dopasuj.py): BBC Nord Dragonz - Kapfenberg Bulls 2026-10-02 (wyniki_365_inne_2026-10: BBC Nord - Kapfenberg Bulls),2026-10-03
+sporty,BG Gottingen,Bg 74 Gottingen,03.10 nauka z dowodow (dopasuj.py): Artland Dragons - BG Gottingen 2026-10-02 (wyniki_365_inne_2026-10: Artland Dragons - Bg 74 Gottingen),2026-10-03
+sporty,CB Tizona,Tizona Burgos,03.10 nauka z dowodow (dopasuj.py): CB Tizona - Albacete Basket 2026-10-02 (wyniki_365_inne_2026-10: Tizona Burgos - Albacete),2026-10-03
+sporty,EPG Baskets Koblenz,Koblenz,03.10 nauka z dowodow (dopasuj.py): Nurnberg Falcons - EPG Baskets Koblenz 2026-10-02 (wyniki_365_inne_2026-10: Nurnberg Falcons BC - Koblenz),2026-10-03
+sporty,Kvarner Rijeka,Kvarner,03.10 nauka z dowodow (dopasuj.py): KK Split - Kvarner Rijeka 2026-10-02 (wyniki_365_inne_2026-10: Split - Kvarner),2026-10-03
+sporty,Mercede Alghero [K],Alghero W,03.10 nauka z dowodow (dopasuj.py): Mercede Alghero [K] - Salerno Basket [K] 2026-10-02 (wyniki_fsx_inne_2026-10: Alghero W - Salerno W),2026-10-03
+sporty,Polonia Bytom,Bytom,03.10 nauka z dowodow (dopasuj.py): Polonia Bytom - ŁKS Łódź 2026-10-03 (terminarz_fs: Bytom - LKS Lodz),2026-10-03
+sporty,Rytas Wilno II,Rytas 2,03.10 nauka z dowodow (dopasuj.py): Rytas Wilno II - BC Telsiai 2026-10-01 (wyniki_fsx_inne_2026-10: Rytas 2 - Telsiai),2026-10-03
+sporty,SBB Baskets Wolmirstedt,Wolmirstedt,03.10 nauka z dowodow (dopasuj.py): SBB Baskets Wolmirstedt - Giessen 46ers 2026-10-02 (wyniki_365_inne_2026-10: Wolmirstedt - Giessen 46ers),2026-10-03
+sporty,Siroki TT Kabeli,HNK Siroki,03.10 nauka z dowodow (dopasuj.py): Borac Cacak - Siroki TT Kabeli 2026-10-02 (wyniki_365_inne_2026-10: KK Borac Cacak - HNK Siroki),2026-10-03
+sporty,Sokół Łańcut,Lancut,03.10 nauka z dowodow (dopasuj.py): GKS Tychy - Sokół Łańcut 2026-10-03 (terminarz_fs: GKS Tychy - Lancut),2026-10-03
+sporty,Universo Treviso,Treviso Basket,03.10 nauka z dowodow (dopasuj.py): Aquila Trento - Universo Treviso 2026-10-03 (terminarz_365: Dolomiti Energia Trento - Treviso Basket),2026-10-03
+sporty,VfL Astrostars Bochum,Bochum,03.10 nauka z dowodow (dopasuj.py): VfL Astrostars Bochum - Eisbaren Bremerhaven 2026-10-02 (wyniki_365_inne_2026-10: Bochum - Eisberen Bremerhaven),2026-10-03
+typuj,BK Fremad Amager,FC Amager,03.10 nauka z dowodow (dopasuj.py): BK Fremad Amager - B93 Kopenhaga 2026-10-02 (wyniki_365_pilka_2026-10: FC Amager - B93 Copenhagen),2026-10-03
+typuj,Egersunds IK,Egersund,03.10 nauka z dowodow (dopasuj.py): Ranheim IL - Egersunds IK 2026-10-02 (wyniki_365_pilka_2026-10: Ranheim - Egersund),2026-10-03
+typuj,Ilves Tampere II,Ilves 2,03.10 nauka z dowodow (dopasuj.py): Ilves Tampere II - Huima/Urho Aanekoski 2026-10-02 (wyniki_fs_pilka_2026-10: Ilves 2 - Huima / Urho),2026-10-03
+typuj,Moghreb Tetouan,Maghreb Tétouan,03.10 nauka z dowodow (dopasuj.py): Ittihad Tanger - Moghreb Tetouan 2026-10-02 (wyniki_365_pilka_2026-10: Ittihad Tanger - Maghreb Tétouan),2026-10-03
+typuj,Union Touarga,US Touarga,03.10 nauka z dowodow (dopasuj.py): Wydad Temara - Union Touarga 2026-10-02 (wyniki_365_pilka_2026-10: Wydad Temara - US Touarga),2026-10-03
+sporty,Frontignan Thau HB,Frontignan,03.10 nauka z dowodow (dopasuj.py): Frontignan Thau HB - Pau Billere HB 2026-10-02 (wyniki_fsx_inne_2026-10: Frontignan - Pau Billere),2026-10-03
+sporty,Grand Besancon Doubs,Besancon,03.10 nauka z dowodow (dopasuj.py): Valence Handball - Grand Besancon Doubs 2026-10-02 (wyniki_fsx_inne_2026-10: Valence - Besancon),2026-10-03
+sporty,HH Elite Horsens [K],Horsens W,03.10 nauka z dowodow (dopasuj.py): HH Elite Horsens [K] - EH Aalborg [K] 2026-09-30 (wyniki_fsx_inne_2026-09: Horsens W - EH Aalborg W),2026-10-03
+sporty,IMS Ringsted,Ringsted,03.10 nauka z dowodow (dopasuj.py): SonderjyskE HK - IMS Ringsted 2026-10-02 (wyniki_fsx_inne_2026-10: Sonderjyske - Ringsted),2026-10-03
+sporty,KPR Legionowo,Legionowo,03.10 nauka z dowodow (dopasuj.py): Industria Kielce - KPR Legionowo 2026-10-03 (terminarz_fs: Kielce - Legionowo),2026-10-03
+sporty,Odder Handbold,Odder,03.10 nauka z dowodow (dopasuj.py): Odder Handbold - Raekker Molle 2026-10-02 (wyniki_fsx_inne_2026-10: Odder - Raekker Molle),2026-10-03
+sporty,Piotrkowianin Piotrków Trybunalski,Piotrkowianin Piotrkow,03.10 nauka z dowodow (dopasuj.py): Wybrzeże Gdańsk - Piotrkowianin Piotrków Trybunalski 2026-10-02 (wyniki_fsx_inne_2026-10: Wybrzeze Gdansk - Piotrkowianin Piotrkow),2026-10-03
+sporty,Pontault Combault,Pontault,03.10 nauka z dowodow (dopasuj.py): Pontault Combault - Elite Val d'Oise 2026-10-02 (wyniki_fsx_inne_2026-10: Pontault - Val d'Oise),2026-10-03
+sporty,Ringkobing HB [K],Ringkobing W,03.10 nauka z dowodow (dopasuj.py): Ringkobing HB [K] - Viborg HK [K] 2026-09-30 (wyniki_fsx_inne_2026-09: Ringkobing W - Viborg W),2026-10-03
+sporty,TM Tonder,Tonder,03.10 nauka z dowodow (dopasuj.py): TM Tonder - HC Midtjylland 2026-10-02 (wyniki_fsx_inne_2026-10: Tonder - Midtjylland),2026-10-03
+sporty,Team Esbjerg [K],Esbjerg W,03.10 nauka z dowodow (dopasuj.py): HC Odense [K] - Team Esbjerg [K] 2026-09-30 (wyniki_fsx_inne_2026-09: Odense W - Esbjerg W),2026-10-03
+sporty,US Ivry,Ivry,03.10 nauka z dowodow (dopasuj.py): US Ivry - HC Cournon-d’Auvergne 2026-10-02 (wyniki_fsx_inne_2026-10: Ivry - Cournon d'Auvergne),2026-10-03
+sporty,US Saintes,Saintes,03.10 nauka z dowodow (dopasuj.py): Draguignan Var Handball - US Saintes 2026-10-02 (wyniki_fsx_inne_2026-10: Draguignan Var - Saintes),2026-10-03
+sporty,Utleira IL [K],Utleira W,03.10 nauka z dowodow (dopasuj.py): Molde HK [K] - Utleira IL [K] 2026-09-30 (wyniki_fsx_inne_2026-09: Molde W - Utleira W),2026-10-03
+sporty,Pałac Bydgoszcz [K],Metalkas Palac Bydgoszcz (W),03.10 nauka z dowodow (dopasuj.py): Pałac Bydgoszcz [K] - BKS Bielsko-Biała [K] 2026-10-03 (terminarz_365: Metalkas Palac Bydgoszcz (W) - BKS Bielsko-Biała (W)),2026-10-03
+sporty,Sokół Mogilno [K],Sokól & Hagric Mogilno (W),03.10 nauka z dowodow (dopasuj.py): Sokół Mogilno [K] - Radomka Radom [K] 2026-10-03 (terminarz_365: Sokól & Hagric Mogilno (W) - Radomka Radom (W)),2026-10-03
+sporty,Torpedo Ust‑Kamenogorsk,Torpedo,03.10 przeglad skrotu z kolizja (Torpedo Nizhny Novgorod; Torpedo-Gorkiy) — dowod: Beibarys Atyrau - Torpedo Ust‑Kamenogorsk 2026-10-02 (wyniki_fs_inne_2026-10: Beibarys Atyrau - Torpedo),2026-10-03
+typuj,Bohemians Dublin,Bohemians,03.10 przeglad skrotu z kolizja (Bohemians 1905) — dowod: Dundalk FC - Bohemians Dublin 2026-10-02 (wyniki_365_pilka_2026-10: Dundalk - Bohemians),2026-10-03
+typuj,Mohammedan SC Dhaka,Mohammedan,03.10 przeglad skrotu z kolizja (Mohammedan SC) — dowod: Fakirapool Young Men - Mohammedan SC Dhaka 2026-10-02 (wyniki_365_pilka_2026-10: Fakirapool Young Men - Mohamm,2026-10-03
+sporty,Arlan Kokschetau,Kokshetau,03.10 przeglad reczny (1 dowod; pisownia): Arlan Kokschetau - HC Almaty 02.10 = Kokshetau - Almaty,2026-10-03
+sporty,HC Pustertal Wolfe,Val Pusteria,03.10 przeglad reczny (1 dowod; wloska nazwa klubu): EC Graz 99ers - HC Pustertal Wolfe 30.09 = Graz99ers - Val Pusteria,2026-10-03
+sporty,Kedainiu Sporto Centras,Kedainiai BC,03.10 przeglad reczny (1 dowod; litewski dopelniacz): BC Omega-Tauras - KSC 30.09 = Omega-Tauras - Kedainiai BC,2026-10-03
+sporty,Vilkaviskio Perlas,Vilkaviskis,03.10 przeglad reczny (1 dowod; litewski dopelniacz): Zalgiris Kowno II - Vilkaviskio Perlas 01.10 = Zalgiris Kaunas 2 - Vilkaviskis,2026-10-03
+typuj,Nykoebing FC,Nykobing,03.10 przeglad reczny (1 dowod; oe = o): Naestved BK - Nykoebing FC 02.10 = Naestved - Nykobing,2026-10-03
+sporty,Sztokholm Handbold,Stoholm,03.10 przeglad reczny (1 dowod; STS blednie spolszczyl dunski Stoholm): Lemvig-Thyboroen - Sztokholm Handbold 02.10 = Lemvig - Stoholm,2026-10-03
+sporty,Futsal Świecie,Swiecie,"03.10 kotwica ligowa futsal: 1 dowod(y), np. Rekord Bielsko-Biała - Futsal Świecie 2026-10-03: para Bielsko-Biala - Swiecie, liga POLAND | Ekstraklasa (przejrzane recznie)",2026-10-03
+sporty,Rekord Bielsko-Biała,Bielsko-Biala,"03.10 kotwica ligowa futsal: 1 dowod(y), np. Rekord Bielsko-Biała - Futsal Świecie 2026-10-03: para Bielsko-Biala - Swiecie, liga POLAND | Ekstraklasa (przejrzane recznie)",2026-10-03
+sporty,Black Wings Linz,EHC Liwest Black Wings Linz,"03.10 kotwica ligowa hokej: 2 dowod(y), np. Black Wings Linz - EC Graz 99ers 2026-10-02: rywal Graz 99ers, liga Austria | ICE Hockey League (przejrzane recznie)",2026-10-03
+sporty,Blue Devils Weiden,Weiden,"03.10 kotwica ligowa hokej: 1 dowod(y), np. Blue Devils Weiden - Eisbaren Regensburg 2026-10-02: rywal Ev Regensburg, liga Germany | DEL2 (przejrzane recznie)",2026-10-03
+sporty,Dukla Michalovce,Michalovce,"03.10 kotwica ligowa hokej: 1 dowod(y), np. Dukla Michalovce - HK Nitra 2026-10-02: rywal MHK Nitra, liga Slovakia | Extraliga (przejrzane recznie)",2026-10-03
+sporty,Gjovik Mammuts,Gjovik,"03.10 kotwica ligowa hokej: 1 dowod(y), np. Kongsvinger IL - Gjovik Mammuts 2026-09-30: para Kongsvinger - Gjovik, liga Norway | Division 1 (przejrzane recznie)",2026-10-03
+sporty,HK Spisska Nova Ves,Nova Ves,"03.10 kotwica ligowa hokej: 1 dowod(y), np. Dukla Trencin - HK Spisska Nova Ves 2026-10-02: rywal HC Dukla Trenčín, liga Slovakia | Extraliga (przejrzane recznie)",2026-10-03
+sporty,Kongsvinger IL,Kongsvinger,"03.10 kotwica ligowa hokej: 1 dowod(y), np. Kongsvinger IL - Gjovik Mammuts 2026-09-30: para Kongsvinger - Gjovik, liga Norway | Division 1 (przejrzane recznie)",2026-10-03
+sporty,Rodovre Mighty Bulls,Rodovre  Bulls,"03.10 kotwica ligowa hokej: 1 dowod(y), np. Herlev Eagles - Rodovre Mighty Bulls 2026-10-02: rywal Herlev Eagles, liga Denmark | Ligaen (przejrzane recznie)",2026-10-03
+sporty,ASVEL Lyon-Villeu...,ASVEL Villeurbanne,"03.10 kotwica ligowa koszykówka: 1 dowod(y), np. Panathinaikos Ateny - ASVEL Lyon-Villeu... 2026-09-30: rywal Panathinaikos, liga Europe | EuroLeague (przejrzane recznie)",2026-10-03
+sporty,AZS UMCS Lublin [K],Lublin (W),"03.10 kotwica ligowa koszykówka: 1 dowod(y), np. MOSiR Bochnia [K] - AZS UMCS Lublin [K] 2026-10-03: para Bochnia W - Lublin (W), liga Poland | Basket Liga Women (przejrzane recznie)",2026-10-03
+sporty,BBC Lausanne,Lausanne Basket,"03.10 kotwica ligowa koszykówka: 1 dowod(y), np. SAM Basket Massagno - BBC Lausanne 2026-09-30: rywal Sam Basket Massagno, liga Switzerland | Coupe de Suisse, Switzerland | SBL (przejrzane recznie)",2026-10-03
+sporty,BC Andorra,MoraBanc Andorra,"03.10 kotwica ligowa koszykówka: 1 dowod(y), np. Joventut Badalona - BC Andorra 2026-10-03: rywal Joventut de Badalona, liga Spain | ACB (przejrzane recznie)",2026-10-03
+sporty,Bursaspor,Bursaspor Durmazlar,"03.10 kotwica ligowa koszykówka: 1 dowod(y), np. Bursaspor - Turk Telekom Ankara 2026-10-03: rywal Turk Telekom, liga Turkiye | Super Ligi (przejrzane recznie)",2026-10-03
+sporty,Decka Pelplin,Uks Jedynka Decka Pelplin,"03.10 kotwica ligowa koszykówka: 2 dowod(y), np. WKK Wrocław - Decka Pelplin 2026-10-03: rywal Wkk Wroclaw, liga Poland | 1. Liga (przejrzane recznie)",2026-10-03
+sporty,Fjolnir Reykjavik [K],Fjolnir W,"03.10 kotwica ligowa koszykówka: 1 dowod(y), np. Haukar Hafnarfjordur [K] - Fjolnir Reykjavik [K] 2026-09-30: para Haukar W - Fjolnir W, liga Iceland | Premier League Women (przejrzane recznie)",2026-10-03
+sporty,Haukar Hafnarfjordur [K],Haukar W,"03.10 kotwica ligowa koszykówka: 1 dowod(y), np. Haukar Hafnarfjordur [K] - Fjolnir Reykjavik [K] 2026-09-30: para Haukar W - Fjolnir W, liga Iceland | Premier League Women (przejrzane recznie)",2026-10-03
+sporty,KK Parnu,Korvpalliklubi Parnu,"03.10 kotwica ligowa koszykówka: 1 dowod(y), np. KK Parnu - Neftchi Baku 2026-09-30: para Korvpalliklubi Parnu - Neftchi IK, liga Europe | FIBA Europe Cup (przejrzane recznie)",2026-10-03
+sporty,Katarzynki Toruń [K],Torun W,"03.10 kotwica ligowa koszykówka: 1 dowod(y), np. Katarzynki Toruń [K] - Zagłębie Sosnowiec [K] 2026-10-03: para Torun W - Sosnowiec (W), liga Poland | Basket Liga Women (przejrzane recznie)",2026-10-03
+sporty,MOSiR Bochnia [K],Bochnia W,"03.10 kotwica ligowa koszykówka: 1 dowod(y), np. MOSiR Bochnia [K] - AZS UMCS Lublin [K] 2026-10-03: para Bochnia W - Lublin (W), liga Poland | Basket Liga Women (przejrzane recznie)",2026-10-03
+sporty,Manchester Basketball,Manchester Giants,"03.10 kotwica ligowa koszykówka: 1 dowod(y), np. Bristol Flyers - Manchester Basketball 2026-10-02: rywal Bristol Flyers, liga United Kingdom | SLB, United Kingdom | SLB Cup (przejrzane recznie)",2026-10-03
+sporty,Neftchi Baku,Neftchi IK,"03.10 kotwica ligowa koszykówka: 1 dowod(y), np. KK Parnu - Neftchi Baku 2026-09-30: para Korvpalliklubi Parnu - Neftchi IK, liga Europe | FIBA Europe Cup (przejrzane recznie)",2026-10-03
+sporty,Pirlo Kufstein Towers,Kufstein,"03.10 kotwica ligowa koszykówka: 1 dowod(y), np. SKN St. Polten - Pirlo Kufstein Towers 2026-10-02: para St. Pölten - Kufstein, liga Austria | Superliga (przejrzane recznie)",2026-10-03
+sporty,Polonia Leszno,Leszno,"03.10 kotwica ligowa koszykówka: 1 dowod(y), np. Polonia Leszno - Decka Pelplin 2026-09-30: para Leszno - Uks Jedynka Decka Pelplin, liga Poland | 1. Liga (przejrzane recznie)",2026-10-03
+sporty,SKN St. Polten,St. Pölten,"03.10 kotwica ligowa koszykówka: 1 dowod(y), np. SKN St. Polten - Pirlo Kufstein Towers 2026-10-02: para St. Pölten - Kufstein, liga Austria | Superliga (przejrzane recznie)",2026-10-03
+sporty,Slavoj Litomerice,Litomerice,"03.10 kotwica ligowa koszykówka: 1 dowod(y), np. Slavoj Litomerice - CZ.Academy 2026-10-02: rywal CZ.ACADEMY, liga Czechia | 1. Liga (przejrzane recznie)",2026-10-03
+sporty,Starwings Basket,Starwings Basel,"03.10 kotwica ligowa koszykówka: 1 dowod(y), np. BBC Nyon - Starwings Basket 2026-09-30: rywal Bbc Nyon, liga Switzerland | Coupe de Suisse, Switzerland | SB League, Swit (przejrzane recznie)",2026-10-03
+sporty,UMF Njardvik [K],Njardvik W,"03.10 kotwica ligowa koszykówka: 1 dowod(y), np. Valur Reykjavik [K] - UMF Njardvik [K] 2026-09-30: para Valur W - Njardvik W, liga Iceland | Premier League Women (przejrzane recznie)",2026-10-03
+sporty,Valur Reykjavik [K],Valur W,"03.10 kotwica ligowa koszykówka: 1 dowod(y), np. Valur Reykjavik [K] - UMF Njardvik [K] 2026-09-30: para Valur W - Njardvik W, liga Iceland | Premier League Women (przejrzane recznie)",2026-10-03
+sporty,Zagłębie Sosnowiec [K],Sosnowiec (W),"03.10 kotwica ligowa koszykówka: 1 dowod(y), np. Katarzynki Toruń [K] - Zagłębie Sosnowiec [K] 2026-10-03: para Torun W - Sosnowiec (W), liga Poland | Basket Liga Women (przejrzane recznie)",2026-10-03
+typuj,Al-Ittihad Kalba,Kalba,"03.10 kotwica ligowa pilka: 1 dowod(y), np. Al-Wasl FC - Al-Ittihad Kalba 2026-10-02: rywal Al Wasl, liga UAE | UAE Pro League (przejrzane recznie)",2026-10-03
+typuj,Al-Jazira SC,Jazira Abu Dhabi,"03.10 kotwica ligowa pilka: 1 dowod(y), np. Khor Fakkan SSC - Al-Jazira SC 2026-10-02: rywal Khor Fakkan, liga UAE | UAE Pro League (przejrzane recznie)",2026-10-03
+typuj,FC Gangneung,Gangneung City,"03.10 kotwica ligowa pilka: 1 dowod(y), np. Daejeon Korail FC - FC Gangneung 2026-10-02: rywal Daejeon Korail, liga South Korea | K League 3 (przejrzane recznie)",2026-10-03
+typuj,FC Vlasim,Graffin Vlasim,"03.10 kotwica ligowa pilka: 1 dowod(y), np. FC Taborsko - FC Vlasim 2026-10-02: rywal Taborsko, liga Czechia | Division 2 (przejrzane recznie)",2026-10-03
+typuj,Tartu Tammeka,JK Tammeka Tartu,"03.10 kotwica ligowa pilka: 1 dowod(y), np. Tartu Tammeka - Viimsi JK 2026-10-02: rywal Viimsi JK, liga Estonia | Meistriliiga (przejrzane recznie)",2026-10-03
+sporty,Aarhus HC,Aarhus Handbold,"03.10 kotwica ligowa piłka ręczna: 1 dowod(y), np. Koge Handbold - Aarhus HC 2026-10-02: para Koge - Aarhus Handbold, liga Denmark | 1. Division (przejrzane recznie)",2026-10-03
+sporty,BM Granollers,Fraikin BM. Granollers,"03.10 kotwica ligowa piłka ręczna: 1 dowod(y), np. SG Flensburg-Handewitt - BM Granollers 2026-09-30: rywal SG Flensburg-Handewitt, liga Europe | European League (przejrzane recznie)",2026-10-03
+sporty,Caserio Ciudad Real,Ciudad Real,"03.10 kotwica ligowa piłka ręczna: 1 dowod(y), np. Caserio Ciudad Real - Ademar Leon 2026-10-02: rywal ABANCA Ademar León, liga Spain | Liga Asobal (przejrzane recznie)",2026-10-03
+sporty,Dijon Metropole,Dijon,"03.10 kotwica ligowa piłka ręczna: 1 dowod(y), np. Dijon Metropole - US Creteil 2026-10-02: para Dijon - Creteil, liga France | Proligue (przejrzane recznie)",2026-10-03
+sporty,Eulen Ludwigshafen,Ludwigshafen,"03.10 kotwica ligowa piłka ręczna: 1 dowod(y), np. Eulen Ludwigshafen - HSG Nordhorn-Lingen 2026-09-30: para Ludwigshafen - Nordhorn-Lingen, liga Germany | 2. Bundesliga (przejrzane recznie)",2026-10-03
+sporty,HSG Nordhorn-Lingen,Nordhorn-Lingen,"03.10 kotwica ligowa piłka ręczna: 1 dowod(y), np. Eulen Ludwigshafen - HSG Nordhorn-Lingen 2026-09-30: para Ludwigshafen - Nordhorn-Lingen, liga Germany | 2. Bundesliga (przejrzane recznie)",2026-10-03
+sporty,Istres Provence,Istres,"03.10 kotwica ligowa piłka ręczna: 1 dowod(y), np. JS Cherbourg Manche - Istres Provence 2026-10-02: para Cherbourg - Istres, liga France | Proligue (przejrzane recznie)",2026-10-03
+sporty,JS Cherbourg Manche,Cherbourg,"03.10 kotwica ligowa piłka ręczna: 1 dowod(y), np. JS Cherbourg Manche - Istres Provence 2026-10-02: para Cherbourg - Istres, liga France | Proligue (przejrzane recznie)",2026-10-03
+sporty,Koge Handbold,Koge,"03.10 kotwica ligowa piłka ręczna: 1 dowod(y), np. Koge Handbold - Aarhus HC 2026-10-02: para Koge - Aarhus Handbold, liga Denmark | 1. Division (przejrzane recznie)",2026-10-03
+sporty,Moyra-Budaors [K],Budaors W,"03.10 kotwica ligowa piłka ręczna: 1 dowod(y), np. Moyra-Budaors [K] - Vaci NKSE [K] 2026-09-30: para Budaors W - Vaci W, liga Hungary | NB I Women (przejrzane recznie)",2026-10-03
+sporty,Ribe-Esbjerg HH,Ribe-Esbjerg,"03.10 kotwica ligowa piłka ręczna: 1 dowod(y), np. Skive FH - Ribe-Esbjerg HH 2026-10-02: para Skive - Ribe-Esbjerg, liga Denmark | Danish Cup, Denmark | Herre Handbold Ligaen (przejrzane recznie)",2026-10-03
+sporty,Selestat Alsace HB,Selestat Handball,"03.10 kotwica ligowa piłka ręczna: 1 dowod(y), np. Tremblay Handball - Selestat Alsace HB 2026-10-02: rywal Tremblay, liga France | Lidl Starligue (przejrzane recznie)",2026-10-03
+sporty,Skive FH,Skive,"03.10 kotwica ligowa piłka ręczna: 1 dowod(y), np. Skive FH - Ribe-Esbjerg HH 2026-10-02: para Skive - Ribe-Esbjerg, liga Denmark | Danish Cup, Denmark | Herre Handbold Ligaen (przejrzane recznie)",2026-10-03
+sporty,TuSEM Essen,Essen,"03.10 kotwica ligowa piłka ręczna: 1 dowod(y), np. TuSEM Essen - SC DHfK Leipzig 2026-10-02: rywal SC DHfK Leipzig, liga Germany | 2. Bundesliga (przejrzane recznie)",2026-10-03
+sporty,US Creteil,Creteil,"03.10 kotwica ligowa piłka ręczna: 1 dowod(y), np. Dijon Metropole - US Creteil 2026-10-02: para Dijon - Creteil, liga France | Proligue (przejrzane recznie)",2026-10-03
+sporty,Vaci NKSE [K],Vaci W,"03.10 kotwica ligowa piłka ręczna: 1 dowod(y), np. Moyra-Budaors [K] - Vaci NKSE [K] 2026-09-30: para Budaors W - Vaci W, liga Hungary | NB I Women (przejrzane recznie)",2026-10-03
+sporty,CN Marseille,Marseille,"03.10 kotwica ligowa piłka wodna: 1 dowod(y), np. CNA Barceloneta - CN Marseille 2026-09-30: para Barceloneta - Marseille, liga EUROPE | Super Cup (przejrzane recznie)",2026-10-03
+sporty,CNA Barceloneta,Barceloneta,"03.10 kotwica ligowa piłka wodna: 1 dowod(y), np. CNA Barceloneta - CN Marseille 2026-09-30: para Barceloneta - Marseille, liga EUROPE | Super Cup (przejrzane recznie)",2026-10-03

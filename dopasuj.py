@@ -14,12 +14,14 @@ z oferty ani cel nie jest krajem (reprezentacje ma sciezka --intl), oraz nazwy s
 Sporty osobowe (tenis, dart, snooker…) — tylko nazwy podobne. Alias skracajacy z kolizja rdzenia w puli -> przeglad. Sprzecznosci (resolver wskazal INNA druzyne niz dowod)
 NIE nadpisuja niczego — ida do raportu (konflikty) do recznej oceny.
 
-Uzycie:  python3 dopasuj.py ucz KURSY.csv.gz [--zewn KATALOG] [--wyjscie aliasy_nauczone.csv] [--konflikty PLIK.csv]
+Uzycie:  python3 dopasuj.py liga KURSY.csv.gz [--wyjscie aliasy_liga.csv]   (kotwica ligowa — mecze jeszcze bez wyniku)
+         python3 dopasuj.py ucz KURSY.csv.gz [--zewn KATALOG] [--wyjscie aliasy_nauczone.csv] [--konflikty PLIK.csv]
                                     [--przeglad dopasuj_przeglad.csv]
 Wynik: aliasy_nauczone.csv w formacie aliasy.csv (modul,nazwa,cel,uzasadnienie,data) — do dopisania do aliasy.csv
 (dziala tylko, gdy cel jest w puli; aliasy w kodzie wygrywaja)."""
 import collections
 import functools
+import itertools
 import glob
 import io
 import contextlib
@@ -219,6 +221,87 @@ def jako_aliasy(a, dzis):
                          'data': dzis})
 
 
+def _rdzen_pasuje(ta, tb):
+    """Jedna nazwa zawiera wszystkie znaczace czlony drugiej (prefiks >= 4 litery: „Lubbecke” w „N-Lubbecke”), albo sa
+    tym samym napisem bez spacji („Orange Academy” = „OrangeAcademy”). Wymagany wspolny czlon >= 4 litery."""
+    if not ta or not tb: return False
+    razem = lambda t: {''.join(x) for x in itertools.permutations(sorted(t))} if len(t) <= 4 else {''.join(sorted(t))}
+    if razem(ta) & razem(tb): return True
+    mn, mx = (ta, tb) if len(ta) <= len(tb) else (tb, ta)
+    zgodne = lambda x: any(x == y or (min(len(x), len(y)) >= 4 and (x.startswith(y) or y.startswith(x))) for y in mx)
+    return all(zgodne(x) for x in mn) and any(len(x) >= 4 for x in mn)
+
+
+def ligi_druzyn(mecze):
+    """mecze: DataFrame z kolumnami S, liga, A, B -> {(S, druzyna): {ligi}}."""
+    out = collections.defaultdict(set)
+    for S, l, a, b in zip(mecze.S, mecze.liga, mecze.A, mecze.B):
+        if isinstance(l, str):
+            out[(S, a)].add(l); out[(S, b)].add(l)
+    return out
+
+
+def kotwica_ligowa(ev, rozwiaz, pule, ligi):
+    """03.10.2026: druga metoda nauki, gdy mecz z oferty nie ma jeszcze wyniku w zrodlach. Jedna strona zdarzenia jest
+    rozpoznana kodem produkcyjnym; druga NIE. Kandydat = wpis z puli, ktorego znaczace czlony zawieraja sie w nazwie
+    z oferty (albo odwrotnie: „Medi Bayreuth” -> „Bayreuth”, „Black Wings Linz” -> „EHC Liwest Black Wings Linz”),
+    z tymi samymi znacznikami i grajacy w ostatnim roku w TEJ SAMEJ lidze co rozpoznany rywal. Alias tylko gdy kandydat
+    jest JEDEN i wszystkie zdarzenia z ta nazwa wskazuja ten sam cel. Reprezentacje pomijane (sciezka --intl)."""
+    dow, stat, przyk = collections.defaultdict(collections.Counter), collections.Counter(), {}
+
+    def kand(S, n, L=None, bez=None):
+        tn, zn = tokeny(n), nazwy.znaczniki(n)
+        return [p for p in pule[S] if p != bez and (L is None or ligi.get((S, p), set()) & L)
+                and nazwy.znaczniki(p) == zn and _rdzen_pasuje(tn, tokeny(p))]
+
+    for r in ev.itertuples(index=False):
+        if r.S not in pule or jest_krajem(r.A) or jest_krajem(r.B): continue
+        ra, rb = rozwiaz(r.S, r.A), rozwiaz(r.S, r.B)
+        if ra is not None and rb is not None: continue
+        if ra is None and rb is None:
+            # PARA: obie strony nierozpoznane — dokladnie jedna para kandydatow ze wspolna liga
+            pary = [(a, b) for a in kand(r.S, r.A) for b in kand(r.S, r.B, bez=a)
+                    if ligi.get((r.S, a), set()) & ligi.get((r.S, b), set())]
+            if len(pary) != 1: stat['para: kandydatow 0' if not pary else 'para: kilka par'] += 1; continue
+            a, b = pary[0]
+            L = ligi[(r.S, a)] & ligi[(r.S, b)]
+            for n, c in ((r.A, a), (r.B, b)):
+                dow[(r.S, n)][c] += 1
+                przyk.setdefault((r.S, n), f'{r.A} - {r.B} {r.d.date()}: para {a} - {b}, liga {", ".join(sorted(L))[:60]}')
+            continue
+        n, ri = (r.A, rb) if ra is None else (r.B, ra)
+        L = ligi.get((r.S, ri), set())
+        if not L: stat['brak ligi rywala'] += 1; continue
+        k = kand(r.S, n, L, ri)
+        if len(k) == 1:
+            dow[(r.S, n)][k[0]] += 1
+            przyk.setdefault((r.S, n), f'{r.A} - {r.B} {r.d.date()}: rywal {ri}, liga {", ".join(sorted(L & ligi[(r.S, k[0])]))[:60]}')
+        else:
+            stat['kandydatow 0' if not k else 'kandydatow wiele'] += 1
+    out = []
+    for (S, n), c in sorted(dow.items()):
+        if len(c) != 1: stat['sprzeczne cele'] += 1; continue
+        cel, ile = next(iter(c.items()))
+        out.append((S, n, cel, ile, przyk[(S, n)])); stat['alias'] += 1
+    return pd.DataFrame(out, columns=['S', 'nazwa', 'cel', 'dowody', 'przyklad']), stat
+
+
+def _mecze_lig(dni=400):
+    """Ligi druzyn z bazy: pilka z kb.sqlite (Division), reszta z sporty.load() (liga) — ostatnie dni."""
+    with contextlib.redirect_stdout(io.StringIO()):
+        import typuj
+        import sporty
+        od = pd.Timestamp.today() - pd.Timedelta(days=dni)
+        m = pd.read_sql('select MatchDate, Division, HomeTeam, AwayTeam from matches', typuj.db(), parse_dates=['MatchDate'])
+        m = m[m.MatchDate >= od]
+        d = sporty.load(); d = d[d.data >= od]
+    cz = [pd.DataFrame({'S': 'pilka', 'liga': m.Division, 'A': m.HomeTeam, 'B': m.AwayTeam})]
+    for s in set(SPORT_STS.values()) - {'pilka'}:
+        x = d[d.sport == sporty.nazwa_sportu(s)]
+        cz.append(pd.DataFrame({'S': s, 'liga': x.liga, 'A': x.gosp, 'B': x.gosc}))
+    return pd.concat(cz, ignore_index=True)
+
+
 def _produkcja():
     """Resolvery i pule z kodu produkcyjnego (typuj — pilka, sporty — reszta)."""
     with contextlib.redirect_stdout(io.StringIO()):
@@ -241,8 +324,18 @@ def _produkcja():
 
 
 def main(a):
-    if not a or a[0] != 'ucz': sys.exit(__doc__)
+    if not a or a[0] not in ('ucz', 'liga'): sys.exit(__doc__)
     arg = lambda k, d: a[a.index(k) + 1] if k in a else d
+    if a[0] == 'liga':
+        ev = zdarzenia_sts(pd.read_csv(a[1], dtype=str))
+        rozwiaz, pule = _produkcja()
+        al, stat = kotwica_ligowa(ev, rozwiaz, pule, ligi_druzyn(_mecze_lig()))
+        for k, v in sorted(stat.items()): print(f'  {k}: {v}')
+        print(f'ALIASY Z KOTWICY LIGOWEJ: {len(al)} (do przejrzenia przed dopisaniem do aliasy.csv)')
+        jako_aliasy(al, pd.Timestamp.today().strftime('%Y-%m-%d')).assign(
+            uzasadnienie=lambda x: x.uzasadnienie.str.replace('nauka ', 'kotwica ligowa ', regex=False)).to_csv(
+            arg('--wyjscie', 'aliasy_liga.csv'), index=False)
+        return
     ev = zdarzenia_sts(pd.read_csv(a[1], dtype=str))
     z = zrodla(arg('--zewn', os.path.join(HERE, 'zewn')))
     rozwiaz, pule = _produkcja()
