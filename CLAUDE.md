@@ -38,7 +38,7 @@ Użytkownik liczy w czasie polskim (UTC+2 latem): 10:00 UTC = 12:00 PL. Przebieg
 - Reguły: Dysk, folder baza-wiedzy — „INSTRUKCJA STS v7” + „POPRAWKI DO INSTRUKCJI v7 — wyd. N” (każde nowsze niż v7).
   Projekt v7: `docs/INSTRUKCJA_v7_projekt.md`; strategia: `docs/STRATEGIA.md`; backtest P48/P58: `docs/BACKTEST_P48.md`.
 - Przebieg: `przebieg.py` (build_kb → uzupelnij_ligi → build_kb → hist_import → swiezosc + kontrole plików).
-- Typowanie: `typuj.py` (piłka), `sporty.py` (inne sporty, linia WERDYKT), `tenis.py`, `sezon.py` (arkusze).
+- Typowanie: `typuj.py` (piłka; wiele meczów naraz: `typuj_wsad.py LISTA.txt` — baza raz na proces, wynik jak osobne wywołania), `sporty.py` (inne sporty, linia WERDYKT), `tenis.py`, `sezon.py` (arkusze).
 - Kupony: `kupon.py`; rozliczenia i dzienniki: `dzienniki.py` (Settlement v2: kolumna `kategoria` = kod SETTLEMENT_ANOMALY
   z warstwa bledu, tabela `ANOMALIE`; stan/wynik/uwaga bez zmian; `--zaklady zaklady_faktyczne.csv` = FAKTYCZNE zaklady
   STS/LVBET/Superbet — gdy sa wpisy dnia, pieniadze Bilansu tylko z nich, kupony systemu = zalecenia; plik tylko na Dysku); CLV: `clv.py`; porownanie kursow STS/SUPERBET/LVBET i linia „GRAJ U:” kazdego kuponu (Telegram): `kursy3.py kupon` (dane z telefonu: `termux/kursy_bukmacherow.py` -> `kursy_bukmacherow_*.csv.gz` na Dysku; mecz tylko jednoznaczny, roznica >35% = podejrzany); kursy z PDF oferty i kurs_zamkniecia: `oferta.py`.
