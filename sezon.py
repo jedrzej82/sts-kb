@@ -264,6 +264,38 @@ def wymagaj(wiersze, nazwa, liga=None, sport=None):
     return w
 
 
+# 04.10.2026 (Raporty 15:00 i 18:00): przedrostki klubow hiszpanskojezycznych, ktorych arkusz 365 nie pisze —
+# "CA Huracan" (arkusz "Huracan"), "RCD Mallorca", "CD Castellon", "UD Las Palmas". Ogolna regula (4) ich NIE
+# zdejmuje, bo "CS San Lorenzo" i "San Lorenzo" to rozne kluby (recenzja 24.09). Zdejmujemy je wiec WYLACZNIE
+# z kotwica ligowa: oba kluby meczu musza miec w arkuszu jednego kandydata i ta para musi grac w JEDNEJ wspolnej
+# lidze (ta sama zasada co dopasuj.py liga). Bez wspolnej ligi albo przy kilku kandydatach — NIE ZNALEZIONO.
+_PRZEDROSTKI_LIGOWE = frozenset('ca cd cs rcd ud ad sd cp ce club'.split())
+
+
+def _bez_przedrostkow(nazwa):
+    t = _tok(nazwa)
+    while len(t) > 1 and t[0] in _PRZEDROSTKI_LIGOWE: t = t[1:]
+    while len(t) > 1 and t[-1] in _PRZEDROSTKI_LIGOWE: t = t[:-1]
+    return t
+
+
+def _kandydaci_ligowi(W, nazwa):
+    """Wiersze arkusza, ktorych nazwa = nazwa z oferty bez przedrostkow (albo odwrotnie: arkusz ma przedrostek)."""
+    cel = sorted(_bez_przedrostkow(nazwa))
+    if len(''.join(cel)) < 4: return []
+    return [w for w in W if sorted(_bez_przedrostkow(w['druzyna'])) == cel]
+
+
+def para_po_lidze(W, a, b):
+    """(wiersz_a, wiersz_b) albo None. Uzywane tylko, gdy znajdz() nie trafil choc jednej druzyny."""
+    ka = [znajdz(W, a)[0]] if znajdz(W, a)[0] else _kandydaci_ligowi(W, a)
+    kb = [znajdz(W, b)[0]] if znajdz(W, b)[0] else _kandydaci_ligowi(W, b)
+    pary = [(x, y) for x in ka for y in kb if x['liga'] == y['liga'] and norm(x['druzyna']) != norm(y['druzyna'])]
+    if len({(norm(x['druzyna']), norm(y['druzyna'])) for x, y in pary}) != 1: return None
+    if len({x['liga'] for x, _ in pary}) != 1: return None
+    return pary[0]
+
+
 def proc(x):
     return f'{100 * x:5.1f}%'
 
@@ -280,8 +312,12 @@ def phi(x):
 def pilka(a, b):
     W = wczytaj('pilka')
     # p27: najpierw ustal OBIE druzyny globalnie, potem szukaj wspolnej ligi tylko dla TYCH samych nazw
-    h0 = wymagaj(W, a)
-    g0 = wymagaj(W, b)
+    if not (znajdz(W, a)[0] and znajdz(W, b)[0]) and (pl := para_po_lidze(W, a, b)):
+        h0, g0 = pl
+        print(f'  dopasowano po wspolnej lidze ({h0["liga"]}): „{a}” → „{h0["druzyna"]}”, „{b}” → „{g0["druzyna"]}”')
+    else:
+        h0 = wymagaj(W, a)
+        g0 = wymagaj(W, b)
     nh, ng = norm(h0['druzyna']), norm(g0['druzyna'])
     if nh == ng:
         raise SystemExit(f'NIE ZNALEZIONO: {a!r} i {b!r} wskazuja te sama druzyne ({h0["druzyna"]}) — pomijam')

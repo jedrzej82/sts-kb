@@ -90,8 +90,11 @@ def klasyfikuj(ev, z, rozwiaz, pule, ligi=None, h2h=None, jest_alias=lambda S, n
             dow.append('PARA_W_ZRODLE')
             if pd.notna(r.t) and any(pd.notna(x.t) and abs((x.t - r.t).total_seconds()) <= TOLERANCJA_MIN * 60 for x in w_zrodle):
                 dow.append('GODZINA')
-        else:
-            # jedyny mecz rozpoznanej druzyny tego dnia jest z innym, ROZPOZNANYM rywalem -> jedna z nazw wskazuje zly klub
+        elif r.S not in dopasuj.OSOBOWE:
+            # jedyny mecz rozpoznanej druzyny tego dnia jest z innym, ROZPOZNANYM rywalem -> jedna z nazw wskazuje zly klub.
+            # 04.10.2026 (Raporty 15:00/18:00: 19 i 9 CONFLICT w Setka Cup): w sportach osobowych (tenis stolowy, dart,
+            # snooker, badminton) zawodnik gra KILKA meczow dziennie, a wyniki dnia sa czesciowe — jedyny ROZEGRANY
+            # dotad mecz z kims innym nie jest dowodem pomylki (Melnyk – Pysmennyi wobec rozegranego Melnyk – Reznychenko).
             for e in (eA, eB):
                 inne = [x for x in mecze if e in (ent(r.S, x.gosp), ent(r.S, x.gosc))]
                 if len(inne) == 1:

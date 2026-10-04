@@ -80,6 +80,10 @@ def _rdzen(n):
     return ' '.join(_pisownia(x) or x for x in t) or str(n)
 
 
+_STS_SEKCJE = {'1. drużyna - strzeli gola|TAK': 'gosp_O0.5', '2. drużyna - strzeli gola|TAK': 'gość_O0.5',
+               'Zakład bez remisu|1': 'DNB_1', 'Zakład bez remisu|2': 'DNB_2'}
+
+
 def _kod_sts(sts_k):
     """Rynki STS zapisane przez oferta.py jako „sekcja|wybor” -> kody bukmacherow: „Zwycięzca meczu|1” = Zwyciezca 1
     (dwudrogowy, z dogrywka), „Liczba punktów (z dogrywką)|-” z linia 157.5 = U157.5."""
@@ -88,6 +92,9 @@ def _kod_sts(sts_k):
     zw = r.str.extract(r'^Zwycięzca meczu\|([12])$')[0]
     pk = r.str.extract(r'^Liczba punktów \(z dogrywką\)\|([+-])$')[0]
     out = r.where(zw.isna(), 'Zwyciezca ' + zw.fillna(''))
+    # 04.10.2026 (Raporty 15:00 i 18:00): rynki pilki zapisane przez oferta.py jako „sekcja|wybor” — telefon zapisuje je
+    # kodami (gosp_O0.5, DNB_1), wiec Portugalia – Norwegia gosp_O0.5 nie miala kursu SUPERBET/LVBET mimo obecnosci w pliku.
+    out = out.replace(_STS_SEKCJE)
     ok = pk.notna() & lin.notna() & (lin % 1 != 0)
     out = out.where(~ok, pk.map({'+': 'O', '-': 'U'}).fillna('') + lin.map(lambda v: f'{v:g}'))
     return sts_k.assign(rynek=out)
@@ -107,6 +114,10 @@ def kod_ako(rynek, sport='', gosp='', gosc=''):
     remis = str(sport).strip().lower() in SPORTY_Z_REMISEM
     m = re.fullmatch(r'([12x])\s*\(?60\s*min\)?|([12x]) ?60min', t)
     if m: return (m.group(1) or m.group(2)).upper()
+    # 04.10.2026 (Raport 15:00 usterka 6): P130 zapisuje nogi „Zwyciezca meczu” kodem Z1/Z2 (hokej, kosz, NFL) —
+    # tu nie bylo tego kodu i kazda taka noga miala „SUPERBET nan | LVBET nan”.
+    m = re.fullmatch(r'z([12])(?: \(.*\))?', t.lower())
+    if m: return f'Zwyciezca {m.group(1)}'
     if t in ('1', '2') and str(sport).strip() and not remis: return f'Zwyciezca {t}'
     m = re.fullmatch(r'(?:podwojna szansa )?(1x|x2|12)', t)
     if m: return m.group(1).upper()

@@ -34,8 +34,10 @@ LV = 'https://offer.lvbet.pl/client-api/v5/'
 SB_SPORT = {5: 'PIŁKA NOŻNA', 3: 'HOKEJ NA LODZIE', 4: 'KOSZYKÓWKA', 11: 'PIŁKA RĘCZNA', 1: 'SIATKÓWKA', 2: 'TENIS', 13: 'DART'}
 SB_DETAL = {5, 3, 4, 11}           # szczegoly: pilka, hokej, koszykowka, reczna
 # LVBET sports_groups_ids[0] -> sport (1 pilka, 2 hokej — diagnoza 02.10; 3 koszykowka, 4 tenis, 29 reczna —
-# --diag-lvbet 02.10 08:19: NBA / BC Elbrus, turnieje tenisowe, BM Granollers; 6 = futbol amerykanski, pominiety)
-LV_SPORT = {1: 'PIŁKA NOŻNA', 2: 'HOKEJ NA LODZIE', 3: 'KOSZYKÓWKA', 4: 'TENIS', 29: 'PIŁKA RĘCZNA'}
+# --diag-lvbet 02.10 08:19: NBA / BC Elbrus, turnieje tenisowe, BM Granollers; 6 = futbol amerykanski)
+# 04.10.2026 (Raport 15:00 usterka 6): NFL na kuponach (P130, Zwyciezca meczu) nie mialo zadnego kursu poza STS —
+# grupa 6 (futbol amerykanski, rozpoznana --diag-lvbet 02.10) byla pomijana.
+LV_SPORT = {1: 'PIŁKA NOŻNA', 2: 'HOKEJ NA LODZIE', 3: 'KOSZYKÓWKA', 4: 'TENIS', 29: 'PIŁKA RĘCZNA', 6: 'FUTBOL AMERYKAŃSKI'}
 SPORTY_Z_REMISEM = ('PIŁKA NOŻNA', 'PIŁKA RĘCZNA')
 KOLUMNY = ['bukmacher', 'sport', 'data_meczu', 'godzina_meczu', 'gospodarz', 'gosc', 'rynek_oryg', 'wybor_oryg', 'linia',
            'rynek', 'kurs']

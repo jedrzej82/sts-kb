@@ -151,9 +151,11 @@ def ucz(ev, z, rozwiaz, pule):
         if r.S not in pule: continue
         mecze = [x for d in r.dni for x in pod_dniu.get((r.S, d), [])]
         eA, eB = ent(r.S, r.A), ent(r.S, r.B)
-        # KOTWICA
+        # KOTWICA — 04.10.2026 (Raport 15:00 usterka 7: 18 „KONFLIKT z resolverem” w Setka Cup): nie w sportach osobowych.
+        # Zawodnik gra tam kilka meczow dziennie, a wyniki dnia sa czesciowe, wiec jedyny ROZEGRANY dotad mecz nie jest
+        # meczem z oferty (Pysmennyi – Dukhovenko wobec rozegranego Pysmennyi – Reznychenko). Zostaje dowod GODZINA.
         for kot, ekot, inna, einna, gosp in ((r.A, eA, r.B, eB, True), (r.B, eB, r.A, eA, False)):
-            if not ekot: continue
+            if not ekot or r.S in OSOBOWE: continue
             po_str = [x for x in mecze if podobne(kot, x.gosp if gosp else x.gosc) and ent(r.S, x.gosp if gosp else x.gosc) == ekot]
             odwr = [x for x in mecze if podobne(kot, x.gosc if gosp else x.gosp) and ent(r.S, x.gosc if gosp else x.gosp) == ekot]
             pary = {(x.gosp, x.gosc) for x in po_str}

@@ -30,6 +30,10 @@ SCAL_RECZNIE = {
     ('ARG', 'Gimnasia La Plata'): 'Gimnasia L.P.',
     ('ARG', 'San Martín de San Juan'): 'San Martin S.J.',
     ('Argentina | Primera Nacional', 'Colon'): 'Colon Santa FE',   # Colon de Santa Fe, spadl z ARG w 2023
+    # 04.10.2026 (Raport 18:00, usterka 2): Sportivo Cerrito (Montevideo) — "Cerrito" w URU do 2022, po spadku 365scores
+    # pisze "Club Sportivo Cerrito" w Segunda Division. Jeden klub pod dwiema nazwami: "CS Cerrito" z oferty trafial
+    # w stary zapis i Plaza Colonia – Cerrito nie mialo wspolnej ligi (NIEPEWNE DOPASOWANIE).
+    ('Uruguay | Segunda Division', 'Club Sportivo Cerrito'): 'Cerrito',
     # A-League: 365scores dopisuje "FC"; cel = pelna nazwa (sam "Newcastle" koliduje z angielskim klubem).
     # "W Sydney" (Western Sydney Wanderers) i "Sydney FC" to DWA kluby — celowo osobno.
     ('AUS', 'Adelaide'): 'Adelaide United FC',

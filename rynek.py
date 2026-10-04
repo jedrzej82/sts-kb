@@ -42,14 +42,34 @@ def p_rynku(k, kursy):
     return (1 / float(kursy[k])) / ksiega if ksiega > 0 else None
 
 
+def p_rynku_szacunek(k, kursy):
+    """04.10.2026 (Raport 18:00 usterka 7): Portugalia – Norwegia U3.5 podana BEZ O3.5 -> p_rynku None -> filtr wylaczony
+    -> ✔ EV +11,2%; z O3.5 ta sama noga odpadala (+17,3 pp). Lista meczow przebiegu podaje kursy z KEY_MARKETS, gdzie
+    nie ma O3.5/O4.5, wiec filtr po cichu nie dzialal na rynkach „ponizej”. Gdy brak dopelnienia, ksiege bierzemy z rynku
+    glownego tego samego meczu (1/X/2 albo Z1/Z2) — marza STS na rynkach O/U i 1X2 rozni sie o kilka punktow, a filtr
+    ma prog 15 pp. Zwraca None, gdy rynku glownego tez nie ma."""
+    if k not in DOPELNIENIA or not kursy or k not in kursy: return None
+    for glowny in (('1', 'X', '2'), ('Z1', 'Z2')):
+        try:
+            if float(kursy[k]) > 1 and all(x in kursy and float(kursy[x]) > 1 for x in glowny):
+                ksiega = sum(1 / float(kursy[x]) for x in glowny)
+                if ksiega >= 1: return (1 / float(kursy[k])) / ksiega
+        except (TypeError, ValueError, ZeroDivisionError):
+            return None
+    return None
+
+
 def filtr_model_rynek(k, p, kursy):
     """KROK 6.4. Zwraca powod odrzucenia albo None.
-    Brak kursu dopelniajacego = brak filtra (nie blokujemy nogi w ciemno)."""
-    pr = p_rynku(k, kursy)
+    Brak kursu dopelniajacego: ksiega z rynku glownego meczu (p_rynku_szacunek); gdy i tego brak — brak filtra
+    (nie blokujemy nogi w ciemno)."""
+    pr, skad = p_rynku(k, kursy), 'po zdjeciu marzy'
+    if pr is None:
+        pr, skad = p_rynku_szacunek(k, kursy), 'po zdjeciu marzy rynku glownego (brak kursu dopelnienia)'
     if pr is None: return None
     d = p - pr
     if abs(d) <= MAX_ROZBIEZNOSC_RYNEK: return None
-    return (f'FILTR MODEL-RYNEK (6.4): P do kuponu {p:.1%} vs P rynku {pr:.1%} po zdjeciu marzy '
+    return (f'FILTR MODEL-RYNEK (6.4): P do kuponu {p:.1%} vs P rynku {pr:.1%} {skad} '
             f'— rozbieznosc {d * 100:+.1f} pp, prog {MAX_ROZBIEZNOSC_RYNEK * 100:.0f} pp')
 
 
