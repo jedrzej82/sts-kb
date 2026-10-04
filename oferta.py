@@ -135,6 +135,15 @@ def _rynek(sekcja, wybor, linia):
     return f'{sekcja}|{wybor}'
 
 
+def bez_wstrzymanych(d, ostrz):
+    """04.10.2026 (Raport 15:00 usterka 8): Unia Oswiecim – Podhale „1 = 1.00, X = 15, 2 = 150” i Ekoball Sanok 1X = 1.00
+    przeszly bez slowa. Kurs 1.00 nic nie wyplaca (rynek wstrzymany) — taki kurs nie jest kursem do typowania."""
+    zero = pd.to_numeric(d.kurs, errors='coerce') <= 1.0
+    for zd_, g_ in d[zero].groupby('zdarzenie', sort=False):
+        ostrz.append(f'{zd_}: kurs 1.00 ({", ".join(g_.rynek.astype(str))}) — rynek wstrzymany, kursy pominiete')
+    return d[~zero].reset_index(drop=True)
+
+
 def czytaj(pdf, pobrano=''):
     """PDF oferty -> (DataFrame w KOLUMNY, lista ostrzezen). pobrano = wymuszona chwila kursow (domyslnie stopka PDF)."""
     wiersze, ostrz = [], []
@@ -228,6 +237,7 @@ def czytaj(pdf, pobrano=''):
                                         sekcja=f'{sekcja} ({podmecz})' if podmecz else sekcja,
                                         linia=linia, wybor=e, zdarzenie=zd))
     d = pd.DataFrame(wiersze, columns=KOLUMNY)
+    d = bez_wstrzymanych(d, ostrz)
     # chwila kursow: stopka PDF (np. 20:25), a gdy jej brak — z nazwy pliku (20-30, chwila zapisu na Dysk)
     d['godzina_pobrania'] = pobrano or wygenerowano or pobrano_z_nazwy(pdf)
     if not len(d): ostrz.append('brak kursow — to nie jest PDF oferty STS albo zmienil sie jego uklad')

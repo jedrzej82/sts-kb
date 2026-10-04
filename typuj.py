@@ -169,6 +169,14 @@ _KRAJE_PL = {
     'kajmany': ('Cayman Islands',), 'gwadelupa': ('Guadeloupe',), 'martynika': ('Martinique',),
     'malediwy': ('Maldives',), 'seszele': ('Seychelles',), 'saintkittsinevis': ('Saint Kitts and Nevis',),
     'wyspycooka': ('Cook Islands',),
+    # 04.10.2026 (Raport 18:00, usterka 3: „Bahamy”, „Turks i Caicos” -> NIE ZNALEZIONO). Zamiast dwoch napisow —
+    # przeglad CALEJ tabeli intl: 63 reprezentacje z >= 8 meczami od 2023 nie mialy wpisu; tu te, ktorych polska
+    # nazwa rozni sie od angielskiej (pozostale, np. Aruba, Haiti, Honduras, trafia sama nazwa).
+    'bahamy': ('Bahamas',), 'turksicaicos': ('Turks and Caicos Islands',),
+    'saintvincentigrenadyny': ('Saint Vincent and the Grenadines',), 'bangladesz': ('Bangladesh',),
+    'gujanafrancuska': ('French Guiana',), 'wyspaman': ('Isle of Man',), 'makau': ('Macau',), 'makao': ('Macau',),
+    'wyspysalomona': ('Solomon Islands',), 'timorwschodni': ('Timor-Leste',),
+    'wyspyswietegotomaszaiksiazeca': ('São Tomé and Príncipe',), 'saotomeiprincipe': ('São Tomé and Príncipe',),
     'amerykanskiewyspydziewicze': ('United States Virgin Islands',), 'egipt': ('Egypt',),
     'ekwador': ('Ecuador',), 'estonia': ('Estonia',), 'filipiny': ('Philippines',),
     'finlandia': ('Finland',), 'francja': ('France',), 'ghana': ('Ghana',),
@@ -674,6 +682,24 @@ def _wariant_kraju(h, a, m, pool, jawne=(False, False)):
     return h, a
 
 
+def skrot_z_terminarza(home, h, a, skroty, mt, pool, m):
+    """04.10.2026 (Raport 18:00, usterka 2): "CA Chacarita Juniors" -> "CA Chacarita Juniors (Aimogasta)" (amatorzy z La
+    Rioja), choc terminarz 365 pisze ten mecz "Chacarita Juniors – Patronato" (Primera Nacional). Skrot z oferty trafil
+    w INNY klub o tym samym rdzeniu; zapis z terminarza wskazuje wlasciwy. Przyjmujemy go WYLACZNIE, gdy nowa para
+    grala w jednej lidze (kotwica ligowa) — inaczej None i jak dotad NIEPEWNE DOPASOWANIE (noga MNIEJ)."""
+    from nazwy import wspolna_liga
+    nowe = [h, a]
+    for n, t in skroty:
+        i = 0 if n == home else 1
+        r = resolve(mt['gosp'] if i == 0 else mt['gosc'], pool)
+        if not r or r == t: return None
+        nowe[i] = r
+    if nowe[0] == nowe[1] or not wspolna_liga(m, *nowe): return None
+    print(f'  TERMINARZ ROZSTRZYGA SKROT: {"; ".join(f"{n!r} -> {t}" for n, t in skroty)} to inny klub; zapis terminarza '
+          f'({mt["gosp"]} – {mt["gosc"]}) -> {nowe[0]} | {nowe[1]}, wspolna liga w ostatnich 2 latach.')
+    return tuple(nowe)
+
+
 def _kraj_z_terminarza(home, away, h, a, kh, ka, pool, m, mt=None):
     """30.09.2026 (audyt oferty 01.10): „CD Junior Barranquilla” -> CD Junior (Nikaragua), „CD Platense Zacatecoluca” ->
     CD Platense (Honduras). Kontrola krajow tylko odrzucala noge. Terminarz ZNA kraj meczu i zapis nazw 365/Flashscore —
@@ -881,6 +907,9 @@ def club(home, away, kursy, live=None):
     # tego samego kraju ani pucharu. Brak wspolnej ligi w 2 latach = noga MNIEJ (bezpieczny kierunek bledu).
     from nazwy import wspolna_liga
     skroty = [(n, t) for n, t in ((home, h), (away, a)) if _SKROTY.get(n) == t]
+    if skroty and not wspolna_liga(m, h, a) and mt and (popr := skrot_z_terminarza(home, h, a, skroty, mt, pool, m)):
+        h, a = popr; dh, da = div_of(h), div_of(a); kh, ka = _kraj_ligi(dh), _kraj_ligi(da)
+        skroty = []
     if skroty and not wspolna_liga(m, h, a) and skrot_w_pucharze_ok(skroty, mt, (kh, ka)):
         print(f'  PUCHAR KRAJOWY ({mt["kraj"]}, {mt["turniej"]}): {h} i {a} bez wspolnej ligi — w pucharze to normalne; '
               'skrocone nazwy zgubily tylko czlony ogolne, kraj zgodny z terminarzem — dopasowanie przyjete.')

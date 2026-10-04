@@ -155,7 +155,10 @@ def test_pisownia_nazw():
 
 
 def test_lvbet_sporty_i_rynek_trojdrogowy():
-    assert {3: 'KOSZYKÓWKA', 4: 'TENIS', 29: 'PIŁKA RĘCZNA'}.items() <= kb.LV_SPORT.items() and 6 not in kb.LV_SPORT
+    assert {3: 'KOSZYKÓWKA', 4: 'TENIS', 29: 'PIŁKA RĘCZNA'}.items() <= kb.LV_SPORT.items()
+    # 04.10.2026: grupa 6 (NFL) wlaczona — nogi Z1/Z2 z P130 nie mialy kursu LVBET; NFL bez remisu = Zwyciezca
+    assert kb.LV_SPORT[6] == 'FUTBOL AMERYKAŃSKI'
+    assert kb.kod_rynku('Zwycięzca meczu', 'A', '', 'A', 'B', 'FUTBOL AMERYKAŃSKI') == 'Zwyciezca 1'
     # „Zwycięzca meczu” z wyborem „Remis” w koszykowce = czas regulaminowy, nie Zwyciezca z dogrywka
     assert kb.kod_rynku('Zwycięzca meczu', 'A', '', 'A', 'B', 'KOSZYKÓWKA', z_remisem=True) == '1'
     assert kb.kod_rynku('Zwycięzca meczu', 'A', '', 'A', 'B', 'KOSZYKÓWKA') == 'Zwyciezca 1'
