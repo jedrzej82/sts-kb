@@ -99,3 +99,47 @@ P bez korekty rynkow (jak typuj.intl, tylko −4 pp „ponizej”), nogi z P >= 
   P zgodne trafiaja o 1–5 pp czesciej — w reprezentacjach bramka odsiewa troche lepiej niz w klubach.
 - Wniosek: zachowanie 18:00 jest zgodne z regula A9/P48/P58 (prawidlowe NIE NA KUPON). Bez zmian w kodzie.
   Lagodniejsza bramka dla reprezentacji (np. forma wazona sila rywala) = zmiana wymogu uzytkownika — tylko jego decyzja.
+
+## Backtest z kursami: wymog „P_model >= P_rynku + N pp” (05.10.2026) — `python3 bt_model_rynek.py 2025-08-01 2026-09-30`
+
+Pytanie z przegladu kuponow papierowych 20.09–04.10: nogi, w ktorych model dawal >= 5 pp wiecej niz rynek, daly +2,9%
+po podatku (n=79), nogi zgodne z rynkiem −10,5% (n=158). Czy wymog przewagi nad rynkiem zwiekszylby wygrane?
+
+Dane: 66 240 nog (rynki 1/X/2, 1X/X2/12, O/U 2.5) z ~22 lig europejskich z kursami w raw/Matches.csv (srednie rynkowe),
+walk-forward jak typuj.py (zespol DC+Elo+pi, korekta_rynkow_v5n, −4 pp „ponizej”). P_rynku = kurs bez marzy.
+Podwojna szansa: kurs syntetyczny z 1X2 (przyblizenie). Zwrot = traf × kurs × 0,88 − 1. Nogi z P_model >= 70%: 13 473.
+
+| roznica P_model − P_rynku | n | P_model | P_rynku | trafnosc | zwrot/noge |
+|---|---|---|---|---|---|
+| < −5 pp | 1 097 | 75,1% | 82,4% | 84,9% | −16,0% |
+| −5…0 pp | 4 759 | 75,6% | 77,5% | 78,0% | −17,8% |
+| 0…+5 pp | 6 231 | 76,5% | 74,6% | 74,6% | −18,1% |
+| +5…+10 pp | 1 025 | 79,1% | 72,4% | 72,7% | −17,9% |
+| +10…+15 pp | 263 | 78,0% | 65,8% | 66,2% | −18,0% |
+| > +15 pp | 98 | 77,2% | 57,8% | 54,1% | −24,6% |
+
+| regula (z filtrem 6.4) | n | trafnosc | zwrot/noge |
+|---|---|---|---|
+| dzis: P >= 70% | 13 370 | 76,3% | −17,8% |
+| + wymog +3 pp | 2 689 | 72,8% | −18,0% |
+| + wymog +5 pp | 1 288 | 71,4% | −17,9% |
+| + wymog +8 pp | 483 | 68,9% | −17,0% |
+
+Brier (P >= 70%): P_model 0,1786, P_rynku **0,1763**.
+
+### Wnioski
+1. **Wymog przewagi nad rynkiem NIE zwieksza wygranych.** Gdy model daje wiecej niz rynek, trafnosc idzie za RYNKIEM
+   (np. +5…+10 pp: model 79,1%, rynek 72,4%, trafnosc 72,7%). Nadwyzka modelu to szum, nie przewaga; zwrot bez zmian
+   (−17…−18% w kazdym przedziale). Wynik +2,9% z kuponow papierowych (n=79) to przypadek w malej probie.
+2. **W ligach europejskich z kursami rynek przewiduje lepiej niz model** (Brier), a trafnosc zgadza sie z P_rynku we
+   wszystkich przedzialach. Podatek 12% + marza (~6%) daja ok. −17% na noge niezaleznie od reguly wyboru.
+3. Filtr 6.4 (odrzuc > 15 pp) jest potwierdzony: nogi > +15 pp trafiaja 54% przy P_model 77%.
+
+### Ograniczenia
+- Tylko ligi europejskie z raw/Matches.csv (rynki najbardziej efektywne). Kupony grane sa czesto z lig egzotycznych
+  (Ameryka Pld., nizsze ligi), gdzie kursow historycznych nie ma — tam przewagi nie da sie tym testem ani potwierdzic, ani wykluczyc.
+- Kursy srednie rynku sa wyzsze niz w STS — w STS wynik bylby gorszy, nie lepszy.
+- Podwojna szansa z kursu syntetycznego.
+
+### Decyzja
+Bez zmian w regulach (CZESC A, filtr 6.4). Wymogu „model > rynek o N pp” NIE wprowadzamy.
