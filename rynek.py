@@ -47,8 +47,11 @@ def p_rynku_szacunek(k, kursy):
     -> ✔ EV +11,2%; z O3.5 ta sama noga odpadala (+17,3 pp). Lista meczow przebiegu podaje kursy z KEY_MARKETS, gdzie
     nie ma O3.5/O4.5, wiec filtr po cichu nie dzialal na rynkach „ponizej”. Gdy brak dopelnienia, ksiege bierzemy z rynku
     glownego tego samego meczu (1/X/2 albo Z1/Z2) — marza STS na rynkach O/U i 1X2 rozni sie o kilka punktow, a filtr
-    ma prog 15 pp. Zwraca None, gdy rynku glownego tez nie ma."""
-    if k not in DOPELNIENIA or not kursy or k not in kursy: return None
+    ma prog 15 pp. Zwraca None, gdy rynku glownego tez nie ma.
+    05.10.2026 (K5-1200, Gwadelupa – Saint Lucia gosp_O0.5): rynki spoza DOPELNIENIA (gol druzyny, HT, pierwszy gol)
+    w ogole nie mialy filtra — model 87,5%, rynek 69% (1,33 / 3,00), noga weszla do K5. Teraz ksiega z rynku glownego
+    dziala dla KAZDEGO rynku z kursem (filtr tylko odrzuca, wiec szerszy zakres moze najwyzej zabrac noge — A2)."""
+    if not kursy or k not in kursy: return None
     for glowny in (('1', 'X', '2'), ('Z1', 'Z2')):
         try:
             if float(kursy[k]) > 1 and all(x in kursy and float(kursy[x]) > 1 for x in glowny):
