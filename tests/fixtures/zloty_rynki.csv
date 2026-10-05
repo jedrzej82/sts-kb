@@ -54,3 +54,7 @@ zwyciezca,hokej,Zwyciezca 1,Rogle BK,Timra IK,1,OK,"01.10 K5b: strona 1; zakres 
 zwyciezca,hokej,Zwyciezca 2,Rogle BK,Timra IK,2,OK,
 zwyciezca,hokej,1_60min,Rogle BK,Timra IK,1,OK,zapis sporty.py; zakres regulamin
 zwyciezca,hokej,Zwyciezca meczu - Timra IK,Rogle BK,Timra IK,2,OK,
+zwyciezca,hokej,Z1 (Zwyciezca meczu),Servette Geneva,EV Zug,1,OK,"naprawione 05.10 (Rozliczenie 04.10): Z1 = zwyciezca z dogrywka; bylo „rynek nieobslugiwany”"
+zwyciezca,koszykowka,Z1 (Zwyciezca meczu),Maccabi Ashdod [K],Hapoel Petah Tikva [K],1,OK,naprawione 05.10 (Rozliczenie 04.10)
+zwyciezca,futbol amerykanski,Z1,Seattle Seahawks,Los Angeles Chargers,1,OK,"naprawione 05.10 (Rozliczenie 04.10; nazwy NFL ze skrotow sporty_hist — test_paczka_0510_wieczor)"
+zwyciezca,hokej,Z2 (Zwyciezca meczu),Dynamo Pardubice,Sparta Praga,2,OK,naprawione 05.10

@@ -189,6 +189,9 @@ def wyniki_inne(kb=HERE):
         print(f'  UWAGA: zewn.inne() niedostepne ({e})')
     if not czesci: return pd.DataFrame(columns=['d', 'sport', 'h', 'a', 'pg', 'pa', 'ot'])
     w = pd.concat(czesci, ignore_index=True)
+    if 'liga' in w:   # 05.10.2026: skroty NFL/MLB z sporty_hist ('SEA') -> pelne nazwy, jak w sporty.load()
+        import sporty
+        w = sporty.rozwin_skroty(w)
     w = pd.DataFrame({'d': _data(w.data).dt.normalize(), 'sport': w.sport, 'h': w.gosp, 'a': w.gosc,
                       'pg': pd.to_numeric(w.pg, errors='coerce'), 'pa': pd.to_numeric(w.pa, errors='coerce'),
                       'ot': pd.to_numeric(w.get('dogrywka', 0), errors='coerce')})
@@ -470,6 +473,8 @@ def _zakres_rynku(rynek, sport):
     if re.search(_60MIN, s, re.I): return 'regulamin'
     if re.search(r'dogryw|\bz OT\b|incl', s, re.I): return 'mecz'
     if re.match(r'(?i)\s*zwyci[eę]zca', s): return 'mecz'
+    # 05.10.2026 (Rozliczenie 04.10): „Z1 (Zwyciezca meczu)” / „Z1” = kod rynku dwudrogowego z kursy/typuj = caly mecz
+    if re.match(r'(?i)\s*z[12]\b', s): return 'mecz'
     return 'regulamin'
 
 
@@ -484,6 +489,9 @@ def _bez_strony(rynek):
 def _typ_zwyciezcy(rynek, gosp, gosc, h, g):
     """'1' / '2' / 'Zwyciezca 1' / 'Zwyciezca Nazwisko' -> h albo g (ta sama strona co w zdarzeniu)."""
     # 01.10.2026: „zwyciezca_1” (podkreslnik) i „1 (60 min)” / „1_60min” — ta sama strona, zakres rozstrzyga _zakres_rynku
+    # 05.10.2026: „Z1 (Zwyciezca meczu)” / „Z2” — kod rynku z przebiegu; strona = cyfra po Z
+    m = re.fullmatch(r'(?i)\s*z([12])\s*(\(\s*zwyci[eę]zca[^)]*\))?\s*', str(rynek).replace('_', ' '))
+    if m: return h if m.group(1) == '1' else g
     s = re.sub(r'(?i)^zwyci[eę]zca(\s+meczu)?\s*[:\-]?\s*', '', str(rynek).replace('_', ' ')).strip()
     s = re.sub(r'(?i)\s*\(?z?\s*dogryw\w*\)?$', '', s).strip()
     s = re.sub(r'(?i)\s*' + _60MIN + r'$', '', s).strip()

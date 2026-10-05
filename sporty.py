@@ -128,6 +128,14 @@ def scal_recznie(d):
     return d
 
 
+def rozwin_skroty(d):
+    """NFL/MLB z GitHuba (hist_import) maja skroty druzyn ('SEA', 'LAC') — pelne nazwy jak w ofercie i w 365scores.
+    05.10.2026: wspolne z dzienniki.wyniki_inne (rozliczenie nog NFL z 04.10 konczylo sie „nie dopasowano”)."""
+    for liga, m in (('NFL', NFL), ('MLB', MLB)):
+        i = d.liga == liga; d.loc[i, 'gosp'] = d.loc[i, 'gosp'].replace(m); d.loc[i, 'gosc'] = d.loc[i, 'gosc'].replace(m)
+    return d
+
+
 def load():
     cols = ['data', 'sport', 'liga', 'gosp', 'gosc', 'pg', 'pa', 'dogrywka']
     h = pd.read_csv(HIST) if os.path.exists(HIST) else pd.DataFrame(columns=cols)
@@ -137,9 +145,7 @@ def load():
         k = lambda z: z.data.astype(str).str[:10] + '|' + z.sport + '|' + z.gosp.astype(str) + '|' + z.gosc.astype(str)
         h = h[~k(h).isin(set(k(x)))]
     d = pd.concat([h, x], ignore_index=True); d['data'] = pd.to_datetime(d.data)
-    for liga, m in (('NFL', NFL), ('MLB', MLB)):
-        i = d.liga == liga; d.loc[i, 'gosp'] = d.loc[i, 'gosp'].replace(m); d.loc[i, 'gosc'] = d.loc[i, 'gosc'].replace(m)
-    d = scal_recznie(scal_warianty(d))
+    d = scal_recznie(scal_warianty(rozwin_skroty(d)))
     return d.sort_values('data', kind='stable')
 
 
@@ -213,7 +219,11 @@ def elo(d, sport, pre=None, info=None):
     if _pula and S:
         _S2, _zm = [], 0
         for _dd, _t, _rt, _gp, _lg in S:
-            _c = _pula.get(norm(_t)) or dopasuj_seed(_t, _pula)
+            # 05.10.2026 (Raport 18:00, usterka 3): tabela „APU Udine” (Lega A) nie przypinala sie do meczow
+            # „Amici Pallacanestro Udinese” — w Elo dwa wpisy, a typowanie trafialo w wpis bez meczow (forma N 10/0).
+            # Alias reczny (aliasy.csv) obowiazuje tez dla nazw z tabel, gdy cel jest w bazie meczow tego sportu.
+            _a = _ALIASY_RECZNE.get(norm(_t))
+            _c = _pula.get(norm(_t)) or (_a if _a and _pula.get(norm(_a)) == _a else None) or dopasuj_seed(_t, _pula)
             if _c and _c != _t: _zm += 1
             _S2.append((_dd, _c or _t, _rt, _gp, _lg))
         S = sorted(_S2)
