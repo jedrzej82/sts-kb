@@ -34,7 +34,8 @@ def test_nfl_skroty_z_sporty_hist_rozliczane(tmp_path, monkeypatch):
                   dict(data=D, sport='baseball', liga='MLB', gosp='SEA', gosc='NYA', pg=1, pa=2, dogrywka=0)]
                  ).to_csv(tmp_path / 'sporty_hist.csv', index=False)
     import zewn
-    monkeypatch.setattr(zewn, 'inne', lambda: pd.DataFrame())
+    monkeypatch.setattr(zewn, 'ZD', zewn.ZD)
+    monkeypatch.setattr(zewn, 'inne', lambda tylko_github=False: pd.DataFrame())
     w = dzienniki.wyniki_inne(str(tmp_path))
     assert set(w.h) == {'Seattle Seahawks', 'Seattle Mariners'}
     W = dict(pilka=None, inne=w, tenis=None)
@@ -70,3 +71,38 @@ def test_tabela_apu_udine_przypieta_do_meczow(monkeypatch):
     R, N, *_ = sporty.elo(mecze, 'koszykówka')
     assert 'APU Udine' not in R and 'Amici Pallacanestro Udinese' in R
     assert sporty.resolve('APU Udine', {'Amici Pallacanestro Udinese', 'Cantu'}, 'koszykówka') == 'Amici Pallacanestro Udinese'
+
+
+def test_rynek_typu_z_dziennika_sportow():
+    assert [sporty._rynek_typu(m) for m in ('1', '2', 'Z1', 'zwyciezca_1', '2_dogrywka', 'AKOP_1', 'ODRZ_2', '1_60min', 'X')] == \
+        ['Z1', 'Z2', 'Z1', 'Z1', 'Z2', 'Z1', 'Z2', '1 (60 min)', 'X']
+
+
+def test_dziennik_typow_rozlicza_nazwy_z_oferty():
+    # przed: sporty.py rozlicz porownywal nazwy doslownie — „Motor Ceske Budejovice” (oferta) nigdy nie trafial
+    # w „HC České Budějovice” (baza): 200 z 216 typow bez rozliczenia. Wynik 05.10: 5:1 (flashscore).
+    W = _W(('hokej', 'HC České Budějovice', 'Kometa Brno', 5, 1, 0), ('hokej', 'Servette Geneva', 'EV Zug', 2, 1, 1))
+    W['inne'].loc[0, 'd'] = pd.Timestamp('2026-10-05')
+    L = pd.DataFrame([dict(data='2026-10-05', sport='hokej', gosp='Motor Ceske Budejovice', gosc='Kometa Brno', rynek='Z1', p=0.567,
+                           trafiony=None),
+                      dict(data=D, sport='hokej', gosp='Servette Geneva', gosc='EV Zug', rynek='1_60min', p=0.5, trafiony=None),
+                      dict(data=D, sport='hokej', gosp='Servette Geneva', gosc='EV Zug', rynek='1', p=0.6, trafiony=None)])
+    L = sporty.rozlicz_typy(L, W)
+    assert list(L.trafiony) == [1, 0, 1]      # Z1 trafiony; 1 w 60 min przegrany (dogrywka); „1” = z dogrywka
+
+
+def test_nhl_z_365_do_rozliczen_tylko_po_koncu_github(tmp_path, monkeypatch):
+    # GitHub NHL konczy sie 15.06 — mecze z pazdziernika tylko z 365scores; dni pokryte przez GitHub bez dubli
+    import zewn
+    monkeypatch.setattr(zewn, 'ZD', zewn.ZD)        # wyniki_inne ustawia zewn.ZD — po tescie wraca oryginal
+    kol = 'data,sport,kraj,turniej,runda,gosp,gosc,wg,wa,okresy_g,okresy_a,zwyciezca,nawierzchnia'.split(',')
+    pd.DataFrame([['2026-09-30', 'hockey', 'USA', 'NHL', '', 'Philadelphia Flyers', 'Pittsburgh Penguins', 0, 7, '', '', 2, ''],
+                  ['2026-06-15', 'hockey', 'USA', 'NHL', '', 'Vegas Golden Knights', 'Carolina Hurricanes', 0, 3, '', '', 2, ''],
+                  ['2026-09-30', 'hockey', 'Finland', 'Liiga', '', 'Tappara', 'Ilves', 3, 2, '', '', 1, '']],
+                 columns=kol).to_csv((tmp_path / 'zewn').mkdir() or tmp_path / 'zewn' / 'wyniki_365_inne_2026-09.csv.gz', index=False)
+    pd.DataFrame([dict(data='2026-06-15', sport='hokej', liga='NHL', gosp='Vegas Golden Knights', gosc='Carolina Hurricanes',
+                       pg=0, pa=3, dogrywka=-1)]).to_csv(tmp_path / 'sporty_hist.csv', index=False)
+    w = dzienniki.wyniki_inne(str(tmp_path))
+    assert len(w[w.h == 'Philadelphia Flyers']) == 1 and len(w[w.h == 'Vegas Golden Knights']) == 1 and len(w[w.h == 'Tappara']) == 1
+    monkeypatch.setattr(zewn, 'ZD', str(tmp_path / 'zewn'))
+    assert 'Philadelphia Flyers' not in set(zewn.inne().gosp)          # do sporty_hist (model) NHL z 365 nie wchodzi

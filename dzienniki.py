@@ -185,6 +185,18 @@ def wyniki_inne(kb=HERE):
         zewn.ZD = os.path.join(kb, 'zewn')
         z = zewn.inne()
         if len(z): czesci.append(z.astype(str))
+        # 05.10.2026: NHL/NBA z GitHuba koncza sie w czerwcu (koniec sezonu w zrodle), a 365scores ma mecze pazdziernika
+        # — typy NHL z 01-04.10 nie mialy z czym sie rozliczyc. Do ROZLICZEN bierzemy 365 tylko z dni PO ostatnim dniu
+        # tej ligi w danych GitHub (bez dubli). Model (sporty_hist) bez zmian.
+        g = zewn.inne(tylko_github=True)
+        if len(g):
+            koniec = {}
+            for c in czesci[:-1] if len(z) else czesci:
+                if 'liga' in c:
+                    for lg, d in c.groupby('liga').data.max().items(): koniec[lg] = max(koniec.get(lg, ''), str(d)[:10])
+            lg = g.liga.astype(str).str.extract(zewn.LIGI_GITHUB, expand=False)
+            nowe = g[[str(d)[:10] > koniec.get(l, '') for d, l in zip(g.data, lg)]]
+            if len(nowe): czesci.append(nowe.astype(str))
     except Exception as e:
         print(f'  UWAGA: zewn.inne() niedostepne ({e})')
     if not czesci: return pd.DataFrame(columns=['d', 'sport', 'h', 'a', 'pg', 'pa', 'ot'])

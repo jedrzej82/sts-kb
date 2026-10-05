@@ -1171,6 +1171,33 @@ _SPORT_SYNONIMY = {'handball': 'piłka ręczna', 'basketball': 'koszykówka', 'v
                    'nfl': 'futbol amerykański', 'floorball': 'unihokej'}
 
 
+def _rynek_typu(m):
+    """Rynek z sporty_typy.csv -> zapis rozliczany przez dzienniki.rozlicz_noge. W logu „1”/„2” = zwyciezca meczu
+    z dogrywka (tak liczyl dawny kod: pg > pa), „1_60min” = czas regulaminowy. AKOP_/ODRZ_ to znacznik kuponu."""
+    m = re.sub(r'^(AKOP|ODRZ)_', '', str(m).strip())
+    m = re.sub(r'(?i)^(zwyci[eę]zca_?|z)([12])$|^([12])_dogrywka$|^([12])$', lambda x: 'Z' + (x.group(2) or x.group(3) or x.group(4)), m)
+    return {'1_60min': '1 (60 min)', '2_60min': '2 (60 min)'}.get(m, m)
+
+
+def rozlicz_typy(L, W=None):
+    """05.10.2026: rozliczenie sporty_typy.csv TYM SAMYM silnikiem co ako_log (dzienniki.rozlicz_noge). Dawny kod
+    porownywal nazwy dokladnie (norm), wiec nazwa z oferty („Motor Ceske Budejovice”) nigdy nie trafiala w nazwe z bazy
+    („HC České Budějovice”), nie znal Z1 / zwyciezca_1 / 1_dogrywka ani tenisa — 200 z 216 typow bez rozliczenia,
+    a kalibracja sportow czekala na >=150. Teraz: aliasy i resolve, dogrywka, serie (pierwszenstwo dnia meczu)."""
+    import dzienniki
+    if W is None:
+        W = dict(pilka=pd.DataFrame(columns=['d', 'h', 'a', 'g', 'ga', 'hg', 'ha']), inne=dzienniki.wyniki_inne(),
+                 tenis=dzienniki.wyniki_tenis())
+    n = 0
+    for i, r in L[L.trafiony.isna()].iterrows():
+        noga = dict(sport=r.sport, zdarzenie=f'{r.gosp} - {r["gosc"]}', rynek=_rynek_typu(r.rynek), data=str(r.data)[:10], uwaga='')
+        stan = dzienniki.rozlicz_noge(noga, W)[0]
+        if stan in ('TRAFIONY', 'PRZEGRANY'):
+            L.loc[i, 'trafiony'] = int(stan == 'TRAFIONY'); n += 1
+    print(f'rozliczono {n} typow; bez wyniku {int(L.trafiony.isna().sum())}')
+    return L
+
+
 def main(a):
     a = list(a)
     if a and a[0] in ('wynik', 'typ') and len(a) > 2: a[2] = nazwa_sportu(a[2])
@@ -1324,33 +1351,13 @@ def main(a):
         print('zapisano', dopisz_typ(LOG, row, a[7:9]))
     elif a[0] == 'rozlicz':
         if not os.path.exists(LOG): sys.exit('brak prognoz')
-        L = pd.read_csv(LOG); d = load()
-        key = {}
-        for r in d.itertuples(): key.setdefault((str(r.data.date()), r.sport, norm(r.gosp), norm(r.gosc)), []).append(r)
-        for i, r in L[L.trafiony.isna()].iterrows():
-            # 30.09.2026 (przeglad): daty NHL/NBA sa amerykanskie, 365 w UTC, log po polsku — wieczorny mecz w Ameryce
-            # ma w bazie dzien wczesniej. Szukamy w oknie ±1 dnia, rozliczamy tylko JEDEN pasujacy mecz.
-            d0 = pd.Timestamp(str(r.data)[:10])
-            kand = [x for k in (-1, 0, 1) for x in key.get((str((d0 + pd.Timedelta(days=k)).date()), r.sport, norm(r.gosp), norm(r['gosc'])), [])]
-            if len(kand) != 1:
-                if len(kand) > 1: print(f'  NIEROZLICZONE: {r.gosp} – {r["gosc"]} {str(r.data)[:10]}: {len(kand)} meczow w oknie ±1 dnia')
-                continue
-            x = kand[0]
-            m = str(r.rynek)
-            dg = getattr(x, 'dogrywka', -1)
-            if pd.isna(dg) or dg == -1:
-                # 30.09.2026 (przeglad): „nie wiadomo” (-1) bylo liczone jak „byla dogrywka” — X zawsze trafione,
-                # 1_60min/2_60min zawsze chybione. Bez wiedzy o dogrywce rozliczamy tylko rynki z dogrywka
-                # (i X, gdy wynik koncowy jest remisem).
-                hit = {'1': x.pg > x.pa, '2': x.pa > x.pg, 'X': True if x.pg == x.pa else None}.get(m)
-            else:
-                reg_draw = dg == 1 or x.pg == x.pa
-                hit = {'1': x.pg > x.pa, '2': x.pa > x.pg, 'X': reg_draw, '1_60min': (x.pg > x.pa) and not reg_draw,
-                       '2_60min': (x.pa > x.pg) and not reg_draw}.get(m)
-            if hit is not None: L.loc[i, 'trafiony'] = int(hit)
+        L = pd.read_csv(LOG)
+        rozlicz_typy(L)
         L.to_csv(LOG, index=False)
         done = L.dropna(subset=['trafiony'])
-        done = done[done.rynek.astype(str).isin(['1', '2'])]   # tabela kal_wlasna: tylko rynki 1/2 (P faworyta z dogrywka)
+        # tabela kal_wlasna: tylko zwyciezca z dogrywka (P faworyta) — „1”/„2” i ten sam rynek pod innym zapisem (Z1, zwyciezca_1)
+        done = done[done.rynek.map(_rynek_typu).isin(['Z1', 'Z2'])]
+        done = done.assign(sport=done.sport.map(nazwa_sportu))   # „koszykowka” i „koszykówka” to jeden sport (05.10.2026)
         if done.empty: print('brak rozliczonych'); return
         rows = []
         for sp, g in done.groupby('sport'):

@@ -792,13 +792,19 @@ def _fsx_bez_dubli(s, fsx=None):
     return s[~dubel]
 
 
-def inne():
-    """Sporty drużynowe i indywidualne (bez tenisa) → wiersze w formacie sporty_hist (data,sport,liga,gosp,gosc,pg,pa,dogrywka)."""
+LIGI_GITHUB = r'\b(NHL|NBA|WNBA|MLB|NFL|KBO|NPB)\b'          # grupa: dzienniki wyciaga nia nazwe ligi
+
+
+def inne(tylko_github=False):
+    """Sporty drużynowe i indywidualne (bez tenisa) → wiersze w formacie sporty_hist (data,sport,liga,gosp,gosc,pg,pa,dogrywka).
+    tylko_github=True: WYLACZNIE ligi z GitHuba (LIGI_GITHUB) — do rozliczen dni, ktorych GitHub jeszcze nie ma
+    (dzienniki.wyniki_inne); do sporty_hist te wiersze NIE wchodza."""
     s = czytaj('wyniki_*_inne_*.csv')
     if not len(s): return pd.DataFrame()
     # te ligi sa z GitHuba (hist_import: nhl/espn/mlb/nfl/kbo_npb). 23.09.2026: NFL, KBO i NPB nie byly
     # wykluczone i wchodzily DRUGI raz pod innymi nazwami druzyn ("USA | NFL" obok "NFL", "Japan | NPB" obok "NPB").
-    s = s[~(s.kraj + ' ' + s.turniej).str.contains(r'\b(?:NHL|NBA|WNBA|MLB|NFL|KBO|NPB)\b')]
+    gh = (s.kraj + ' ' + s.turniej).str.contains(LIGI_GITHUB.replace('(', '(?:', 1))
+    s = s[gh] if tylko_github else s[~gh]
     s = _hokej_fs_bez_dubli(s)
     s = _fsx_bez_dubli(s)
     rows = []
