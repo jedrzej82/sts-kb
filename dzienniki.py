@@ -466,6 +466,10 @@ def _rozlicz_noge(r, W):
     # 29.09.2026 (przeglad): remis byl liczony jako wygrana goscia („2” TRAFIONY przy 3:3 w futsalu)
     if pg == pa:
         if regulamin: return 'PRZEGRANY', wyn, 'remis w czasie regulaminowym'
+        # 05.10.2026 (HSG Wetzlar – Rhein-Neckar Löwen 30:30, Bundesliga, 2 polowy): w recznej/futsalu/rugby remis bywa
+        # wynikiem KONCOWYM (liga bez dogrywki) — zwyciezcy nie ma, rynek zwyciezcy przegrany. Tylko sporty z remisem
+        # (sporty.DRAW_PRIOR); hokej: remis w danych moze znaczyc brak zapisu karnych — dalej recznie, jak sporty spoza listy.
+        if sp in sporty.DRAW_PRIOR and sp != 'hokej': return 'PRZEGRANY', wyn, 'remis jako wynik koncowy — brak zwyciezcy'
         return 'BRAK WYNIKU', wyn, 'remis przy rynku zwyciezcy — sprawdz recznie'
     zw = gosp if pg > pa else gosc
     return ('TRAFIONY' if typ == zw else 'PRZEGRANY'), wyn, ''

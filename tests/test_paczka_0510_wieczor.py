@@ -106,3 +106,12 @@ def test_nhl_z_365_do_rozliczen_tylko_po_koncu_github(tmp_path, monkeypatch):
     assert len(w[w.h == 'Philadelphia Flyers']) == 1 and len(w[w.h == 'Vegas Golden Knights']) == 1 and len(w[w.h == 'Tappara']) == 1
     monkeypatch.setattr(zewn, 'ZD', str(tmp_path / 'zewn'))
     assert 'Philadelphia Flyers' not in set(zewn.inne().gosp)          # do sporty_hist (model) NHL z 365 nie wchodzi
+
+
+def test_remis_koncowy_w_recznej_przegrywa_rynek_zwyciezcy():
+    # HSG Wetzlar – Rhein-Neckar Löwen 02.10: 30:30 (Bundesliga, bez dogrywki) — typ „2” byl „sprawdz recznie”
+    W = _W(('piłka ręczna', 'HSG Wetzlar', 'Rhein-Neckar Löwen', 30, 30, -1), ('hokej', 'Tappara', 'Ilves', 3, 3, -1))
+    r = dict(sport='piłka ręczna', zdarzenie='HSG Wetzlar - Rhein-Neckar Lowen', rynek='Z2', data=D, uwaga='')
+    assert dzienniki.rozlicz_noge(r, W)[0] == 'PRZEGRANY'
+    r = dict(sport='hokej', zdarzenie='Tappara - Ilves', rynek='Z1', data=D, uwaga='')
+    assert dzienniki.rozlicz_noge(r, W)[0] == 'BRAK WYNIKU'       # hokej: remis w danych = brak zapisu karnych
