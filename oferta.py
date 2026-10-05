@@ -291,9 +291,11 @@ def zamkniecia(kursy, ako):
                                       if re.match(r'\d{4}-\d{2}-\d{2}', str(r.get('data', ''))) else ''}
         # mecz musi zaczynac sie PO przebiegu, ktory zapisal noge (25.09 21:00: „Australia - Brazylia” bez daty w uwadze
         # trafilo na mecz z 25.09 12:00 — ten sam dzien, ale rozegrany, zanim noge w ogole wpisano)
+        # 05.10.2026 (Raport 18:00, usterka 1): PDF tez musi byc POZNIEJSZY niz przebieg — PDF 17:25 wpisal nogom AKOP-1800
+        # „zamkniecie” = kurs z chwili typowania (CLV 0), sprzecznie z P115.5
         uruch = pd.to_datetime(f"{str(r.get('data', ''))[:10]} {str(r.get('godzina_uruchomienia', '')).strip()}", errors='coerce')
         kand = [x for x in idx.get((_klucz_nazwy(h), _klucz_nazwy(g), kod), [])
-                if x.data_meczu in dni and (pd.isna(uruch) or x.t_start > uruch)]
+                if x.data_meczu in dni and (pd.isna(uruch) or (x.t_start > uruch and x.t_pobr > uruch))]
         if len(kand) != 1: continue
         x = kand[0]
         if str(r.get('kurs_zamkniecia', '')).strip() == x.kurs: continue

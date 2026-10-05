@@ -16,6 +16,8 @@ Filtr tylko ODRZUCA nogi — nie jest w stanie zadnej dopuscic (A2: progi wolno
 zaostrzac, nie luzowac).
 """
 
+import re
+
 MAX_ROZBIEZNOSC_RYNEK = 0.15
 
 # Rynki dopelniajace sie do 1 — po nich liczymy ksiege (overround) i zdejmujemy marze.
@@ -76,12 +78,19 @@ def filtr_model_rynek(k, p, kursy):
             f'— rozbieznosc {d * 100:+.1f} pp, prog {MAX_ROZBIEZNOSC_RYNEK * 100:.0f} pp')
 
 
+def kod_rynku(k):
+    """05.10.2026 (Raport 18:00, usterka 4): „--kurs gosc_O0.5=1.65” (bez ogonka) dawalo „gosc_O0.5: brak rynku”
+    bez ostrzezenia — model zna tylko „gość_O0.5”. Ten sam zapis ASCII rozlicza juz dzienniki.rynek_pilka."""
+    return re.sub(r'(?i)^go[sś][cć]_', 'gość_', str(k).strip())
+
+
 def kursy_z_argv(a):
     """Wyciaga '--kurs RYNEK=KURS' z listy argumentow. Zwraca (reszta_argumentow, {rynek: kurs})."""
     kursy, reszta, i = {}, [], 0
     while i < len(a):
         if a[i] == '--kurs' and i + 1 < len(a):
             k, _, v = a[i + 1].partition('=')
+            k = kod_rynku(k)
             try: kursy[k] = float(v)
             except ValueError: pass
             i += 2

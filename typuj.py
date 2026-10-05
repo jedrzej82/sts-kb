@@ -1172,7 +1172,7 @@ def ev_kelly(p, o):
 
 # 03.10.2026: FILTR MODEL-RYNEK (KROK 6.4) mieszka w rynek.py — wspolny z sporty.py.
 # Nazwy reeksportowane, bo testy i starsze wywolania siegaja po typuj.p_rynku / typuj.MAX_ROZBIEZNOSC_RYNEK.
-from rynek import MAX_ROZBIEZNOSC_RYNEK, filtr_model_rynek, p_rynku    # noqa: F401
+from rynek import MAX_ROZBIEZNOSC_RYNEK, filtr_model_rynek, p_rynku, kod_rynku    # noqa: F401
 
 __all__ = ['MAX_ROZBIEZNOSC_RYNEK', 'filtr_model_rynek', 'p_rynku']
 
@@ -1244,7 +1244,8 @@ def value(rows, kursy, dz=None, mecz=None, szacunek=False, polski=False):
     d = {k: pc for k, p, pc in rows}
     print('\nWARTOŚĆ (kurs użyty dopiero po wyliczeniu P; podatek 12%):')
     for k, o in kursy.items():
-        if k not in d: print(f'  {k}: brak rynku'); continue
+        if k not in d:   # 05.10.2026: literowka w kodzie rynku nie moze przejsc po cichu
+            print(f'  {k}: brak rynku — UWAGA: model nie zna kodu „{k}” (sprawdz zapis; znane: {", ".join(sorted(d))})'); continue
         p = d[k]; ev, kelly = ev_kelly(p, o)
         print(f'  {k} @ {o}: P={p:.1%}, kurs sprawiedliwy={1 / p / TAX:.2f}, EV={ev:+.1%}, ¼ Kelly={kelly / 4:.1%} bankrollu'
               + ('  ✔ wartość' if ev > 0 else '  ✘ brak wartości'))
@@ -1406,7 +1407,7 @@ def main(argv):
         ab, _, k = x.partition('='); a_, _, b_ = ab.partition('+')
         PARY.append((a_, b_, float(k.replace(',', '.')) if k else None))
     while '--kurs' in args:
-        i = args.index('--kurs'); k, v = args[i + 1].split('='); kursy[k] = float(v.replace(',', '.')); del args[i:i + 2]
+        i = args.index('--kurs'); k, v = args[i + 1].split('='); kursy[kod_rynku(k)] = float(v.replace(',', '.')); del args[i:i + 2]
     live = None
     if '--live' in args:
         i = args.index('--live'); live = (int(args[i + 1]), args[i + 2], args.count('--czerwona-gosp'), args.count('--czerwona-gosc'))
