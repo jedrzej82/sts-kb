@@ -115,3 +115,12 @@ def test_remis_koncowy_w_recznej_przegrywa_rynek_zwyciezcy():
     assert dzienniki.rozlicz_noge(r, W)[0] == 'PRZEGRANY'
     r = dict(sport='hokej', zdarzenie='Tappara - Ilves', rynek='Z1', data=D, uwaga='')
     assert dzienniki.rozlicz_noge(r, W)[0] == 'BRAK WYNIKU'       # hokej: remis w danych = brak zapisu karnych
+
+
+def test_bt_model_rynek_kursy_bez_marzy():
+    import bt_model_rynek as bt
+    r = pd.Series(dict(OddHome=2.0, OddDraw=3.5, OddAway=4.0, Over25=1.8, Under25=2.0))
+    k = bt.kursy_rynku(r)
+    assert abs(k['1'][1] + k['X'][1] + k['2'][1] - 1) < 1e-9 and abs(k['O2.5'][1] + k['U2.5'][1] - 1) < 1e-9
+    assert abs(k['1X'][0] - 1 / (1 / 2.0 + 1 / 3.5)) < 1e-9 and abs(k['1X'][1] - (k['1'][1] + k['X'][1])) < 1e-9
+    assert bt.kursy_rynku(pd.Series(dict(OddHome=float('nan'), OddDraw=3.5, OddAway=4.0, Over25=None, Under25=None))) == {}
