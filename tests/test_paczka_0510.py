@@ -61,3 +61,14 @@ def test_aliasy_klubow_z_raportu_2100():
     pool = {'CA River Plate', 'River Plate', 'Tigres', 'U.A.N.L.- Tigres'}
     assert typuj.resolve('River Plate Montevideo', pool) == 'CA River Plate'
     assert typuj.resolve('Tigres FC Bogota', pool) == 'Tigres'
+
+
+def test_filtr_dziala_dla_gola_druzyny():
+    # 05.10 12:00, K5-1200: Gwadelupa – Saint Lucia gosp_O0.5 @1.33, P modelu 87,5% — rynek 1X2 3,30/3,50/1,92
+    # (faworytem Saint Lucia). Przed: filtr 6.4 pomijal rynek spoza DOPELNIENIA, noga weszla do K5.
+    import rynek
+    kursy = {'1': 3.30, 'X': 3.50, '2': 1.92, 'gosp_O0.5': 1.33}
+    pow_ = rynek.filtr_model_rynek('gosp_O0.5', 0.875, kursy)
+    assert pow_ and '+19.7 pp' in pow_
+    assert rynek.filtr_model_rynek('gosp_O0.5', 0.70, kursy) is None     # zgodne z rynkiem — przechodzi
+    assert rynek.filtr_model_rynek('gosp_O0.5', 0.875, {'gosp_O0.5': 1.33}) is None   # bez 1X2 — bez filtra
