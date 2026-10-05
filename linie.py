@@ -42,6 +42,22 @@ def rate_pass(d, sport, rec=None):
     return T, L, last
 
 
+def liga_meczu(d, sport, h, g):
+    """05.10.2026 (Raport 15:00 usterka 3): liga = liga OSTATNIEGO meczu gospodarza — „Anwil – Górnik Wałbrzych” (PLK)
+    liczyl sie ze srednia ENBL, „Partizan – Mega” (ABA) ze srednia Euroligi. Teraz: wspolna liga obu druzyn, w ktorej
+    gospodarz zagral najwiecej meczow w ostatnim roku (liga przed pucharem); brak wspolnej — jak dotad ostatni mecz."""
+    ds = d[d.sport == sport]
+    mh = ds[(ds.gosp == h) | (ds.gosc == h)]
+    mg = ds[(ds.gosp == g) | (ds.gosc == g)]
+    wsp = set(mh.liga) & set(mg.liga)
+    if not wsp: return mh.liga.iloc[-1]
+    rok = mh[(mh.data >= mh.data.max() - pd.Timedelta(days=365)) & mh.liga.isin(wsp)]
+    if not len(rok): rok = mh[mh.liga.isin(wsp)]
+    ile = rok.groupby('liga').size()
+    kand = set(ile[ile == ile.max()].index)                  # remis liczby meczow -> liga ostatniego z tych meczow
+    return next(lg for lg in rok.liga.iloc[::-1] if lg in kand)
+
+
 def _iso(p, y, nb=15):
     o = np.argsort(p); p, y = p[o], y[o].astype(float)
     q = np.array_split(np.arange(len(p)), nb)
@@ -277,7 +293,7 @@ def main(a):
                      'a linie licza sie wylacznie z historii. To NIE jest usterka nazwy — nie szukaj aliasu.')
         h, g = rh, rg
         if h not in T or g not in T: sys.exit(f'Brak drużyny w bazie wyników ({h if h not in T else g}) — linie liczone tylko dla drużyn z historią meczów.')
-        ds = d[(d.sport == sport) & ((d.gosp == h) | (d.gosc == h))]; liga = ds.liga.iloc[-1]
+        liga = liga_meczu(d, sport, h, g)
         lg = L[liga]; sh = lambda s, i: (s[i] * s[2] + PRIOR) / (s[2] + PRIOR)
         today = pd.Timestamp.today().normalize()
         for t in (h, g):   # nowy sezon (ostatni mecz > 90 dni temu) → 1/3 do średniej, jak w pętli

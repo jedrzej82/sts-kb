@@ -197,6 +197,9 @@ def tabela(sts_k, buk_k):
         baza[b] = [kl.get((s, d) + mapa.get((s, d, g, a), (None, None)) + (ry,)) for s, d, g, a, ry in
                    zip(baza.sport, baza.data_meczu, baza.gospodarz, baza.gosc, baza.rynek)]
         baza[b] = pd.to_numeric(baza[b], errors='coerce')
+        # 05.10.2026 (Raport 15:00 usterka 2): „nan” mylil dwa przypadki — meczu nie ma w pliku z telefonu ALBO mecz jest,
+        # ale bukmacher nie wystawil tego rynku (LVBET 14:32: Backa Topola bez „gol gospodarza”, Tatran bez O1.5)
+        baza[f'{b}_mecz'] = [(s, d, g, a) in mapa for s, d, g, a in zip(baza.sport, baza.data_meczu, baza.gospodarz, baza.gosc)]
         baza[f'{b}_podejrzany'] = (baza[b] / baza.STS - 1).abs() > MAKS_ROZNICA
         baza.loc[baza[f'{b}_podejrzany'], b] = float('nan')
     return baza, staty
@@ -242,7 +245,10 @@ def gdzie_grac(out, laczne):
         if x == b: continue
         if x in laczne: inne.append(f'{x} {laczne[x]:.3f}'); continue
         brak = [str(i + 1) for i, (_, _, w) in enumerate(out) if pd.isna(w.get(x, float('nan')))]
-        inne.append(f'{x} nie znaleziono nogi {",".join(brak)}')
+        bez_rynku = [str(i + 1) for i, (_, _, w) in enumerate(out) if pd.isna(w.get(x, float('nan'))) and w.get(f'{x}_mecz')]
+        bez_meczu = [i for i in brak if i not in bez_rynku]
+        inne.append(f'{x} ' + '; '.join(([f'nie znaleziono nogi {",".join(bez_meczu)}'] if bez_meczu else [])
+                                        + ([f'brak rynku nogi {",".join(bez_rynku)}'] if bez_rynku else [])))
         # na nogach, ktore ma: iloraz kursow wzgledem wybranego bukmachera
         wsp = [(w.get(x), w.get(b)) for _, _, w in out
                if pd.notna(w.get(x, float('nan'))) and pd.notna(w.get(b, float('nan')))]
@@ -253,6 +259,12 @@ def gdzie_grac(out, laczne):
     if sprawdz:
         linia += ' — POROWNANIE NIEPELNE, sprawdz w aplikacji: ' + '; '.join(sprawdz)
     return linia
+
+
+def _kurs_opis(w, b):
+    k = w.get(b, float('nan'))
+    if pd.notna(k): return f'{b} {k:.2f}'
+    return f'{b} brak rynku' if w.get(f'{b}_mecz') else f'{b} nan'
 
 
 def _arg(a, nazwa, dom=None):
@@ -284,7 +296,7 @@ def main(a):
         out, laczne = kupon(tab, list(zip(k.zdarzenie, k.rynek, k.kurs, k.sport if 'sport' in k else [''] * len(k))))
         print(f'{tag}#{nr} {gdzie_grac(out, laczne)}')
         for zd, ry, w in out:
-            print(f'  {zd} | {ry} | ' + ' | '.join(f'{b} {w.get(b, float("nan")):.2f}' for b in BUKMACHERZY))
+            print(f'  {zd} | {ry} | ' + ' | '.join(_kurs_opis(w, b) for b in BUKMACHERZY))
 
 
 if __name__ == '__main__':
