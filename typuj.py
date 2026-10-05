@@ -692,9 +692,11 @@ def skrot_z_terminarza(home, h, a, skroty, mt, pool, m):
     for n, t in skroty:
         i = 0 if n == home else 1
         r = resolve(mt['gosp'] if i == 0 else mt['gosc'], pool)
-        if not r or r == t: return None
+        if not r: return None
+        # 05.10.2026 (Raport 04.10 21:00 usterka 2): Godoy Cruz – CA Los Andes — OBIE nazwy byly skrotami, a terminarz
+        # potwierdzal pierwsza (Godoy Cruz = Godoy Cruz). Potwierdzenie to nie powod do rezygnacji: ta strona zostaje.
         nowe[i] = r
-    if nowe[0] == nowe[1] or not wspolna_liga(m, *nowe): return None
+    if nowe == [h, a] or nowe[0] == nowe[1] or not wspolna_liga(m, *nowe): return None
     print(f'  TERMINARZ ROZSTRZYGA SKROT: {"; ".join(f"{n!r} -> {t}" for n, t in skroty)} to inny klub; zapis terminarza '
           f'({mt["gosp"]} – {mt["gosc"]}) -> {nowe[0]} | {nowe[1]}, wspolna liga w ostatnich 2 latach.')
     return tuple(nowe)

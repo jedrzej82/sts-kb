@@ -34,6 +34,14 @@ SCAL_RECZNIE = {
     # pisze "Club Sportivo Cerrito" w Segunda Division. Jeden klub pod dwiema nazwami: "CS Cerrito" z oferty trafial
     # w stary zapis i Plaza Colonia – Cerrito nie mialo wspolnej ligi (NIEPEWNE DOPASOWANIE).
     ('Uruguay | Segunda Division', 'Club Sportivo Cerrito'): 'Cerrito',
+    # 05.10.2026 (Raport 04.10 21:00 usterki 1 i 4): sparingi „Amistosos de Verano” 365scores zapisuja kluby pelna nazwa,
+    # a liga — skrotem ze starego zrodla. "Argentinos Juniors" z oferty trafial w JEDEN sparing ze stycznia (ROZNE LIGI
+    # BEZ ELO, NIESWIEZA 263 dni). Unión Española po spadku (2025) gra w Primera B jako "U. Española".
+    ('Argentina | Amistosos de Verano', 'Argentinos Juniors'): 'Argentinos Jrs',
+    ('Argentina | Amistosos de Verano', 'Central Córdoba SdE'): 'Central Cordoba',
+    ('Argentina | Amistosos de Verano', 'Instituto AC Cordoba'): 'Instituto',
+    ('Chile | First Division B', 'U. Española'): 'Unión Española',
+    ('Uruguay | Segunda Division', 'La Luz'): 'La Luz FC',          # URU do 2023 jako La Luz FC, potem Segunda (365: La Luz)
     # A-League: 365scores dopisuje "FC"; cel = pelna nazwa (sam "Newcastle" koliduje z angielskim klubem).
     # "W Sydney" (Western Sydney Wanderers) i "Sydney FC" to DWA kluby — celowo osobno.
     ('AUS', 'Adelaide'): 'Adelaide United FC',
