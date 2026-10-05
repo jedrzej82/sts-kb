@@ -72,3 +72,41 @@ def test_filtr_dziala_dla_gola_druzyny():
     assert pow_ and '+19.7 pp' in pow_
     assert rynek.filtr_model_rynek('gosp_O0.5', 0.70, kursy) is None     # zgodne z rynkiem — przechodzi
     assert rynek.filtr_model_rynek('gosp_O0.5', 0.875, {'gosp_O0.5': 1.33}) is None   # bez 1X2 — bez filtra
+
+
+# ---------- Raport 05.10 15:00 ----------
+def test_mega_basket_alias():
+    import sporty
+    assert sporty.resolve('Mega Basket Belgrad', {'KK Mega Vizura', 'KK Partizan'}, 'koszykówka') == 'KK Mega Vizura'
+
+
+def test_kursy3_brak_rynku_to_nie_brak_meczu():
+    # LVBET 14:32: mecz Backa Topola jest w pliku, ale bez rynku „gol gospodarza” — przed: „LVBET nan” jak przy braku meczu
+    import kursy3
+    sts = pd.DataFrame([dict(sport='PIŁKA NOŻNA', data_meczu='2026-10-05', godzina_meczu='18:00', gospodarz='TSC Backa Topola',
+                             gosc='Graficar Belgrad', rynek=r, kurs=k, linia='')
+                        for r, k in (('1. drużyna - strzeli gola|TAK', '1.07'), ('1', '1.40'))])
+    buk = pd.DataFrame([dict(bukmacher='LVBET', sport='PIŁKA NOŻNA', data_meczu='2026-10-05', godzina_meczu='18:00',
+                             gospodarz='TSC Backa Topola', gosc='FK Graficar Beograd', rynek='1', kurs=1.38)])
+    tab, _ = kursy3.tabela(sts, kursy3.wczytaj_bukmacherow_df(buk))
+    out, laczne = kursy3.kupon(tab, [('TSC Backa Topola - Graficar Belgrad', 'gosp_O0.5', '1.07', 'pilka')])
+    assert kursy3._kurs_opis(out[0][2], 'LVBET') == 'LVBET brak rynku'
+    assert 'LVBET brak rynku nogi 1' in kursy3.gdzie_grac(out, laczne)
+    assert kursy3._kurs_opis(out[0][2], 'SUPERBET') == 'SUPERBET nan'      # Superbet bez tego meczu w pliku
+
+
+def test_linie_liga_meczu_to_wspolna_liga():
+    # przed: „koszykówka (Europe | ENBL): Anwil – Górnik Wałbrzych” — liga ostatniego meczu gospodarza
+    import linie
+    d = pd.DataFrame([('koszykówka', '2026-05-01', 'Poland | Basket Liga', 'Anwil', 'Gornik'),
+                      ('koszykówka', '2026-09-20', 'Poland | Basket Liga', 'Anwil', 'Slask'),
+                      ('koszykówka', '2026-09-27', 'Poland | Basket Liga', 'Gornik', 'Slask'),
+                      ('koszykówka', '2026-10-01', 'Europe | ENBL', 'X', 'Anwil')],
+                     columns=['sport', 'data', 'liga', 'gosp', 'gosc']).assign(data=lambda x: pd.to_datetime(x.data))
+    assert linie.liga_meczu(d, 'koszykówka', 'Anwil', 'Gornik') == 'Poland | Basket Liga'
+    assert linie.liga_meczu(d, 'koszykówka', 'Anwil', 'Nowy') == 'Europe | ENBL'     # brak wspolnej — jak dotad
+
+
+def test_literowka_tatran(monkeypatch):
+    nazwy = _scal([('Slovakia | 2. Liga', '2026-09-27', 'Taran Liptovsky Mikulas', 'STK Samorin', 1, 1)], monkeypatch)
+    assert 'Taran Liptovsky Mikulas' not in nazwy and 'Tatran Liptovsky Mikulas' in nazwy

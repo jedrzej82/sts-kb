@@ -41,6 +41,9 @@ SCAL_RECZNIE = {
     ('Argentina | Amistosos de Verano', 'Central Córdoba SdE'): 'Central Cordoba',
     ('Argentina | Amistosos de Verano', 'Instituto AC Cordoba'): 'Instituto',
     ('Chile | First Division B', 'U. Española'): 'Unión Española',
+    # 05.10.2026 (Raport 15:00 usterka 4): literowka zrodla — "Taran" zamiast "Tatran" (MFK Tatran Liptovsky Mikulas);
+    # oferta STS, LVBET i Superbet pisza Tatran, dopasowanie dzialalo tylko przez terminarz.
+    ('Slovakia | 2. Liga', 'Taran Liptovsky Mikulas'): 'Tatran Liptovsky Mikulas',
     ('Uruguay | Segunda Division', 'La Luz'): 'La Luz FC',          # URU do 2023 jako La Luz FC, potem Segunda (365: La Luz)
     # A-League: 365scores dopisuje "FC"; cel = pelna nazwa (sam "Newcastle" koliduje z angielskim klubem).
     # "W Sydney" (Western Sydney Wanderers) i "Sydney FC" to DWA kluby — celowo osobno.
