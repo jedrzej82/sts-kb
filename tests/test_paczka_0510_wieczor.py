@@ -124,3 +124,25 @@ def test_bt_model_rynek_kursy_bez_marzy():
     assert abs(k['1'][1] + k['X'][1] + k['2'][1] - 1) < 1e-9 and abs(k['O2.5'][1] + k['U2.5'][1] - 1) < 1e-9
     assert abs(k['1X'][0] - 1 / (1 / 2.0 + 1 / 3.5)) < 1e-9 and abs(k['1X'][1] - (k['1'][1] + k['X'][1])) < 1e-9
     assert bt.kursy_rynku(pd.Series(dict(OddHome=float('nan'), OddDraw=3.5, OddAway=4.0, Over25=None, Under25=None))) == {}
+
+
+def test_licznik_clv_grupy_lig():
+    import clv
+    assert [clv.grupa_ligi(x) for x in ('MIĘDZYNARODOWE - LIGA NARODÓW UEFA', 'PNA kwalifikacje', 'Hiszpania LaLiga 2',
+                                        'Serie A', 'NIEMCY - BUNDESLIGA', 'Brazylia Serie B', 'JAMAJKA - PREMIER LEAGUE',
+                                        'URUGWAJ - PRIMERA DIVISION', 'KLUBOWE - MECZE TOWARZYSKIE', '')] == \
+        ['reprezentacje', 'reprezentacje', 'europa_top', 'europa_top', 'europa_top', 'pozostale', 'pozostale',
+         'pozostale', 'pozostale', 'nieznana']
+
+
+def test_licznik_clv_postep_i_sygnal():
+    import clv
+    w = [dict(data='2026-10-05', godzina_uruchomienia='12:00', tag='AKOP', nr_kuponu='1', noga_nr=str(i + 1), sport='pilka',
+              liga='Peru Primera Division', zdarzenie=f'A{i} - B{i}', rynek='1X', kurs='1.30', kurs_zamkniecia='1.25')
+         for i in range(3)]
+    w.append(dict(data='2026-10-05', godzina_uruchomienia='12:00', tag='AKOP', nr_kuponu='1', noga_nr='RAZEM', kurs='2.2',
+                  status='PAPIEROWY'))
+    lin = clv.licznik(pd.DataFrame(w).fillna(''))
+    assert '3 z 3 nog' in lin[0]
+    egz = next(x for x in lin if 'egzotyczne' in x)
+    assert '3/300' in egz and '+4.00%' in egz and 'brakuje 297' in egz

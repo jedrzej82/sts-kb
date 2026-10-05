@@ -2,6 +2,7 @@
 """CLV (closing line value) — czy model bije rynek. Poprawka 56.3.
   python3 clv.py typy_log.csv            — podsumowanie: wszystkie nogi, za pieniadze, papierowe
   python3 clv.py typy_log.csv --od 2026-09-29
+  python3 clv.py licznik [ako_log.csv]    — licznik CLV do Raportu: grupy lig, postep do 300 nog na grupe
 
 Wymagane kolumny: kurs_typu, kurs_zamkniecia. Opcjonalne: data, pieniadze (1/0 albo tak/nie), sport, rynek.
 CLV nogi = kurs_typu / kurs_zamkniecia − 1. Dodatnie = wzielismy kurs wyzszy niz rynek na zamknieciu.
@@ -10,6 +11,7 @@ Kryterium z CZESCI A pkt 4 (Faza 2 wymaga srednie CLV >= 0 przy >= 100 nogach, F
 srednie CLV > 0 i jednostronny test t: p < 0,05. Ponizej 30 nog wynik jest tylko informacyjny.
 Wiersze bez kursu zamkniecia sa pomijane (puste pole to brak pomiaru, nie zero)."""
 import math
+import re
 import sys
 
 import pandas as pd
@@ -112,9 +114,70 @@ def _linia(nazwa, s):
     return f'  {nazwa:<12} n={s["n"]:<4} srednie CLV {s["srednia"]:+.2%}  p={p}  → {s["werdykt"]}'
 
 
+# 05.10.2026: licznik do Raportu. Backtest z kursami (docs/BACKTEST_P48.md) — w ligach europejskich z kursami model nie ma
+# przewagi nad rynkiem; jedyne miejsce, gdzie moze ja miec, to ligi slabiej wyceniane. Sygnal: srednie CLV > +3% przy
+# >= 300 nogach W GRUPIE (blad std sredniej ok. 0,4 pp przy rozrzucie 6-8%).
+CEL_NOG, PROG_CLV = 300, 0.03
+_KRAJE_TOP = ('anglia', 'hiszpania', 'wlochy', 'niemcy', 'francja', 'holandia', 'belgia', 'portugalia', 'turcja', 'grecja',
+              'szkocja')
+_LIGI_TOP = ('premier league', 'championship', 'league one', 'league two', 'laliga', 'laliga 2', 'serie a', 'serie b',
+             'bundesliga', '2. bundesliga', 'ligue 1', 'ligue 2', 'eredivisie', 'pro league be', 'pro league', 'primeira liga',
+             'liga portugal', 'super lig', 'super league gr', 'premiership', 'la liga', 'segunda division')
+_KRAJE_INNE = ('jamajka', 'brazylia', 'usa', 'izrael', 'katar', 'chile', 'peru', 'urugwaj', 'argentyna', 'kolumbia', 'paragwaj',
+               'boliwia', 'panama', 'salwador', 'gwatemala', 'serbia', 'szwecja', 'norwegia', 'czechy', 'slowacja', 'austria',
+               'szwajcaria', 'litwa', 'finlandia', 'dania', 'irlandia', 'australia', 'zea', 'ekwador', 'meksyk', 'japonia', 'chiny')
+
+
+def grupa_ligi(liga):
+    """Nazwa ligi z oferty -> 'reprezentacje' | 'europa_top' (ligi z kursami historycznymi, raw/Matches.csv) | 'pozostale'."""
+    import unicodedata
+    from nazwy import LITERY
+    s = unicodedata.normalize('NFKD', str(liga).translate(LITERY)).encode('ascii', 'ignore').decode().lower().strip()
+    s = re.sub(r'\s+', ' ', s)
+    if not s or s == '-': return 'nieznana'
+    if re.search(r'^miedzynarodowe(?! - klub)|liga narodow|narodow afryki|\bpna\b|asean|zatoki perskiej|reprezentacj|'
+                 r'^mecze towarzyskie$|world grand prix', s):
+        return 'reprezentacje'
+    m = re.match(r'^([a-z]+)(?:\s*-\s*|\s+)(.*)$', s)
+    if m and m.group(1) in _KRAJE_TOP:
+        return 'europa_top' if m.group(2).strip() in _LIGI_TOP else 'pozostale'
+    if m and m.group(1) in _KRAJE_INNE: return 'pozostale'
+    return 'europa_top' if s in _LIGI_TOP else 'pozostale'
+
+
+def licznik(df):
+    """ako_log (str) -> linie licznika CLV do Raportu (tylko pilka — kurs zamkniecia jest z PDF oferty STS)."""
+    if 'kurs_typu' not in df.columns and 'kurs' in df.columns:
+        df = df.rename(columns={'kurs': 'kurs_typu'})
+    n = przygotuj_ako(df)
+    n = n[n.get('sport', pd.Series('', index=n.index)).astype(str).str.lower().str.startswith(('pilka', 'piłka'))]
+    d = przygotuj(n)
+    d['grupa'] = d.get('liga', pd.Series('', index=d.index)).map(grupa_ligi)
+    out = [f'LICZNIK CLV (pilka; kurs typu vs zamkniecie STS; cel {CEL_NOG} nog na grupe, sygnal przewagi: srednie CLV > '
+           f'+{PROG_CLV:.0%}) — {len(d)} z {len(n)} nog ma kurs zamkniecia']
+    for g, nazwa in (('pozostale', 'ligi egzotyczne/nizsze'), ('europa_top', 'ligi europejskie top'),
+                     ('reprezentacje', 'reprezentacje'), ('nieznana', 'liga nieznana')):
+        x = d[d.grupa == g]
+        if g == 'nieznana' and not len(x): continue
+        s = podsumuj(x.clv)
+        if not s['n']:
+            out.append(f'  {nazwa:<24} 0/{CEL_NOG} — brak pomiaru'); continue
+        stan = (f'brakuje {CEL_NOG - s["n"]}' if s['n'] < CEL_NOG else
+                ('PRZEWAGA (CLV > +3%, p < 0,05)' if s['srednia'] > PROG_CLV and s['p'] is not None and s['p'] < 0.05
+                 else 'BRAK PRZEWAGI (cel osiagniety, CLV <= +3% albo nieistotne)'))
+        p = '—' if s['p'] is None else f'{s["p"]:.3f}'
+        out.append(f'  {nazwa:<24} {s["n"]}/{CEL_NOG}  srednie CLV {s["srednia"]:+.2%}  p={p}  → {stan}')
+    return out
+
+
 def main(a):
     if not a:
         sys.exit(__doc__)
+    if a[0] == 'licznik':
+        import os
+        p = a[1] if len(a) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ako_log.csv')
+        print('\n'.join(licznik(pd.read_csv(p, dtype=str, keep_default_na=False))))
+        return
     df = pd.read_csv(a[0], dtype=str, keep_default_na=False)
     # 01.10.2026: ako_log zapisuje kurs nogi jako „kurs”, a wiersze RAZEM to kupony, nie nogi — clv.py konczyl sie
     # „BRAK KOLUMN: kurs_typu” i nogi kuponow nigdy nie mialy CLV

@@ -734,6 +734,12 @@ def main(a):
           f'AKO_papierowe {bil["pap_liczba"]} (trafione {bil["pap_traf"]}, nierozliczone {bil["pap_nierozl"]}) | '
           f'srednie laczne P {sr:.3f} | wirtualnie z 5 zl {bil["pap_wirt"]:+.2f} zl')
     print(f'(saldo narastajaco = saldo z poprzedniego Bilansu + wynik dnia; zapisano {wyj})')
+    # 05.10.2026: licznik CLV do Raportu (cala historia ako_log; grupy lig, postep do 300 nog) — clv.licznik
+    try:
+        import clv
+        print('\n' + '\n'.join(clv.licznik(ako)))
+    except Exception as e:
+        print(f'\nLICZNIK CLV: niedostepny ({type(e).__name__}: {e})')
 
 
 if __name__ == '__main__':
