@@ -23,6 +23,11 @@ import pandas as pd
 import nazwy
 
 TOLERANCJA_MIN = 5
+# 06.10.2026: w sportach indywidualnych STS podaje godzine orientacyjna (kolejny mecz na korcie): „Kraus – Bartunkova”
+# STS 11:40, LVBET 12:00; „Bhosale/Micic” STS 09:00, Superbet 14:00 — 138 meczow LVBET bez pary. Tu: caly dzien (8 h),
+# ale oba nazwiska wyrazne, ta sama liczba zawodnikow (singiel/debel) i jedna para. Inicjal „B” to nie rezerwy.
+INDYWIDUALNE = frozenset({'TENIS', 'DART', 'BADMINTON', 'SNOOKER', 'MMA', 'BOKS', 'TENIS STOŁOWY'})
+TOLERANCJA_INDYW_MIN = 8 * 60
 MAKS_ROZNICA = 0.35
 BUKMACHERZY = ('STS', 'SUPERBET', 'LVBET')
 
@@ -57,7 +62,7 @@ def _zn_rowne(a, b):
 PISOWNIA = {'konga': 'kongo', 'pilzno': 'plzen', 'pilsen': 'plzen', 'munchen': 'munich', 'muenchen': 'munich', 'chernigiv': 'chernihiv',
             'kobenhavn': 'copenhagen', 'koebenhavn': 'copenhagen'}
 # cala nazwa (nie czlon — „WKS Slask” to klub): 03.10 Superbet „WKS - Kamerun”, STS „Wybrzeże Kości Słoniowej - Kamerun”
-CALE_NAZWY = {'wks': 'wybrzeze kosci sloniowej'}
+CALE_NAZWY = {'wks': 'wybrzeze kosci sloniowej', 'zea': 'zjednoczone emiraty arabskie'}   # 06.10: Superbet „ZEA”
 
 
 def _pisownia(slowo):
@@ -185,11 +190,18 @@ def dopasuj_mecze(sts, buk):
     for r in sts.itertuples(index=False):
         g = po_dniu.get((r.sport, r.data_meczu))
         if g is None: stat['brak'] += 1; continue
-        c = g[(g.t - r.t).abs() <= TOLERANCJA_MIN]
-        c = [x for x in c.itertuples(index=False)
-             if _podobne(r.gospodarz, x.gospodarz) and _podobne(r.gosc, x.gosc)
-             and _zn_rowne(_zn(r.gospodarz), _zn(x.gospodarz)) and _zn_rowne(_zn(r.gosc), _zn(x.gosc))
-             and not (_zn(r.gospodarz) is None and _zn(r.gosc) is None)]   # obie strony uciete = znaczniki nieznane
+        indyw = str(r.sport).upper() in INDYWIDUALNE
+        c = g[(g.t - r.t).abs() <= (TOLERANCJA_INDYW_MIN if indyw else TOLERANCJA_MIN)]
+        if indyw:
+            debel = lambda n: '/' in str(n)
+            c = [x for x in c.itertuples(index=False)
+                 if _wyrazne(r.gospodarz, x.gospodarz) and _wyrazne(r.gosc, x.gosc)
+                 and debel(r.gospodarz) == debel(x.gospodarz) and debel(r.gosc) == debel(x.gosc)]
+        else:
+            c = [x for x in c.itertuples(index=False)
+                 if _podobne(r.gospodarz, x.gospodarz) and _podobne(r.gosc, x.gosc)
+                 and _zn_rowne(_zn(r.gospodarz), _zn(x.gospodarz)) and _zn_rowne(_zn(r.gosc), _zn(x.gosc))
+                 and not (_zn(r.gospodarz) is None and _zn(r.gosc) is None)]   # obie strony uciete = znaczniki nieznane
         # para musi miec choc jedna strone z wyraznym wspolnym czlonem; z kilku par wygrywa jedyna wyrazna po obu stronach
         c = [x for x in c if _wyrazne(r.gospodarz, x.gospodarz) or _wyrazne(r.gosc, x.gosc)]
         if len({(x.gospodarz, x.gosc) for x in c}) > 1:
