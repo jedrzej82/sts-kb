@@ -245,35 +245,92 @@ def sts_adresy(tekst):
     return sorted(x for x in a if not _STS_STATYCZNY.search(x) and len(x) < 200)
 
 
+_HOST_W_ADRESIE = re.compile(r"(?:https?|wss?):\\?/\\?/([a-z0-9][a-z0-9.-]*\.[a-z]{2,})", re.I)
+_HOST_GOLY = re.compile(r"[\"'`]([a-z0-9][a-z0-9-]*(?:\.[a-z0-9-]+)*\.(?:pl|com|io|net|eu|cloud|bet|app))[\"'`/]", re.I)
+_STS_CHUNK = re.compile(r"[\"'`(/]((?:nextweb-assets/)?(?:chunk|[a-z-]+)-[A-Z0-9]{6,}\.js)", re.I)
+_STS_SLOWA = ('offer', 'odds', 'market', 'apiUrl', 'baseUrl', 'apiBase', 'graphql', 'websocket', 'wss:', 'sportsbook',
+              'betting', 'eventId', 'environment')
+
+
+def sts_hosty(tekst):
+    """Wszystkie hosty w kodzie (nie tylko sts.pl): adres API bywa w innej domenie albo skladany z czesci."""
+    h = {}
+    for m in list(_HOST_W_ADRESIE.finditer(tekst)) + list(_HOST_GOLY.finditer(tekst)):
+        x = m.group(1).lower().rstrip('.')
+        if re.search(r'\.(?:js|css|png|svg|jpg|json|map|html)$', x): continue
+        h[x] = h.get(x, 0) + 1
+    return h
+
+
+def sts_chunki(tekst, baza='https://www.sts.pl/nextweb-assets/'):
+    """Doladowywane pliki aplikacji (import() w main.js): „chunk-ABC123.js” -> pelny adres."""
+    out = []
+    for m in _STS_CHUNK.finditer(tekst):
+        n = m.group(1).split('/')[-1]
+        u = baza + n
+        if u not in out: out.append(u)
+    return out
+
+
+def sts_konteksty(tekst, slowo, ile=8, szer=110):
+    """Fragmenty kodu wokol slowa (bez powtorzen) — z nich widac, jak aplikacja sklada adres oferty."""
+    out = []
+    for m in re.finditer(re.escape(slowo), tekst):
+        f = re.sub(r'\s+', ' ', tekst[max(0, m.start() - szer):m.end() + szer])
+        if f not in out: out.append(f)
+        if len(out) >= ile: break
+    return out
+
+
 def diag_sts(a):
     kat = a[a.index('--katalog') + 1] if '--katalog' in a else '/sdcard/Download'
     teraz = na_pl(dt.datetime.now(dt.timezone.utc))
-    linie = [f'DIAGNOZA STS {teraz:%Y-%m-%d %H:%M} (czas polski)']
+    linie = [f'DIAGNOZA STS v2 {teraz:%Y-%m-%d %H:%M} (czas polski)']
     hs = dict(H, Accept='text/html,application/xhtml+xml,*/*')
-    skrypty, adresy = [], set()
+    skrypty, adresy, hosty, kod = [], set(), {}, {}
     for url in STS_STRONY:
         st, typ, t = _sts_pobierz(url, hs)
         linie.append(f'\n== STRONA {url}: status {st}, typ {typ}, {len(t)} znakow')
         linie.append('   osadzone dane: ' + (', '.join(sorted(set(_STS_DANE.findall(t)))) or 'brak'))
-        linie.append(f'   slowa w HTML: odds/kurs {len(re.findall(r"(?i)odds|kurs", t))}, 1X2 {t.count("1X2")}')
         if st != 200: linie.append('   poczatek: ' + t[:400].replace('\n', ' '))
+        for i, s in enumerate(re.findall(r'<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>', t, re.S | re.I)[:8]):
+            if s.strip(): linie.append(f'   skrypt w HTML {i + 1}: ' + re.sub(r'\s+', ' ', s)[:300])
+        for m in re.findall(r'<(?:link|meta)[^>]+>', t, re.I)[:40]:
+            if re.search(r'(?i)preload|preconnect|dns-prefetch|config|env|api', m): linie.append('   ' + m[:200])
         skrypty += [s for s in sts_skrypty(t, 'https://www.sts.pl') if s not in skrypty]
         adresy |= set(sts_adresy(t))
-    linie.append(f'\n== SKRYPTY: {len(skrypty)} (sprawdzam do 25)')
-    for u in skrypty[:25]:
+    kolejka = list(skrypty)
+    linie.append('\n== SKRYPTY (strona + doladowywane chunk-*.js, do 60)')
+    i = 0
+    while i < len(kolejka) and i < 60:
+        u = kolejka[i]; i += 1
         st, typ, t = _sts_pobierz(u, dict(H, Accept='*/*'))
-        z = sts_adresy(t) if st == 200 else []
-        adresy |= set(z)
-        linie.append(f'   {st} {len(t):>8} {u[:120]} -> adresow {len(z)}')
+        if st == 200:
+            kod[u] = t
+            adresy |= set(sts_adresy(t))
+            for x, n in sts_hosty(t).items(): hosty[x] = hosty.get(x, 0) + n
+            kolejka += [c for c in sts_chunki(t) if c not in kolejka]
+        linie.append(f'   {st} {len(t):>8} {u[:120]}')
         time.sleep(0.3)
+    linie.append(f'   (znalezionych plikow: {len(kolejka)}, pobranych: {i})')
+    linie.append(f'\n== HOSTY w kodzie: {len(hosty)}')
+    linie += [f'   {n:>4} {x}' for x, n in sorted(hosty.items(), key=lambda z: -z[1])[:80]]
     adresy = sorted(adresy)
     linie.append(f'\n== ADRESY (mozliwe zrodla oferty): {len(adresy)}')
     linie += ['   ' + x for x in adresy[:300]]
+    linie.append('\n== KOD WOKOL SLOW (jak aplikacja sklada adres oferty)')
+    caly = '\n'.join(kod.values())
+    for s in _STS_SLOWA:
+        k = sts_konteksty(caly, s)
+        linie.append(f'-- {s}: {len(k)}')
+        linie += ['   ' + x for x in k]
     linie.append('\n== PROBY (GET, jedna na adres; bez adresow ze zmiennymi)')
     pr = [x for x in adresy if x.startswith(('http', '//')) and not re.search(r'[{}$]', x)]
     pr += ['https://www.sts.pl' + x for x in adresy if x.startswith('/') and not re.search(r'[{}$]', x)]
+    pr += [f'https://{x}/' for x, _ in sorted(hosty.items(), key=lambda z: -z[1])
+           if re.search(r'(?i)api|offer|feed|sport|bet', x) and 'sts' in x][:15]
     hj = dict(H, Origin='https://www.sts.pl', Referer='https://www.sts.pl/')
-    for u in pr[:60]:
+    for u in list(dict.fromkeys(pr))[:60]:
         u = 'https:' + u if u.startswith('//') else u
         st, typ, t = _sts_pobierz(u, hj, limit=200_000)
         jest_json = t.lstrip()[:1] in ('{', '[')
