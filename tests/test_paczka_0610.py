@@ -176,3 +176,23 @@ def test_aliasy_i_kraj_z_rozliczen_0610():
     assert typuj._kraj_pl('Wyspy Sw. Tomasza i Ksiazeca', {'São Tomé and Príncipe', 'Gibraltar'}) == 'São Tomé and Príncipe'
     assert sporty.resolve('Basquet Coruna', {'Leyma Coruña', 'Bilbao Basket'}, 'koszykówka') == 'Leyma Coruña'
     assert sporty.resolve('Oakland Athletics', {'Athletics', 'Cleveland Guardians'}, 'baseball') == 'Athletics'
+
+
+def test_samokontrola_podejrzenie_i_brak():
+    import samokontrola as s
+    d = pd.DataFrame([dict(zrodlo='ako_log', sport='pilka', liga='Peru | Liga 1', rynek='U3.5', p=0.75, traf=int(i < 53))
+                      for i in range(80)]
+                     + [dict(zrodlo='ako_log', sport='pilka', liga='Spain | LaLiga', rynek='1X', p=0.80, traf=int(i < 42))
+                        for i in range(50)])
+    lin = s.linie(d)
+    assert any('PODEJRZENIE: rynek U3.5 w lidze Peru | Liga 1 (pilka) zawyzony (P 75%, wchodzi 66%, n=80' in x for x in lin)
+    assert not any('Spain' in x for x in lin)                      # 84% przy P 80% — w porzadku
+    assert not any('PODEJRZENIE' in x for x in s.linie(d[d.liga == 'Spain | LaLiga']))
+    assert not any('PODEJRZENIE' in x for x in s.linie(d.head(40)))  # n < 50 — za malo, zeby wskazywac
+
+
+def test_samokontrola_rynki_sportow():
+    import samokontrola as s
+    assert s._rynek('pilka', 'Liczba goli ponizej 3.5') == 'U3.5'
+    assert [s._rynek('hokej', x) for x in ('Z1 (Zwyciezca meczu)', 'zwyciezca_1', '1_60min')] == ['Z1', 'Z1', '1 (60 min)']
+    assert s._sport('piłka nożna') == 'pilka' and s._sport('koszykowka') == 'koszykówka' and s._p('74,5') == 0.745
