@@ -137,6 +137,23 @@ def _podobne(a, b):
     return dopasuj.podobne(_rdzen(a), _rdzen(b))
 
 
+# 06.10.2026: czlony, ktore nie odrozniaja klubow (dopasuj.OGOLNE ich nie ma — tam sluza do nauki aliasow). Przez nie
+# STS „Cleethorpes Town - Hyde United” pasowalo w Superbet do siebie ORAZ do „Alfreton Town - United of Manchester”
+# (Town~Town, United~United) — dwie pary = brak dopasowania; gdyby wlasciwego meczu nie bylo, zostalaby jedna ZLA para.
+GENERYCZNE = frozenset('town united utd city county rovers wanderers athletic athletico atletico sporting sport sports '
+                       'real deportivo union club borough albion'.split())
+
+
+def _wyrazne(a, b):
+    """Czy dwie nazwy maja wspolny czlon, ktory odroznia kluby (nie Town/United/City...)."""
+    import dopasuj
+    for x in dopasuj.tokeny(_rdzen(a)):
+        for y in dopasuj.tokeny(_rdzen(b)):
+            k, d = (x, y) if len(x) <= len(y) else (y, x)
+            if len(k) >= 3 and d.startswith(k) and k not in GENERYCZNE and d not in GENERYCZNE: return True
+    return False
+
+
 def wczytaj_bukmacherow(pliki):
     cz = [pd.read_csv(p, dtype=str, keep_default_na=False) for p in pliki if os.path.exists(p)]
     return wczytaj_bukmacherow_df(pd.concat(cz, ignore_index=True) if cz else None)
@@ -173,6 +190,11 @@ def dopasuj_mecze(sts, buk):
              if _podobne(r.gospodarz, x.gospodarz) and _podobne(r.gosc, x.gosc)
              and _zn_rowne(_zn(r.gospodarz), _zn(x.gospodarz)) and _zn_rowne(_zn(r.gosc), _zn(x.gosc))
              and not (_zn(r.gospodarz) is None and _zn(r.gosc) is None)]   # obie strony uciete = znaczniki nieznane
+        # para musi miec choc jedna strone z wyraznym wspolnym czlonem; z kilku par wygrywa jedyna wyrazna po obu stronach
+        c = [x for x in c if _wyrazne(r.gospodarz, x.gospodarz) or _wyrazne(r.gosc, x.gosc)]
+        if len({(x.gospodarz, x.gosc) for x in c}) > 1:
+            obie = [x for x in c if _wyrazne(r.gospodarz, x.gospodarz) and _wyrazne(r.gosc, x.gosc)]
+            if len({(x.gospodarz, x.gosc) for x in obie}) == 1: c = obie
         pary = {(x.gospodarz, x.gosc) for x in c}
         if len(pary) == 1:
             wynik[(r.sport, r.data_meczu, r.gospodarz, r.gosc)] = next(iter(pary)); stat['jednoznaczne'] += 1
