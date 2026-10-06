@@ -26,6 +26,7 @@ FAZY = {1: {'A': 5, 'B': 3, 'C': 2}, 2: {'A': 8, 'B': 5, 'C': 2}, 3: {'A': 8, 'B
 LIMIT_DZIEN_ZL, LIMIT_DZIEN_KUPONY, BUDZET = 10, 3, 300
 MAKS_NOG_KANDYDATOW = 25
 PILKA_KURS = (1.50, 2.00)  # 06.10.2026 (uzytkownik): codziennie jeden najpewniejszy AKO z pilki noznej w tym zakresie
+BONUS_KURS = (1.75, 2.20)  # 06.10.2026 (uzytkownik): obrot bonusem LVBET — 3 AKO pod rzad, kazdy kurs >= 1,75; podatek pominiety
 MIX_MIN_KURS = 1.50        # ponizej wyplata po podatku < 1,32 x stawki — „mix” bez sensu   # najlepsze wg P — kombinacje 4 z 25 to 12 650, liczy sie w sekundy
 
 
@@ -118,6 +119,16 @@ def najlepszy(d, rodzaj):
             if o['kurs'] >= MIX_MIN_KURS and o['szacunki'] <= 1:
                 o['sporty'] = d.loc[list(c), 'sport'].nunique(); kand.append(o)
         klucz = lambda o: (round(o['p'], 4), o['sporty'], o['ev'])
+    elif rodzaj == 'BONUS':
+        # 06.10.2026 (uzytkownik): obrot bonusem LVBET — trzy AKO pod rzad z kursem >= 1,75, wszystkie musza wejsc.
+        # Liczy sie WYLACZNIE szansa wejscia (EV i podatek nieistotne: grane srodki bonusowe). Kurs tuz nad progiem =
+        # najwyzsze P, wiec gorna granica 2,20 tylko odcina kupony bez sensu.
+        dd = d[d.sport.astype(str).str.lower().isin(['', 'pilka', 'piłka', 'pilka nozna', 'piłka nożna'])]
+        for c in _kombinacje(dd, 2, 3):
+            o = _opis(dd, c)
+            if BONUS_KURS[0] <= o['kurs'] <= BONUS_KURS[1] and o['szacunki'] == 0: kand.append(o)
+        kand.sort(key=lambda o: (-round(o['p'], 4), o['kurs']))
+        return kand    # lista (najlepsze pierwsze) — przebieg wybiera pierwszy, ktory w LVBET ma kurs >= 1,75
     elif rodzaj == 'PILKA':
         # 06.10.2026 (decyzja uzytkownika): codziennie JEDEN kupon z pilki noznej, kurs laczny 1,50–2,00, 2–3 nogi
         # z roznych meczow, NAJWYZSZE laczne P. Nogi: wszystkie, ktore przeszly bramki typuj.py (takze EV <= 0).
@@ -193,6 +204,25 @@ def main(argv):
                   f' — PRZED POSTAWIENIEM przepisz kursy z aplikacji i przelicz EV')
     print('\n' + linia_mix(najlepszy(d[(d.polski == 0) & (d.marza <= 1.10)], 'MIX'), d))
     print('\n' + '\n'.join(linie_pilka(wsz, a, wydane, kupony)))
+    print('\n' + '\n'.join(linie_bonus(wsz)))
+
+
+def linie_bonus(wsz, ile=3):
+    """06.10.2026: AKO BONUS LVBET — do 3 kandydatow (rozne nogi) z najwyzszym P przy kursie >= 1,75."""
+    kand = najlepszy(wsz[(wsz.polski == 0) & (wsz.marza <= 1.10)], 'BONUS')   # bez polskich klubow (A1 d) i marzy > 110%
+    if not kand:
+        return [f'AKO BONUS LVBET (kurs >= {BONUS_KURS[0]:.2f}): brak — za malo pewnych nog pilkarskich (bez szacunkow) na taki kurs']
+    out, uzyte = [f'AKO BONUS LVBET (kurs >= {BONUS_KURS[0]:.2f}; liczy sie tylko szansa wejscia — srodki bonusowe):'], set()
+    for o in kand:
+        if uzyte & set(o['nogi']): continue
+        uzyte |= set(o['nogi'])
+        nogi = ' + '.join(f'{wsz.at[i, "mecz"]} {wsz.at[i, "rynek"]} ({wsz.at[i, "p"]:.0%} @{wsz.at[i, "kurs"]:.2f})' for i in o['nogi'])
+        out.append(f'   {len(out)}. P {o["p"]:.1%} | kurs STS {o["kurs"]:.2f} | {nogi}')
+        if len(out) > ile: break
+    out.append('   → graj PIERWSZY kandydat, ktory w LVBET ma kurs laczny >= 1,75 (kursy3.py kupon; LVBET bywa nizej niz STS)')
+    p1 = kand[0]['p']
+    out.append(f'   (szansa wejscia najlepszego: {p1:.0%}; trzy takie kupony pod rzad: ok. {p1 ** 3:.0%} — to nie gwarancja)')
+    return out
 
 
 def linie_pilka(wsz, a, wydane, kupony):
