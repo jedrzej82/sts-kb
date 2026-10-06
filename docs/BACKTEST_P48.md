@@ -143,3 +143,31 @@ Brier (P >= 70%): P_model 0,1786, P_rynku **0,1763**.
 
 ### Decyzja
 Bez zmian w regulach (CZESC A, filtr 6.4). Wymogu „model > rynek o N pp” NIE wprowadzamy.
+
+## Rynek 3.5 gola (U3.5 / O3.5) — `python3 bt_ou35.py 2024-08-01 2026-09-30` i `--intl 2022-01-01` (06.10.2026)
+
+Powod: 05.10 przegraly dwie nogi U3.5 z P modelu ok. 70% (Francja – Belgia, Wlochy – Turcja). Sprawdzono CALA skale P,
+nie tylko >= 70%. Kluby: 86 534 mecze walk-forward; w 15 327 meczach P rynku z kursow na 2.5 gola (Poisson — kursow
+na 3.5 w historii nie ma; ta proxy jest dobrze skalibrowana: roznice < 1 pp w przedzialach 50–90%).
+
+| | n | Brier | uwagi |
+|---|---|---|---|
+| P_model (po korektach) — wszystkie mecze | 86 534 | 0,1991 | zaniza U3.5 o ok. 2 pp w calej skali (korekta −4 pp za mocna; zostaje — tylko zaostrza) |
+| P_rynku (mecze z kursami) | 15 327 | **0,1992** | prawie idealnie skalibrowany |
+| P_model na tych samych meczach | 15 327 | 0,2023 | |
+| mieszanka w·model + (1−w)·rynek | 7 720 (test) | w = 0 najlepsze | model nic nie dodaje do rynku |
+
+| nogi U3.5 | n | P_model | P_rynku | trafnosc |
+|---|---|---|---|---|
+| model >= rynek + 5 pp | 624 | 68,0% | 60,5% | **58,8%** |
+| model <= rynek − 5 pp | 5 013 | 65,6% | 73,3% | 73,0% |
+| P_model >= 70% w ligach ze srednia >= 3,2 gola | 589 | 71,3% | — | **62,1%** |
+
+Reprezentacje (4 989 meczow od 2022): P po korektach zaniza U3.5 o 3–5 pp w srodku skali, ale przy duzej przewadze Elo
+model PRZESZACOWUJE gole: P(U3.5) < 30% (czyli O3.5 > 70%) -> U3.5 weszlo w 43% (O3.5 tylko 57%).
+
+### Decyzja (Poprawka 145)
+Dla U3.5 i O3.5: **P do kuponu = min(P_modelu, P_rynku bez marzy)** (`rynek.p_kuponu_wg_rynku`, w `typuj.value`).
+Tylko obniza (A2). Na nogach U3.5 z P_model >= 70% i kursami: zostaje 5 913 nog (trafnosc 77,6%), odpada 551 nog
+z trafnoscia **66,1%** (ponizej progu 70%); Brier 0,1799 -> 0,1791. Na kursach 05.10: Wlochy – Turcja U3.5 1.62 / O3.5 2.30
+-> P rynku 58,7%, EV −16,4% — noga NIE NA KUPON (dotad dopuszczona z P 70,4%).

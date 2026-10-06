@@ -1172,7 +1172,7 @@ def ev_kelly(p, o):
 
 # 03.10.2026: FILTR MODEL-RYNEK (KROK 6.4) mieszka w rynek.py — wspolny z sporty.py.
 # Nazwy reeksportowane, bo testy i starsze wywolania siegaja po typuj.p_rynku / typuj.MAX_ROZBIEZNOSC_RYNEK.
-from rynek import MAX_ROZBIEZNOSC_RYNEK, filtr_model_rynek, p_rynku, kod_rynku    # noqa: F401
+from rynek import MAX_ROZBIEZNOSC_RYNEK, filtr_model_rynek, p_rynku, kod_rynku, p_kuponu_wg_rynku    # noqa: F401
 
 __all__ = ['MAX_ROZBIEZNOSC_RYNEK', 'filtr_model_rynek', 'p_rynku']
 
@@ -1255,6 +1255,8 @@ def value(rows, kursy, dz=None, mecz=None, szacunek=False, polski=False):
         elif (pow_r := filtr_model_rynek(k, pk, kursy)):
             print(f'      → NIE NA KUPON: {pow_r}')
         else:
+            pk, uw = p_kuponu_wg_rynku(k, pk, kursy)   # 06.10.2026: U3.5/O3.5 — mniejsze z modelu i rynku
+            if uw: print(f'      → {uw}')
             evk, kk = ev_kelly(pk, o)
             print(f'      → P do kuponu {pk:.1%}: EV={evk:+.1%}, ¼ Kelly={kk / 4:.1%}'
                   + ('  ✔ NOGA DOPUSZCZONA' if evk > 0 else '  ✘ NIE NA KUPON: EV ≤ 0 po bramce'))
