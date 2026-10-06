@@ -358,4 +358,10 @@ def main(a):
 
 
 if __name__ == '__main__':
-    main(sys.argv[1:] or ['backtest'])
+    # 06.10.2026 (Raport 21:00 usterka 1): bez argumentow uruchamial sie pelny backtest (kilka minut, nadpisuje pliki
+    # kalibracji linii) — przebieg wolal „python3 linie.py”, zeby zobaczyc pomoc, i dostal timeout. Teraz pomoc;
+    # backtest tylko jawnie: python3 linie.py backtest
+    if not sys.argv[1:] or sys.argv[1] in ('-h', '--help', 'pomoc'):
+        print(__doc__)
+        sys.exit(0)
+    main(sys.argv[1:])
