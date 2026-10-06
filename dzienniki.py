@@ -154,20 +154,21 @@ def wyniki_pilka(kb=HERE):
         con = sqlite3.connect(db)
         m = pd.read_sql("select MatchDate d, HomeTeam h, AwayTeam a, FTHome g, FTAway ga, HTHome hg, HTAway ha from matches "
                         "where MatchDate >= date('now', '-60 day')", con)
-        czesci.append(m)
+        czesci.append(m.assign(zr='kb'))
         try:
             i = pd.read_sql("select date d, home_team h, away_team a, home_score g, away_score ga from intl "
                             "where date >= date('now', '-60 day')", con)
-            czesci.append(i.assign(hg=None, ha=None))
+            czesci.append(i.assign(hg=None, ha=None, zr='kb'))
         except Exception:
             pass
     for f in glob.glob(os.path.join(kb, 'zewn', 'wyniki_*_pilka_*.csv*')):
         try:
             z = pd.read_csv(f, dtype=str, keep_default_na=False)
-            czesci.append(pd.DataFrame({'d': z.data, 'h': z.gosp, 'a': z.gosc, 'g': z.wg, 'ga': z.wa, 'hg': None, 'ha': None}))
+            zr = os.path.basename(f).split('_')[1]   # wyniki_365_pilka_... -> 365 (zrodlo: osobna pula nazw w _szukaj)
+            czesci.append(pd.DataFrame({'d': z.data, 'h': z.gosp, 'a': z.gosc, 'g': z.wg, 'ga': z.wa, 'hg': None, 'ha': None, 'zr': zr}))
         except Exception as e:
             print(f'  UWAGA: {os.path.basename(f)} nieczytelny ({e})')
-    if not czesci: return pd.DataFrame(columns=['d', 'h', 'a', 'g', 'ga', 'hg', 'ha'])
+    if not czesci: return pd.DataFrame(columns=['d', 'h', 'a', 'g', 'ga', 'hg', 'ha', 'zr'])
     w = pd.concat(czesci, ignore_index=True)
     w['d'] = _data(w.d).dt.normalize()
     for c in ('g', 'ga', 'hg', 'ha'): w[c] = pd.to_numeric(w[c], errors='coerce')
@@ -266,6 +267,30 @@ def _szukaj(w, d0, gosp, gosc, rozwiaz, kol_h='h', kol_a='a'):
     okno = w[(w.d >= d0 - pd.Timedelta(days=1)) & (w.d <= d0 + pd.Timedelta(days=1))]
     if okno.empty:   # 01.10.2026: z data konca zrodla (dart z walker95sam/darts potrafi miec 2-3 dni opoznienia)
         return None, 'brak wynikow z tych dni' + (f' (zrodlo konczy sie {w.d.max():%Y-%m-%d})' if len(w) else '')
+    x, odw = _szukaj_w_oknie(okno, d0, gosp, gosc, rozwiaz, kol_h, kol_a)
+    if x is not None or 'zr' not in okno or okno.zr.nunique() < 2: return x, odw
+    # 06.10.2026 (ako_log 05.10: Deportivo Riestra – CA Central Cordoba): pula z KILKU zrodel ma ten sam klub pod kilkoma
+    # nazwami (365 „Riestra”, Flashscore „Dep. Riestra”) i resolve odrzuca nazwe jako niejednoznaczna — choc oba
+    # kandydaci to ten sam mecz. Gdy wspolna pula nie rozstrzyga: to samo szukanie w KAZDYM zrodle osobno (tam nazwa
+    # klubu jest jedna); wynik tylko, gdy zrodla, ktore znalazly mecz, podaja ten sam wynik.
+    traf = {}
+    for zr, ok in okno.groupby('zr'):
+        n = len(_OSTRZEZENIA)
+        y, o = _szukaj_w_oknie(ok, d0, gosp, gosc, rozwiaz, kol_h, kol_a)
+        if y is None:
+            del _OSTRZEZENIA[n:]
+            continue
+        g, a = (y.ga, y.g) if o else (y.g, y.ga)
+        traf[zr] = (y, o, (float(g), float(a)))
+    if not traf: return x, odw
+    if len({t[2] for t in traf.values()}) != 1: return None, f'zrodla ({", ".join(sorted(traf))}) podaja rozne wyniki — nie zgadujemy'
+    zr = sorted(traf)[0]
+    y, o, _ = traf[zr]
+    _OSTRZEZENIA.append(f'dopasowano w zrodle {"/".join(sorted(traf))} osobno: {gosp} - {gosc} = {y[kol_h]} - {y[kol_a]} (sprawdz)')
+    return y, o
+
+
+def _szukaj_w_oknie(okno, d0, gosp, gosc, rozwiaz, kol_h, kol_a):
     pula = set(okno[kol_h]) | set(okno[kol_a])
     h, g = rozwiaz(gosp, pula), rozwiaz(gosc, pula)
     if h and g:
