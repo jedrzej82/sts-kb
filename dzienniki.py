@@ -235,8 +235,24 @@ def rynek_pilka(r):
     return re.sub(r'(?i)^go[sś][cć]_', 'gość_', s)
 
 
+def _hit_pilka(rynek, g, a, hg, ha):
+    """Rynek z ako_log -> True/False/None (nie da sie rozstrzygnac z wyniku). ucz.hit + „gosc/gosp gole N-M”."""
+    from ucz import hit
+    m = re.fullmatch(r'(?i)(go[sś][cć]|gosp|gospodarz)\s*_?gole\s*(\d+)\s*[-–]\s*(\d+)', str(rynek).strip())
+    if m:   # 06.10.2026 (PAPU 03.10 „gość gole 1-2”): liczba goli druzyny w przedziale
+        x = a if m.group(1).lower().startswith('go') and not m.group(1).lower().startswith('gosp') else g
+        return int(m.group(2)) <= x <= int(m.group(3))
+    m = re.fullmatch(r'(?i)(go[sś][cć]|gosp)_([OU])(\d+)\.5', str(rynek).strip())
+    if m:   # gole druzyny z dowolnym progiem („gosp_O2.5”); ucz.hit zna tylko 0.5 i 1.5
+        x = a if m.group(1).lower() != 'gosp' else g
+        return x > int(m.group(3)) if m.group(2).upper() == 'O' else x <= int(m.group(3))
+    return hit(rynek_pilka(rynek), g, a, hg, ha)
+
+
 def _para(zdarzenie):
-    p = re.split(r'\s+[-–]\s+', str(zdarzenie).strip(), maxsplit=1)
+    # 06.10.2026: ako_log 20.09 zapisywal godzine w nazwie („OGC Nice - LOSC Lille (17:15)”) — gosc „LOSC Lille (17:15)”
+    # nie dopasowywal sie do niczego (oferta.zamkniecia juz ja zdejmowal). Godzina na koncu nie jest czescia nazwy.
+    p = re.split(r'\s+[-–]\s+', re.sub(r'\s*\(\d{1,2}:\d{2}\)\s*$', '', str(zdarzenie).strip()), maxsplit=1)
     return (p[0].strip(), p[1].strip()) if len(p) == 2 else (None, None)
 
 
@@ -260,7 +276,7 @@ def _szukaj(w, d0, gosp, gosc, rozwiaz, kol_h='h', kol_a='a'):
         if len(x):
             x, powod = _jeden_mecz(x, d0)
             return (x.drop(labels='_odw'), bool(x['_odw'])) if x is not None else (None, f'{h} - {g}: {powod}')
-    k = _po_kotwicy(okno, h, g, gosp, gosc, rozwiaz, kol_h, kol_a)
+    k = _po_kotwicy(okno, h, g, gosp, gosc, rozwiaz, kol_h, kol_a, d0)
     if k is not None: return k
     if not h or not g: return None, f'nie dopasowano: {gosp if not h else gosc}'
     return None, f'{h} - {g}: brak meczu w oknie +-1 dnia'
@@ -281,7 +297,7 @@ def _jeden_mecz(x, d0):
     return x.iloc[-1], ''
 
 
-def _po_kotwicy(okno, h, g, gosp, gosc, rozwiaz, kol_h, kol_a):
+def _po_kotwicy(okno, h, g, gosp, gosc, rozwiaz, kol_h, kol_a, d0=None):
     """29.09.2026 (proba generalna, 28.09): dwa zrodla pisza ten sam mecz inaczej — Flashscore „Maccabi Bnei Raina –
     H. Raanana”, 365 „Maccabi Bnei Reineh – Hapoel Raanana”. Kazda nazwa z oferty trafiala w INNE zrodlo i para nie
     istniala nigdzie. Kotwica: druzyna dopasowana w puli, a jej rywal w tym wierszu musi dac sie dopasowac do drugiej
@@ -290,11 +306,20 @@ def _po_kotwicy(okno, h, g, gosp, gosc, rozwiaz, kol_h, kol_a):
     kand = []
     for kotw, drugi, gosp_kotw in ((h, gosc, True), (g, gosp, False)):
         if not kotw: continue
-        for r in okno[(okno[kol_h] == kotw) | (okno[kol_a] == kotw)].itertuples(index=False):
+        mecze_kotw = okno[(okno[kol_h] == kotw) | (okno[kol_a] == kotw)]
+        for r in mecze_kotw.itertuples(index=False):
             r = r._asdict()
             na_gosp = r[kol_h] == kotw
             rywal = r[kol_a] if na_gosp else r[kol_h]
-            if _cicho_bez_uwag(rozwiaz, drugi, {rywal}) != rywal: continue
+            # 06.10.2026 (sporty_typy 19–20.09: Trinec – „Plzen” = HC Plzen 1929, Karlovy Vary – „Pardubice” = HC CSOB
+            # Pardubice): resolve() odrzuca krotka nazwe miasta, bo w calej bazie bywa kilka klubow. Przy kotwicy jest
+            # JEDEN mecz rozpoznanej druzyny w oknie — wystarczy, ze wszystkie czlony nazwy z oferty sa w nazwie rywala.
+            # jedyny RYWAL kotwicy w DNIU MECZU (jak dopasuj.py); ten sam mecz z dwoch zrodel (365 + Flashscore) to jeden rywal
+            dnia = mecze_kotw[mecze_kotw.d == d0] if d0 is not None and 'd' in mecze_kotw else mecze_kotw.iloc[0:0]
+            rywale_dnia = {b if a == kotw else a for a, b in zip(dnia[kol_h], dnia[kol_a])}
+            jedyny = r.get('d') == d0 and rywale_dnia == {rywal}
+            if _cicho_bez_uwag(rozwiaz, drugi, {rywal}) != rywal and not (jedyny and _czlony_zawarte(drugi, rywal)):
+                continue
             kand.append((pd.Series(r), na_gosp != gosp_kotw, rywal))
     if not kand: return None
     def _wyn(s, odwr):
@@ -305,6 +330,17 @@ def _po_kotwicy(okno, h, g, gosp, gosc, rozwiaz, kol_h, kol_a):
     s, odwr, rywal = kand[0]
     _OSTRZEZENIA.append(f'dopasowano po jednej druzynie: {gosp} - {gosc} = {s[kol_h]} - {s[kol_a]} (sprawdz)')
     return s, odwr
+
+
+def _czlony_zawarte(nazwa, rywal):
+    """Wszystkie czlony nazwy z oferty (bez znakow diakrytycznych, >= 3 litery, bez znacznikow rezerw/kobiet) sa czlonami
+    nazwy rywala, a znaczniki (rezerwy, kobiety, U19) sa takie same po obu stronach."""
+    import sporty
+    from nazwy import znaczniki
+    if set(znaczniki(nazwa)) != set(znaczniki(rywal)): return False
+    cz = lambda t: {sporty.norm(x) for x in re.split(r'[\s\-/.]+', str(t)) if len(sporty.norm(x)) >= 3}
+    a, b = cz(nazwa), cz(rywal)
+    return bool(a) and a <= b
 
 
 def _cicho_bez_uwag(rozwiaz, nazwa, pula):
@@ -330,8 +366,10 @@ def _cicho(f, nazwa, pula):
 
 
 def _rozwiaz_pilka(nazwa, pula):
+    # 06.10.2026: jak typuj.main — po resolve() proba z polska nazwa miasta (EGZONIMY). Dotad rozliczenie jej nie robilo:
+    # „Lokomotiva Zagrzeb” (ako_log 20.09) typowana jako NK Lokomotiva Zagreb konczyla „nie dopasowano”.
     import typuj
-    return _cicho(lambda n, p: typuj._kraj_pl(n, p) or typuj.resolve(n, p), nazwa, pula)
+    return _cicho(lambda n, p: typuj._kraj_pl(n, p) or typuj.resolve(n, p) or typuj._przez_egzonim(n, p), nazwa, pula)
 
 
 def _rozwiaz_inne(nazwa, pula):
@@ -398,7 +436,6 @@ def rozlicz_noge(r, W):
 
 
 def _rozlicz_noge(r, W):
-    from ucz import hit
     sport = str(r.get('sport', '')).lower()
     gosp, gosc = _para(r['zdarzenie'])
     if not gosp: return 'BRAK WYNIKU', '', 'zdarzenie bez „A - B”'
@@ -414,25 +451,37 @@ def _rozlicz_noge(r, W):
         if x is None: return 'BRAK WYNIKU', '', odw
         g, a = (x.ga, x.g) if odw else (x.g, x.ga)
         hg, ha = (x.ha, x.hg) if odw else (x.hg, x.ha)
-        kod = rynek_pilka(rynek)
-        h = hit(kod, int(g), int(a), hg, ha)
         wyn = f'{int(g)}:{int(a)}'
+        # 06.10.2026: rynek laczony z kreatora („1 + gosp_O2.5”, PAPU 03.10) — kazda czesc z wyniku, noga wchodzi, gdy
+        # wchodza wszystkie. Czesc, ktorej nie da sie sprawdzic z wyniku (strzaly, kartki), = caly rynek nieobslugiwany.
+        if '+' in rynek:
+            czesci = [_hit_pilka(c.strip(), int(g), int(a), hg, ha) for c in rynek.split('+')]
+            if any(c is None for c in czesci): return 'BRAK WYNIKU', wyn, f'rynek „{rynek}” nieobslugiwany (czesc spoza wyniku)'
+            return ('TRAFIONY' if all(czesci) else 'PRZEGRANY'), wyn, ''
+        kod = rynek_pilka(rynek)
+        h = _hit_pilka(rynek, int(g), int(a), hg, ha)
         # 01.10.2026 (Settlement v2): zwrot DNB i rynek nieobslugiwany to rozne sytuacje — dawniej jeden komunikat
         if h is None and str(kod).startswith('DNB_') and int(g) == int(a): return 'BRAK WYNIKU', wyn, 'zwrot (DNB przy remisie)'
         if h is None: return 'BRAK WYNIKU', wyn, f'rynek „{rynek}” nieobslugiwany'
         return ('TRAFIONY' if h else 'PRZEGRANY'), wyn, ''
     if sport == 'tenis':
         t = W['tenis']
-        okno = t[(t.d >= d0 - pd.Timedelta(days=1)) & (t.d <= d0 + pd.Timedelta(days=1))]
-        pula = set(okno.w) | set(okno.l)
-        H, G = _kandydaci_tenis(gosp, pula), _kandydaci_tenis(gosc, pula)
+        # 06.10.2026: czesc tenis_hist (zrodlo z tourney_date) ma date POCZATKU turnieju, nie dnia meczu — noga z sr/czw
+        # (Parks – Fernandez 23.09, Sakkari – Hibino 24.09) nie miala meczu w oknie +-1 dnia i konczyla „nie dopasowano”.
+        # Najpierw okno +-1 dnia; gdy pary tam nie ma — 8 dni wstecz, ale tylko jeden mecz tej pary (jeden zwyciezca).
+        for wstecz in (1, 8):
+            okno = t[(t.d >= d0 - pd.Timedelta(days=wstecz)) & (t.d <= d0 + pd.Timedelta(days=1))]
+            pula = set(okno.w) | set(okno.l)
+            H, G = _kandydaci_tenis(gosp, pula), _kandydaci_tenis(gosc, pula)
+            x = okno[(okno.w.isin(H) & okno.l.isin(G)) | (okno.w.isin(G) & okno.l.isin(H))] if H and G else okno.iloc[0:0]
+            if len(x): break
         if not H or not G: return 'BRAK WYNIKU', '', f'nie dopasowano: {gosp if not H else gosc}'
         # mecz rozstrzyga PARA: kilku kandydatow po jednej stronie jest dopuszczalne, jesli dokladnie
-        # jedna para (kandydat, kandydat) grala w oknie +-1 dnia
-        x = okno[(okno.w.isin(H) & okno.l.isin(G)) | (okno.w.isin(G) & okno.l.isin(H))]
+        # jedna para (kandydat, kandydat) grala w oknie
         pary = {frozenset((a, b)) for a, b in zip(x.w, x.l)}
-        if not pary: return 'BRAK WYNIKU', '', f'{"/".join(sorted(H))} - {"/".join(sorted(G))}: brak meczu w oknie +-1 dnia'
+        if not pary: return 'BRAK WYNIKU', '', f'{"/".join(sorted(H))} - {"/".join(sorted(G))}: brak meczu w oknie +-1 dnia (i 8 dni wstecz)'
         if len(pary) > 1: return 'BRAK WYNIKU', '', f'kilka pasujacych meczow ({len(pary)}) — nie zgadujemy'
+        if wstecz > 1 and x.w.nunique() > 1: return 'BRAK WYNIKU', '', 'ta para grala w oknie kilka razy z roznym zwyciezca — nie zgadujemy'
         h = x.iloc[-1].w if x.iloc[-1].w in H else x.iloc[-1].l
         g = x.iloc[-1].l if h == x.iloc[-1].w else x.iloc[-1].w
         if len(H) > 1 or len(G) > 1: _OSTRZEZENIA.append(f'tenis: {gosp} - {gosc} = {h} - {g} (jedyna pasujaca para, sprawdz)')

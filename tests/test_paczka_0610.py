@@ -121,3 +121,58 @@ def test_ako_bonus_lvbet_min_175(tmp_path, capsys):
     assert 'G - H' not in out and 'trzy takie kupony pod rzad: ok. 22%' in out
     kupon.main([_nogi(tmp_path, [('A - B', '1X', 0.88, 1.25, 0, 0, '', '', 'pilka', 0)])])
     assert 'AKO BONUS LVBET (kurs >= 1.75): brak' in capsys.readouterr().out
+
+
+# ---- poszukiwanie usterek 06.10: rozliczenia 20.09–05.10 na danych z paczki 06.10 ----
+
+def _Wp(*mecze):
+    return dict(pilka=pd.DataFrame([dict(d=pd.Timestamp(d), h=h, a=a, g=g, ga=ga, hg=None, ha=None) for d, h, a, g, ga in mecze]),
+                inne=pd.DataFrame(columns=['d', 'sport', 'h', 'a', 'pg', 'pa', 'ot']), tenis=pd.DataFrame(columns=['d', 'w', 'l', 'score']))
+
+
+def test_godzina_w_nazwie_meczu_i_egzonim():
+    # ako_log 20.09: „OGC Nice - LOSC Lille (17:15)”, „Dinamo Zagrzeb - Lokomotiva Zagrzeb (20:00)” — bylo „nie dopasowano”
+    W = _Wp(('2026-09-20', 'OGC Nice', 'LOSC Lille', 2, 1), ('2026-09-20', 'Dinamo Zagreb', 'NK Lokomotiva Zagreb', 3, 2))
+    r = dict(sport='pilka', zdarzenie='OGC Nice - LOSC Lille (17:15)', rynek='U4.5', data='2026-09-20', uwaga='')
+    assert dzienniki.rozlicz_noge(r, W)[:2] == ('TRAFIONY', '2:1')
+    r = dict(sport='pilka', zdarzenie='Dinamo Zagrzeb - Lokomotiva Zagrzeb (20:00)', rynek='1X', data='2026-09-20', uwaga='')
+    assert dzienniki.rozlicz_noge(r, W)[:2] == ('TRAFIONY', '3:2')
+
+
+def test_rynki_laczone_i_gole_druzyny():
+    W = _Wp(('2026-10-03', 'Switzerland', 'Slovenia', 2, 1), ('2026-10-03', 'North Macedonia', 'Scotland', 0, 2))
+    noga = lambda z, ry: dict(sport='pilka', zdarzenie=z, rynek=ry, data='2026-10-03', uwaga='')
+    assert dzienniki.rozlicz_noge(noga('Switzerland - Slovenia', '1 + gosp_O2.5'), W)[0] == 'PRZEGRANY'   # 2 gole gosp.
+    assert dzienniki.rozlicz_noge(noga('Switzerland - Slovenia', '1 + gosp_O1.5'), W)[0] == 'TRAFIONY'
+    assert dzienniki.rozlicz_noge(noga('North Macedonia - Scotland', 'gość gole 1-2'), W)[0] == 'TRAFIONY'
+    stan, _, uw = dzienniki.rozlicz_noge(noga('Switzerland - Slovenia', 'O1.5 + strzaly O29.5'), W)
+    assert stan == 'BRAK WYNIKU' and 'spoza wyniku' in uw                                           # nie zgadujemy strzalow
+
+
+def test_tenis_data_poczatku_turnieju():
+    # czesc tenis_hist ma date poczatku turnieju (21.09), noga z 24.09 — bylo „nie dopasowano”
+    W = dict(pilka=None, inne=None, tenis=pd.DataFrame([dict(d=pd.Timestamp('2026-09-21'), w='Maria Sakkari', l='Nao Hibino',
+                                                             score='7-5 6-1')]))
+    r = dict(sport='tenis', zdarzenie='Sakkari Maria - Hibino Nao', rynek='Zwyciezca Sakkari', data='2026-09-24', uwaga='')
+    assert dzienniki.rozlicz_noge(r, W)[0] == 'TRAFIONY'
+    W['tenis'] = pd.concat([W['tenis'], pd.DataFrame([dict(d=pd.Timestamp('2026-09-19'), w='Nao Hibino', l='Maria Sakkari', score='6-1 6-1')])])
+    assert dzienniki.rozlicz_noge(r, W)[0] == 'BRAK WYNIKU'            # dwa mecze tej pary z roznym zwyciezca — nie zgadujemy
+
+
+def test_kotwica_jedyny_rywal_dnia_dwa_zrodla():
+    # sporty_typy 19.09: Trinec – „Plzen” (w bazie HC Plzen 1929, ten sam mecz z 365 i Flashscore)
+    mecze = [('2026-09-18', 'Třinec', 'Kometa Brno', 6, 5), ('2026-09-19', 'Třinec', 'HC Plzeň 1929', 3, 2),
+             ('2026-09-19', 'Třinec', 'HC Plzeň 1929', 3, 2), ('2026-09-19', 'HC Plzeň 1929 B', 'Tabor', 1, 0)]
+    W = dict(pilka=None, tenis=None, inne=pd.DataFrame([dict(d=pd.Timestamp(d), sport='hokej', h=h, a=a, pg=x, pa=y, ot=0)
+                                                       for d, h, a, x, y in mecze]))
+    r = dict(sport='hokej', zdarzenie='Třinec - Plzeň', rynek='1 (60 min)', data='2026-09-19', uwaga='')
+    stan, wyn, uw = dzienniki.rozlicz_noge(r, W)
+    assert (stan, wyn) == ('TRAFIONY', '3:2') and 'po jednej druzynie' in uw
+    assert dzienniki._czlony_zawarte('Plzeň', 'HC Plzeň 1929') and not dzienniki._czlony_zawarte('Plzeň B', 'HC Plzeň 1929')
+
+
+def test_aliasy_i_kraj_z_rozliczen_0610():
+    import typuj
+    assert typuj._kraj_pl('Wyspy Sw. Tomasza i Ksiazeca', {'São Tomé and Príncipe', 'Gibraltar'}) == 'São Tomé and Príncipe'
+    assert sporty.resolve('Basquet Coruna', {'Leyma Coruña', 'Bilbao Basket'}, 'koszykówka') == 'Leyma Coruña'
+    assert sporty.resolve('Oakland Athletics', {'Athletics', 'Cleveland Guardians'}, 'baseball') == 'Athletics'

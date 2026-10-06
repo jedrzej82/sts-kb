@@ -177,6 +177,7 @@ _KRAJE_PL = {
     'gujanafrancuska': ('French Guiana',), 'wyspaman': ('Isle of Man',), 'makau': ('Macau',), 'makao': ('Macau',),
     'wyspysalomona': ('Solomon Islands',), 'timorwschodni': ('Timor-Leste',),
     'wyspyswietegotomaszaiksiazeca': ('São Tomé and Príncipe',), 'saotomeiprincipe': ('São Tomé and Príncipe',),
+    'wyspyswtomaszaiksiazeca': ('São Tomé and Príncipe',),   # 06.10.2026: ako_log 23.09 „Wyspy Sw. Tomasza i Ksiazeca”
     'amerykanskiewyspydziewicze': ('United States Virgin Islands',), 'egipt': ('Egypt',),
     'ekwador': ('Ecuador',), 'estonia': ('Estonia',), 'filipiny': ('Philippines',),
     'finlandia': ('Finland',), 'francja': ('France',), 'ghana': ('Ghana',),
