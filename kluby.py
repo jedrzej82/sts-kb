@@ -66,6 +66,12 @@ SCAL_RECZNIE = {
     ('Spain | Segunda RFEF', 'Terrassa FC'): 'Terrassa',
     ('Uruguay | Segunda Division', 'Tacuarembó FC'): 'Tacuarembó',
     ('Venezuela | Liga FUTVE 2', 'Aragua FC'): 'Aragua',
+    # 06.10.2026 (Raport 18:00: KONFLIKT/MOZLIWY_DUBEL „Alfreton Town=Alfreton”): ten sam przeglad z „Town/City” w rdzeniu.
+    # Celowo NIE: Salisbury (Salisbury City FC upadl 2014; Salisbury FC to nastepca).
+    ('England | Non League Premier', 'Alfreton'): 'Alfreton Town',
+    ('England | Non League Premier', 'Kettering'): 'Kettering Town',
+    ('Ireland | Division 1', 'Athlone Town'): 'Athlone',
+    ('SC2', 'FC Edinburgh'): 'Edinburgh City',          # Edinburgh City -> FC Edinburgh (2022) -> Edinburgh City
     # ta sama para, kariery z dwoch lig jednoczesnie (zrodlo pisze klub inaczej w kazdej lidze), zero wspolnych dni:
     ('N2', 'Emmen'): 'FC Emmen',                           # dotad tylko alias typuj (aliasy.csv 03.10)
     ('N2', 'FC Dordrecht'): 'Dordrecht',
