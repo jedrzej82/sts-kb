@@ -26,6 +26,10 @@ def load():
         d = pd.concat([d, x], ignore_index=True)
     d = d.rename(columns={'zwyciezca': 'winner_name', 'przegrany': 'loser_name', 'nawierzchnia': 'surface', 'poziom': 'tourney_level'})
     d = d.dropna(subset=['date', 'winner_name', 'loser_name'])
+    # 06.10.2026 (Raport 05.10 21:00 usterka 4): zrodlo pisze czasem „Alicia  Dudeney” (dwie spacje) — sklejanie
+    # wariantow wybieralo ten zapis jako glowny i taki trafial do raportu. Jedna spacja, bez spacji na koncach.
+    for c in ('winner_name', 'loser_name'):
+        d[c] = d[c].astype(str).str.replace(r'\s+', ' ', regex=True).str.strip()
     d = d[~d.score.astype(str).str.contains('W/O|RET|DEF|Walkover|w/o|Ret', na=False)]
     d['surface'] = d.surface.fillna('Hard').replace({'Carpet': 'Hard'})
     d = _scal_warianty(d)

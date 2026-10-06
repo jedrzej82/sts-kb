@@ -462,10 +462,13 @@ def _rozlicz_noge(r, W):
     if typ is None: return 'BRAK WYNIKU', wyn, f'rynek „{rynek}” nieobslugiwany'
     regulamin = zakres == 'regulamin'
     if regulamin and x.ot == 1: return 'PRZEGRANY', wyn, 'rozstrzygniety w dogrywce, a rynek w czasie regulaminowym'
+    # 06.10.2026 (Raport 21:00 usterka 1, Wetzlar – Löwen 30:30, rynek „2” = czas regulaminowy): remis KONCOWY znaczy, ze
+    # i po czasie regulaminowym byl remis (dogrywka dodaje bramki, karne nie zmieniaja zapisu) — strona przegrywa,
+    # wiedza o dogrywce nie jest potrzebna. Dotad „brak informacji o dogrywce” wygrywal z tym rozstrzygnieciem.
+    if regulamin and pg == pa: return 'PRZEGRANY', wyn, 'remis w czasie regulaminowym'
     if regulamin and x.ot == -1: return 'BRAK WYNIKU', wyn, 'brak informacji o dogrywce'
     # 29.09.2026 (przeglad): remis byl liczony jako wygrana goscia („2” TRAFIONY przy 3:3 w futsalu)
     if pg == pa:
-        if regulamin: return 'PRZEGRANY', wyn, 'remis w czasie regulaminowym'
         # 05.10.2026 (HSG Wetzlar – Rhein-Neckar Löwen 30:30, Bundesliga, 2 polowy): w recznej/futsalu/rugby remis bywa
         # wynikiem KONCOWYM (liga bez dogrywki) — zwyciezcy nie ma, rynek zwyciezcy przegrany. Tylko sporty z remisem
         # (sporty.DRAW_PRIOR); hokej: remis w danych moze znaczyc brak zapisu karnych — dalej recznie, jak sporty spoza listy.
