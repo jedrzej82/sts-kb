@@ -52,3 +52,29 @@ def test_bt_ou35_rynek_z_kursow_na_25():
     assert abs(bt_ou35.p_ponizej(bt_ou35.lam_z_over25(0.5), 2) - 0.5) < 1e-6
     p = bt_ou35.p_rynku_u35(1.80, 2.05)          # rynek ok. 53% na powyzej 2.5 -> ok. 69% na ponizej 3.5
     assert 0.68 < p < 0.70 and bt_ou35.p_rynku_u35(float('nan'), 2.0) is None
+
+
+def test_u35_liga_bramkostrzelna_i_o25_reprezentacji(monkeypatch):
+    import typuj
+    monkeypatch.setattr(typuj, 'LIGA_BEZ_TESTU', None)
+    dz = {'U3.5': 0.74, 'O2.5': 0.78, '1X': 0.80}
+    typuj.KONTEKST_MECZU.clear(); typuj.KONTEKST_MECZU['sr_goli_ligi'] = 3.79      # OBOS-ligaen 2025/26
+    p, powod = typuj.werdykt_nogi('U3.5', dz)
+    assert p is None and 'Poprawka 146' in powod
+    assert typuj.werdykt_nogi('1X', dz) == (0.80, None)
+    typuj.KONTEKST_MECZU['sr_goli_ligi'] = 2.6
+    assert typuj.werdykt_nogi('U3.5', dz) == (0.74, None)
+    assert typuj.werdykt_nogi('O2.5', dz) == (0.78, None)                       # kluby: O2.5 bez zmian
+    typuj.KONTEKST_MECZU.clear(); typuj.KONTEKST_MECZU['intl'] = True
+    p, powod = typuj.werdykt_nogi('O2.5', dz)
+    assert p is None and 'reprezentacje' in powod
+    typuj.KONTEKST_MECZU.clear()
+
+
+def test_srednia_goli_ligi():
+    import typuj
+    m = pd.DataFrame(dict(Division=['A'] * 40 + ['B'] * 10, MatchDate=pd.Timestamp('2026-09-01'),
+                          FTHome=[3] * 40 + [5] * 10, FTAway=[1] * 40 + [5] * 10))
+    assert typuj.srednia_goli_ligi(m, {'A', 'B'}, dzis='2026-10-06') == 4.0         # B ma < 30 meczow — pominieta
+    assert typuj.srednia_goli_ligi(m, {'B'}, dzis='2026-10-06') is None
+    assert typuj.srednia_goli_ligi(m, {'A'}, dzis='2027-12-01') is None            # stare mecze poza 12 mies.

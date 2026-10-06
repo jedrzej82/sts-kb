@@ -1065,6 +1065,9 @@ def club(home, away, kursy, live=None):
     global LIGA_BEZ_TESTU
     LIGA_BEZ_TESTU = liga_bez_testu(m, {dh, da})
     if LIGA_BEZ_TESTU: print(f'\nLIGA BEZ TESTU: {LIGA_BEZ_TESTU} — P informacyjnie, ZADNA noga z tego meczu NIE idzie na kupon.')
+    KONTEKST_MECZU.clear(); KONTEKST_MECZU['sr_goli_ligi'] = srednia_goli_ligi(m, {dh, da})
+    if (_sr := KONTEKST_MECZU['sr_goli_ligi']) is not None and _sr >= PROG_LIGA_BRAMKOSTRZELNA:
+        print(f'\nLIGA BRAMKOSTRZELNA: srednia {_sr:.2f} gola na mecz (12 mies.) — U3.5 z P >= 70% NIE NA KUPON (Poprawka 146).')
     dz = drugie_zrodlo([(r.MatchDate, r.HomeTeam, r.AwayTeam, int(r.FTHome), int(r.FTAway)) for r in _mm.itertuples()], h, a, rows)
     value(rows, kursy, dz, mecz=f'{home} - {away}', szacunek=bool(szac), polski='poland' in (kh, ka))
     for a_, b_, k_ in PARY:
@@ -1185,6 +1188,10 @@ RYNKI_ZAWYZONE_P70 = {'U2.5': (64, 0.745, 0.531), 'BTTS_nie': (60, 0.797, 0.517)
                       'BTTS_tak': (8, 0.833, 0.500), '2': (69, 0.757, 0.652)}
 
 
+# 06.10.2026 (bt_ou35.py, docs/BACKTEST_P48.md): kontekst meczu dla regul rynku goli — 'sr_goli_ligi' (kluby: srednia goli
+# ligi z 12 mies., wieksza z dwoch lig) i 'intl' (reprezentacje). Ustawia main / intl przed value().
+KONTEKST_MECZU = {}
+PROG_LIGA_BRAMKOSTRZELNA = 3.2
 LIGA_BEZ_TESTU = None   # 03.10.2026: powod blokady meczu z ligi bez historii/testu (ustawia main po rozpoznaniu lig)
 MIN_MECZOW_NA_KUPON = 60
 
@@ -1219,7 +1226,26 @@ def werdykt_nogi(k, dz):
     if k in RYNKI_ZAWYZONE_P70 and dz[k] >= 0.70:
         n, p, t = RYNKI_ZAWYZONE_P70[k]
         return None, f'rynek {k} przy P >= 70% ZAWYZONY w backtescie (n={n}: P {p:.0%} -> trafnosc {t:.0%}; Poprawka 58.5)'
+    # 06.10.2026 (Poprawka 146, bt_ou35.py): w ligach ze srednia >= 3,2 gola nogi U3.5 z P >= 70% wchodzily w 62%
+    # (dwa niezalezne okresy: n=589 i n=571); w reprezentacjach O2.5 z P >= 70%: P 80% -> trafnosc 70% (n=348)
+    sr = KONTEKST_MECZU.get('sr_goli_ligi')
+    if k == 'U3.5' and sr is not None and sr >= PROG_LIGA_BRAMKOSTRZELNA and dz[k] >= 0.70:
+        return None, (f'U3.5 w lidze ze srednia {sr:.2f} gola (>= {PROG_LIGA_BRAMKOSTRZELNA}) — przy P >= 70% trafnosc 62% '
+                      f'(bt_ou35, n=589; Poprawka 146)')
+    if k == 'O2.5' and KONTEKST_MECZU.get('intl') and dz[k] >= 0.70:
+        return None, 'reprezentacje: O2.5 przy P >= 70% ZAWYZONY (n=348: P 80% -> trafnosc 70%; Poprawka 146)'
     return dz[k], None
+
+
+def srednia_goli_ligi(m, ligi, dzis=None, dni=365, min_n=30):
+    """Najwieksza srednia goli na mecz wsrod lig meczu (ostatnie `dni`, co najmniej `min_n` meczow) albo None."""
+    dzis = pd.Timestamp(dzis or dt.date.today())
+    sr = []
+    for l in ligi:
+        if not isinstance(l, str): continue
+        x = m[(m.Division == l) & (m.MatchDate >= dzis - pd.Timedelta(days=dni)) & (m.MatchDate <= dzis)].dropna(subset=['FTHome', 'FTAway'])
+        if len(x) >= min_n: sr.append(float((x.FTHome + x.FTAway).mean()))
+    return max(sr) if sr else None
 
 
 NOGI_PLIK = None   # --nogi PLIK: nogi DOPUSZCZONE dopisywane do CSV dla kupon.py (faza 4)
@@ -1384,6 +1410,7 @@ def intl(home, away, neutral, kursy):
     if len(hh): print('\nH2H:', ' | '.join(f'{r.date} {r.home_team} {int(r.home_score)}:{int(r.away_score)} {r.away_team}' for r in hh.itertuples()))
     dz = drugie_zrodlo([(r.date, r.home_team, r.away_team, int(r.home_score), int(r.away_score)) for r in df.itertuples()
                         if pd.notna(r.home_score) and pd.notna(r.away_score)], h, a, rows)
+    KONTEKST_MECZU.clear(); KONTEKST_MECZU['intl'] = True   # Poprawka 146: O2.5 reprezentacji przy P >= 70% zawyzony
     value(rows, kursy, dz, mecz=f'{home} - {away}', szacunek=bool(szac), polski='Poland' in (h, a))
     for a_, b_, k_ in PARY:
         para(rows, (lh, la), -0.05, a_, b_, k_, dz, mecz=f'{home} - {away}', szacunek=bool(szac), polski='Poland' in (h, a))
@@ -1399,7 +1426,7 @@ def main(argv):
     """Jedno wywolanie typuj.py (argumenty jak w wierszu polecen). Wolane tez przez typuj_wsad.py dla wielu meczow."""
     global NOGI_PLIK, LIGA_BEZ_TESTU
     NOGI_PLIK, LIGA_BEZ_TESTU = None, None
-    PARY.clear()
+    PARY.clear(); KONTEKST_MECZU.clear()
     args = list(argv)
     kursy = {}
     if '--nogi' in args:
