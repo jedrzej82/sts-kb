@@ -44,6 +44,32 @@ SCAL_RECZNIE = {
     # 05.10.2026 (Raport 15:00 usterka 4): literowka zrodla — "Taran" zamiast "Tatran" (MFK Tatran Liptovsky Mikulas);
     # oferta STS, LVBET i Superbet pisza Tatran, dopasowanie dzialalo tylko przez terminarz.
     ('Slovakia | 2. Liga', 'Taran Liptovsky Mikulas'): 'Tatran Liptovsky Mikulas',
+    # 06.10.2026 (Raport 12:00 usterka 4: „Hyde United NIESWIEZA 2014-04-26”, „Welling United NIESWIEZA 2016-04-30”):
+    # ten sam klub z dwoch zrodel — football-data (stara liga, do spadku) i 365scores (od 2025, inny zapis). Oferta
+    # trafiala w stary wpis bez meczow od lat. Lista z przegladu calej bazy (rdzen nazwy bez United/Utd/FC/AFC, stary
+    # wpis konczy sie przed 2024, nowy gra od 2025, nigdy nie grali ze soba); kazda para sprawdzona recznie.
+    # Celowo NIE: Wimbledon – AFC Wimbledon (dwa kluby), Austin (Austin Bold, USL) – Austin FC, Airdrie (Airdrieonians
+    # do 2002) – Airdrie Utd, Clydebank (do 2002) – Clydebank FC — nastepcy, nie te same kluby.
+    ('England | Non League Premier', 'Hyde'): 'Hyde United',
+    ('England | Non League Premier', 'Welling Utd'): 'Welling United',
+    ('England | Non League Premier', 'Guiseley AFC'): 'Guiseley',
+    ('England | National League N/S', 'Chorley FC'): 'Chorley',
+    ('England | National League N/S', 'Maidstone United'): 'Maidstone',
+    ('England | National League N/S', 'AFC Telford'): 'AFC Telford United',
+    ('EC', 'Telford United'): 'AFC Telford United',       # AFC Telford United (od 2004) — w EC od 2012 bez „AFC”
+    ('EC', 'Boston Utd'): 'Boston',                        # Boston United: E3 do 2007, EC od 2024
+    ('Ireland | National League', 'Mervue United'): 'Mervue',
+    ('Ireland | Division 1', 'UC Dublin FC'): 'UC Dublin',
+    ('Peru | Liga 2', 'Pirata FC'): 'Pirata',
+    ('Portugal | Liga Portugal 2', 'FC Penafiel'): 'Penafiel',
+    ('Russia | Russian First League', 'FC Ufa'): 'Ufa',
+    ('Spain | Segunda RFEF', 'Terrassa FC'): 'Terrassa',
+    ('Uruguay | Segunda Division', 'Tacuarembó FC'): 'Tacuarembó',
+    ('Venezuela | Liga FUTVE 2', 'Aragua FC'): 'Aragua',
+    # ta sama para, kariery z dwoch lig jednoczesnie (zrodlo pisze klub inaczej w kazdej lidze), zero wspolnych dni:
+    ('N2', 'Emmen'): 'FC Emmen',                           # dotad tylko alias typuj (aliasy.csv 03.10)
+    ('N2', 'FC Dordrecht'): 'Dordrecht',
+    ('D3', 'FC Erzgebirge Aue'): 'Erzgebirge Aue',
     ('Uruguay | Segunda Division', 'La Luz'): 'La Luz FC',          # URU do 2023 jako La Luz FC, potem Segunda (365: La Luz)
     # A-League: 365scores dopisuje "FC"; cel = pelna nazwa (sam "Newcastle" koliduje z angielskim klubem).
     # "W Sydney" (Western Sydney Wanderers) i "Sydney FC" to DWA kluby — celowo osobno.
