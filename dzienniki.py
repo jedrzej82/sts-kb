@@ -792,6 +792,15 @@ def main(a):
         print('\n' + '\n'.join(clv.licznik(ako)))
     except Exception as e:
         print(f'\nLICZNIK CLV: niedostepny ({type(e).__name__}: {e})')
+    # 06.10.2026 (decyzja uzytkownika): samokontrola — gdzie system sie myli (sport / rynek / liga, n >= 50, > 5 pp)
+    try:
+        import samokontrola
+        tp = os.path.join(HERE, 'sporty_typy.csv')
+        d = pd.concat([samokontrola.nogi_ako(ako, W),
+                       samokontrola.nogi_typy(pd.read_csv(tp) if os.path.exists(tp) else None)], ignore_index=True)
+        print('\n' + '\n'.join(samokontrola.linie(d)))
+    except Exception as e:
+        print(f'\nSAMOKONTROLA: niedostepna ({type(e).__name__}: {e})')
 
 
 if __name__ == '__main__':
