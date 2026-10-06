@@ -171,3 +171,30 @@ Dla U3.5 i O3.5: **P do kuponu = min(P_modelu, P_rynku bez marzy)** (`rynek.p_ku
 Tylko obniza (A2). Na nogach U3.5 z P_model >= 70% i kursami: zostaje 5 913 nog (trafnosc 77,6%), odpada 551 nog
 z trafnoscia **66,1%** (ponizej progu 70%); Brier 0,1799 -> 0,1791. Na kursach 05.10: Wlochy – Turcja U3.5 1.62 / O3.5 2.30
 -> P rynku 58,7%, EV −16,4% — noga NIE NA KUPON (dotad dopuszczona z P 70,4%).
+
+### Czy sam model da sie nauczyc lepiej liczyc 3.5? (06.10.2026, druga czesc)
+Uzytkownik: „nie chodzi o podawanie kursu, tylko o lepsze przewidywanie”. Sprawdzono, czy model (bez kursu) da sie poprawic
+dodatkowymi informacjami. Regresja logistyczna na P_model + cechy, uczona na meczach do 07.2025, sprawdzona na 68 218 meczach
+od 08.2025 (bez przecieku; cechy druzyn z 10 POPRZEDNICH meczow):
+
+| model | Brier (test) |
+|---|---|
+| P_model (kupon) | 0,2000 |
+| + kalibracja | 0,2000 |
+| + czestosc U3.5 w lidze | 0,1999 |
+| + forma druzyn (U3.5 w 10 meczach) | 0,1998 |
+| + srednia goli druzyn | **0,1995** |
+| + celne strzaly (tylko 21 lig, 15,6% meczow) | 0,1996 |
+| (dla porownania) rynek, mecze z kursami | 0,2017 vs model 0,2048 |
+
+Wniosek: z danych, ktore mamy (wyniki; strzaly tylko w duzych ligach), poprawa jest kosmetyczna (0,25% Brier),
+a nowe P bylo w tescie gorzej skalibrowane (przeszacowane o 1,5–2,6 pp). NIE wdrazamy przeliczenia P. Zostaja dwa
+miejsca, gdzie model myli sie systematycznie i potwierdzone w obu okresach:
+- ligi ze srednia >= 3,2 gola na mecz: U3.5 z P >= 70% trafia 62% (n=589 uczenie, n=571 test);
+- reprezentacje: O2.5 z P >= 70%: P 79,6% -> trafnosc 70,1% (n=348). Tamze: przy wielkiej przewadze Elo model zawyza gole
+  (P(U3.5) < 30% -> U3.5 weszlo w 44%); reguła −4 pp „ponizej” w reprezentacjach zaniza (P surowe trafniejsze) — zostaje, bo tylko zaostrza.
+
+### Decyzja (Poprawka 146)
+`typuj.werdykt_nogi`: U3.5 z P >= 70% w lidze ze srednia >= 3,2 gola (12 mies., wieksza z dwoch lig, >= 30 meczow) — NIE NA KUPON;
+reprezentacje: O2.5 z P >= 70% — NIE NA KUPON. Tylko zaostrza (A2). Do poprawy samego przewidywania potrzebne sa nowe dane
+(sklady, xG z FotMob/Understat — tryb obserwacji w termux/zrodla.py); po zebraniu — ten sam test.

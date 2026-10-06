@@ -83,9 +83,10 @@ def wiersze(start, koniec):
                 if lam is None: continue
                 mk = markets(*lam, mdl['rho'] if mdl else -0.05)
                 out.append((r.MatchDate, div, kal('U3.5', mk['U3.5']), mk['U3.5'], sum(lam), sr_lig,
-                            kursy.get((div, r.MatchDate, r.HomeTeam, r.AwayTeam)), int(r.FTHome + r.FTAway <= 3)))
+                            kursy.get((div, r.MatchDate, r.HomeTeam, r.AwayTeam)), int(r.FTHome + r.FTAway <= 3),
+                            r.HomeTeam, r.AwayTeam))
         print(ms.date(), len(out), flush=True)
-    return pd.DataFrame(out, columns=['data', 'liga', 'p_model', 'p_surowe', 'lam', 'sr_ligi', 'p_rynek', 'u35'])
+    return pd.DataFrame(out, columns=['data', 'liga', 'p_model', 'p_surowe', 'lam', 'sr_ligi', 'p_rynek', 'u35', 'gosp', 'gosc'])
 
 
 def intl_wiersze(od='2022-01-01'):
