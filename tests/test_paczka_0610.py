@@ -34,3 +34,21 @@ def test_tenis_jedna_spacja_w_nazwisku(tmp_path, monkeypatch):
     d = tenis.load()
     n = set(d.winner_name) | set(d.loser_name)
     assert 'Alicia Dudeney' in n and not any('  ' in x or x != x.strip() for x in n)
+
+
+def test_u35_p_do_kuponu_min_model_rynek():
+    import rynek
+    # Wlochy – Turcja 05.10, PDF 17:30: U3.5 1.62 / O3.5 2.30; model 70,4% -> rynek 58,7% (noga przegrala 2:3+)
+    kursy = {'U3.5': 1.62, 'O3.5': 2.30, '1': 1.40, 'X': 5.10, '2': 7.75}
+    p, uw = rynek.p_kuponu_wg_rynku('U3.5', 0.704, kursy)
+    assert abs(p - 0.5868) < 0.001 and 'liczy sie mniejsze' in uw
+    assert rynek.p_kuponu_wg_rynku('U3.5', 0.55, kursy) == (0.55, None)        # rynek wyzej — zostaje model (A2)
+    assert rynek.p_kuponu_wg_rynku('U2.5', 0.704, {'U2.5': 1.30, 'O2.5': 3.5}) == (0.704, None)   # inne rynki bez zmian
+    assert rynek.p_kuponu_wg_rynku('U3.5', 0.704, {}) == (0.704, None)          # bez kursow nic nie zmienia
+
+
+def test_bt_ou35_rynek_z_kursow_na_25():
+    import bt_ou35
+    assert abs(bt_ou35.p_ponizej(bt_ou35.lam_z_over25(0.5), 2) - 0.5) < 1e-6
+    p = bt_ou35.p_rynku_u35(1.80, 2.05)          # rynek ok. 53% na powyzej 2.5 -> ok. 69% na ponizej 3.5
+    assert 0.68 < p < 0.70 and bt_ou35.p_rynku_u35(float('nan'), 2.0) is None

@@ -64,6 +64,22 @@ def p_rynku_szacunek(k, kursy):
     return None
 
 
+# 06.10.2026 (bt_ou35.py, docs/BACKTEST_P48.md): na rynku 3.5 gola kurs przewiduje lepiej niz model — 86 534 mecze
+# klubowe: gdy model daje >= 5 pp wiecej niz rynek, wchodzi tyle, ile mowi rynek (58,8% przy P modelu 68,0%); mieszanka
+# model+rynek najlepsza przy wadze modelu 0. Reprezentacje: przy duzej przewadze Elo model przeszacowuje gole.
+RYNKI_ZA_RYNKIEM = ('U3.5', 'O3.5')
+
+
+def p_kuponu_wg_rynku(k, p, kursy):
+    """P do kuponu dla rynkow z RYNKI_ZA_RYNKIEM = min(P modelu, P rynku bez marzy). Zwraca (P, uwaga albo None).
+    Tylko obniza (A2) — gdy rynek daje wiecej albo nie da sie go policzyc, zostaje P modelu."""
+    if k not in RYNKI_ZA_RYNKIEM: return p, None
+    pr = p_rynku(k, kursy)
+    if pr is None: pr = p_rynku_szacunek(k, kursy)
+    if pr is None or pr >= p: return p, None
+    return pr, f'P rynku {pr:.1%} < P modelu {p:.1%} — na {k} liczy sie mniejsze (bt_ou35: rynek trafniejszy)'
+
+
 def filtr_model_rynek(k, p, kursy):
     """KROK 6.4. Zwraca powod odrzucenia albo None.
     Brak kursu dopelniajacego: ksiega z rynku glownego meczu (p_rynku_szacunek); gdy i tego brak — brak filtra
