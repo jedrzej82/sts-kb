@@ -12,6 +12,8 @@ Wynik: kursy_bukmacherow_RRRR-MM-DD_GG-MM.csv.gz (Pobrane) — kolumny:
           gosp_O0.5, gość_O0.5; koszykowka O/U z dogrywka); pusty = rynek zapisany tylko surowo (rynek_oryg/wybor_oryg).
 
 Uzycie:  python kursy_bukmacherow.py --diag-lvbet   (numery sportow LVBET)
+         python kursy_bukmacherow.py --diag-sts [--katalog /sdcard/Download]   (skad strona STS bierze oferte;
+                                                    plik diag_sts_*.txt do wgrania na Dysk)
          python kursy_bukmacherow.py [--godzin 30] [--bez-lvbet] [--bez-superbet] [--katalog /sdcard/Download] [--wszystko]
          (--wszystko = takze rynki bez kodu; domyslnie tylko z kodem — plik ok. 30 razy mniejszy)"""
 import csv
@@ -23,6 +25,7 @@ import re
 import ssl
 import sys
 import time
+import urllib.error
 import urllib.request
 
 H = {'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/128 Mobile Safari/537.36',
@@ -200,8 +203,92 @@ def diag_lvbet():
                 print(f'    rynki: blad {x}')
 
 
+# ---------------- diagnoza STS (06.10.2026) ----------------
+# Kursy STS bierzemy z PDF oferty — STS ucina w nim dlugie nazwy, a uklad PDF moze sie zmienic. Cel: kursy STS ze strony
+# (jak Superbet i LVBET). Srodowisko przebiegu i sesja w chmurze nie maja dostepu do sts.pl, wiec diagnoza idzie
+# na telefonie: strona -> skrypty -> adresy API -> jedna proba kazdego adresu. Bez logowania, bez danych konta.
+STS_STRONY = ('https://www.sts.pl/', 'https://www.sts.pl/zaklady-bukmacherskie/pilka-nozna')
+_STS_ADRES = re.compile(r"(?:https?:|wss?:)?//[a-z0-9][a-z0-9.-]*(?:\.|^)sts(?:bet)?\.[a-z]{2,3}(?:/[^\s\"'`<>)\\]*)?", re.I)
+_STS_SCIEZKA = re.compile(r"[\"'`](/(?:api|offer|oferta|graphql|gql|sportsbook|feed|odds|events|betting)[^\"'`\s<>]*)[\"'`]", re.I)
+_STS_SKRYPT = re.compile(r"<script[^>]+src=[\"']([^\"']+)[\"']", re.I)
+_STS_DANE = re.compile(r'(__NEXT_DATA__|__NUXT__|__INITIAL_STATE__|__APOLLO_STATE__|window\.__[A-Z_]+__)')
+_STS_STATYCZNY = re.compile(r'\.(?:js|css|png|jpe?g|svg|gif|webp|woff2?|ttf|ico|map)(?:\?|$)', re.I)
+
+
+def _sts_pobierz(url, naglowki=None, limit=3_000_000):
+    """(status, typ, tekst) — bez wyjatkow (diagnoza ma zapisac tez bledy)."""
+    try:
+        r = urllib.request.urlopen(urllib.request.Request(url, headers=naglowki or H), timeout=30, context=CTX)
+        b = r.read(limit)
+        if r.headers.get('Content-Encoding') == 'gzip': b = gzip.decompress(b)
+        return r.status, r.headers.get('Content-Type', ''), b.decode('utf-8', 'replace')
+    except urllib.error.HTTPError as e:
+        return e.code, (e.headers.get('Content-Type', '') if e.headers else ''), (e.read(2000) or b'').decode('utf-8', 'replace')
+    except Exception as e:
+        return None, '', f'{type(e).__name__}: {e}'
+
+
+def sts_skrypty(html, baza):
+    """Adresy skryptow strony (wzgledne -> pelne), bez powtorzen, w kolejnosci."""
+    out = []
+    for src in _STS_SKRYPT.findall(html):
+        u = src if src.startswith('http') else ('https:' + src if src.startswith('//') else baza.rstrip('/') + '/' + src.lstrip('/'))
+        if u not in out: out.append(u)
+    return out
+
+
+def sts_adresy(tekst):
+    """Adresy, ktore wygladaja na zrodlo oferty: hosty STS (ze sciezka) i sciezki /api, /offer, /graphql...
+    Bez plikow statycznych (.js, .css, obrazki, czcionki)."""
+    a = {m.group(0).rstrip('.,;') for m in _STS_ADRES.finditer(tekst)}
+    a |= {m.group(1) for m in _STS_SCIEZKA.finditer(tekst)}
+    return sorted(x for x in a if not _STS_STATYCZNY.search(x) and len(x) < 200)
+
+
+def diag_sts(a):
+    kat = a[a.index('--katalog') + 1] if '--katalog' in a else '/sdcard/Download'
+    teraz = na_pl(dt.datetime.now(dt.timezone.utc))
+    linie = [f'DIAGNOZA STS {teraz:%Y-%m-%d %H:%M} (czas polski)']
+    hs = dict(H, Accept='text/html,application/xhtml+xml,*/*')
+    skrypty, adresy = [], set()
+    for url in STS_STRONY:
+        st, typ, t = _sts_pobierz(url, hs)
+        linie.append(f'\n== STRONA {url}: status {st}, typ {typ}, {len(t)} znakow')
+        linie.append('   osadzone dane: ' + (', '.join(sorted(set(_STS_DANE.findall(t)))) or 'brak'))
+        linie.append(f'   slowa w HTML: odds/kurs {len(re.findall(r"(?i)odds|kurs", t))}, 1X2 {t.count("1X2")}')
+        if st != 200: linie.append('   poczatek: ' + t[:400].replace('\n', ' '))
+        skrypty += [s for s in sts_skrypty(t, 'https://www.sts.pl') if s not in skrypty]
+        adresy |= set(sts_adresy(t))
+    linie.append(f'\n== SKRYPTY: {len(skrypty)} (sprawdzam do 25)')
+    for u in skrypty[:25]:
+        st, typ, t = _sts_pobierz(u, dict(H, Accept='*/*'))
+        z = sts_adresy(t) if st == 200 else []
+        adresy |= set(z)
+        linie.append(f'   {st} {len(t):>8} {u[:120]} -> adresow {len(z)}')
+        time.sleep(0.3)
+    adresy = sorted(adresy)
+    linie.append(f'\n== ADRESY (mozliwe zrodla oferty): {len(adresy)}')
+    linie += ['   ' + x for x in adresy[:300]]
+    linie.append('\n== PROBY (GET, jedna na adres; bez adresow ze zmiennymi)')
+    pr = [x for x in adresy if x.startswith(('http', '//')) and not re.search(r'[{}$]', x)]
+    pr += ['https://www.sts.pl' + x for x in adresy if x.startswith('/') and not re.search(r'[{}$]', x)]
+    hj = dict(H, Origin='https://www.sts.pl', Referer='https://www.sts.pl/')
+    for u in pr[:60]:
+        u = 'https:' + u if u.startswith('//') else u
+        st, typ, t = _sts_pobierz(u, hj, limit=200_000)
+        jest_json = t.lstrip()[:1] in ('{', '[')
+        linie.append(f'   {st} {typ[:40]:<40} {len(t):>7} {"JSON " if jest_json else ""}{u[:140]}')
+        if st == 200 and jest_json: linie.append('      ' + t[:600].replace('\n', ' '))
+        time.sleep(0.3)
+    plik = f'{kat}/diag_sts_{teraz:%Y-%m-%d_%H-%M}.txt'
+    with open(plik, 'w', encoding='utf-8') as fh: fh.write('\n'.join(linie) + '\n')
+    print('\n'.join(linie[:12]))
+    print(f'\nzapisano {plik} — wgraj ten plik na Dysk do folderu baza-wiedzy')
+    return plik
+
 def main(a):
     if '--diag-lvbet' in a: return diag_lvbet()
+    if '--diag-sts' in a: return diag_sts(a)
     godzin = float(a[a.index('--godzin') + 1]) if '--godzin' in a else 30
     kat = a[a.index('--katalog') + 1] if '--katalog' in a else '/sdcard/Download'
     od = dt.datetime.now(dt.timezone.utc).replace(microsecond=0, tzinfo=None); do = od + dt.timedelta(hours=godzin)
