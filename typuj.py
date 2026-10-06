@@ -1251,15 +1251,23 @@ def srednia_goli_ligi(m, ligi, dzis=None, dni=365, min_n=30):
 NOGI_PLIK = None   # --nogi PLIK: nogi DOPUSZCZONE dopisywane do CSV dla kupon.py (faza 4)
 
 
-def _dopisz_noge(mecz, rynek, p, kurs, szacunek, polski):
+def _dopisz_noge(mecz, rynek, p, kurs, szacunek, polski, ev_dodatni=True):
     """Wiersz dla kupon.py. marza i kryteria (A4.3) zostaja puste — uzupelnia przebieg; bez kryteriow kupon.py
-    daje poziom D, czyli PAPIEROWY (bezpieczny kierunek)."""
+    daje poziom D, czyli PAPIEROWY (bezpieczny kierunek).
+    06.10.2026: ev_dodatni=0 — noga przeszla wszystkie bramki, ale EV <= 0 po podatku; kupon.py bierze ja TYLKO do
+    „AKO PILKA DNIA” (najpewniejszy kupon 1,50–2,00), nigdy do K1–K5 i MIX. Kolumny wg naglowka istniejacego pliku."""
     import csv
+    kol = ['mecz', 'rynek', 'p', 'kurs', 'szacunek', 'polski', 'marza', 'kryteria', 'sport', 'ev_dodatni']
     nowy = not os.path.exists(NOGI_PLIK)
+    if not nowy:
+        with open(NOGI_PLIK, encoding='utf-8') as fh: kol = next(csv.reader(fh), kol) or kol
+    if not ev_dodatni and 'ev_dodatni' not in kol: return   # stary plik bez kolumny — noga EV<=0 nie moze trafic do K1–K5
+    w = dict(mecz=mecz, rynek=rynek, p=f'{p:.4f}', kurs=kurs, szacunek=int(szacunek), polski=int(polski), marza='',
+             kryteria='', sport='pilka', ev_dodatni=int(bool(ev_dodatni)))
     with open(NOGI_PLIK, 'a', encoding='utf-8', newline='') as fh:
-        w = csv.writer(fh)
-        if nowy: w.writerow(['mecz', 'rynek', 'p', 'kurs', 'szacunek', 'polski', 'marza', 'kryteria'])
-        w.writerow([mecz, rynek, f'{p:.4f}', kurs, int(szacunek), int(polski), '', ''])
+        wr = csv.writer(fh)
+        if nowy: wr.writerow(kol)
+        wr.writerow([w.get(c, '') for c in kol])
 
 
 def value(rows, kursy, dz=None, mecz=None, szacunek=False, polski=False):
@@ -1289,6 +1297,9 @@ def value(rows, kursy, dz=None, mecz=None, szacunek=False, polski=False):
             if evk > 0 and NOGI_PLIK and mecz:
                 _dopisz_noge(mecz, k, pk, o, szacunek, polski)
                 print(f'      (zapisano do {NOGI_PLIK} — uzupelnij marza i kryteria A4.3 przed kupon.py)')
+            elif NOGI_PLIK and mecz:   # 06.10.2026: tylko do AKO PILKA DNIA (kupon.py), nie do K1–K5
+                _dopisz_noge(mecz, k, pk, o, szacunek, polski, ev_dodatni=False)
+                print(f'      (zapisano do {NOGI_PLIK} z ev_dodatni=0 — tylko kandydat do AKO PILKA DNIA, nie K1–K5)')
 
 
 PARY = []   # --para A+B[=kurs Buildera]

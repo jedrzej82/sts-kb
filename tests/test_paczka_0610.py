@@ -78,3 +78,32 @@ def test_srednia_goli_ligi():
     assert typuj.srednia_goli_ligi(m, {'A', 'B'}, dzis='2026-10-06') == 4.0         # B ma < 30 meczow — pominieta
     assert typuj.srednia_goli_ligi(m, {'B'}, dzis='2026-10-06') is None
     assert typuj.srednia_goli_ligi(m, {'A'}, dzis='2027-12-01') is None            # stare mecze poza 12 mies.
+
+
+def _nogi(tmp_path, w):
+    f = tmp_path / 'nogi.csv'
+    pd.DataFrame(w, columns=['mecz', 'rynek', 'p', 'kurs', 'szacunek', 'polski', 'marza', 'kryteria', 'sport', 'ev_dodatni']).to_csv(f, index=False)
+    return str(f)
+
+
+def test_ako_pilka_dnia_najpewniejszy_15_20(tmp_path, capsys):
+    import kupon
+    f = _nogi(tmp_path, [('A - B', '1X', 0.88, 1.20, 0, 0, '', '', 'pilka', 0),
+                         ('C - D', 'U4.5', 0.90, 1.15, 0, 0, '', '', 'pilka', 0),
+                         ('E - F', '12', 0.80, 1.30, 0, 0, '', '', 'pilka', 0),
+                         ('G - H', 'O1.5', 0.70, 1.45, 0, 0, '', '', 'pilka', 1),
+                         ('I - J', 'Z1', 0.95, 1.40, 0, 0, '', '', 'hokej', 1)])       # hokej — nie do AKO PILKA
+    kupon.main([f])
+    out = capsys.readouterr().out
+    linia = next(x for x in out.splitlines() if x.startswith('AKO PILKA DNIA'))
+    assert 'kurs 1.56' in linia and 'laczne P 70.4%' in linia      # A-B 1X 1.20 x E-F 12 1.30 = 1.56; P 0.88 x 0.80
+    assert 'I - J' not in out.split('AKO PILKA DNIA')[1]
+    assert 'NIE za wlasne pieniadze' in out                            # EV <= 0 -> tylko bonus/papier (CZESC A)
+    k1_k5 = out.split('NAJPEWNIEJSZY MIX')[0]
+    assert 'A - B' not in k1_k5 and 'E - F' not in k1_k5             # nogi ev_dodatni=0 nie trafiaja do K1–K5
+
+
+def test_ako_pilka_dnia_brak(tmp_path, capsys):
+    import kupon
+    kupon.main([_nogi(tmp_path, [('A - B', '1X', 0.88, 1.10, 0, 0, '', '', 'pilka', 0)])])
+    assert 'AKO PILKA DNIA (1.50–2.00): brak' in capsys.readouterr().out
