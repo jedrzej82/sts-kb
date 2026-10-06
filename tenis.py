@@ -34,6 +34,7 @@ def load():
     d['surface'] = d.surface.fillna('Hard').replace({'Carpet': 'Hard'})
     d = _scal_warianty(d)
     d = _scal_zapisy(d)
+    d = _scal_skroty(d)
     return d.sort_values('date', kind='stable').reset_index(drop=True)
 
 
@@ -166,6 +167,77 @@ def _scal_zapisy(d):
     ALIASY.update(mapa)
     return d
 
+
+
+_SKROT = re.compile(r'^(.+?)((?:\s+[A-Z]\.)+)$')
+
+
+def _scal_skroty(d):
+    """06.10.2026 (Raport 05.10 21:00 usterka 4, Ruzic – Dudeney): Flashscore zapisuje ITF jako „Nazwisko I.”
+    („Dudeney A.”, „Amariei I. D.”) — od 07.2025 ok. 2 tys. meczow, 860 osob. _scal_warianty tego nie widzi (bierze
+    OSTATNI czlon za nazwisko, a tu nazwisko jest pierwsze), wiec mecze ITF z 01-02.10 nie trafialy do „Alicia
+    Dudeney”: Elo bez nich i „dane nieaktualne (>90 dni)”, choc grala tydzien temu.
+    Skrot -> pelna nazwa TYLKO gdy wszystko sie zgadza:
+      - ta sama plec rozgrywek (wiekszosc >= 80% meczow), nazwisko skrotu = KONCOWE czlony pelnej nazwy,
+        a imiona pelnej nazwy zaczynaja sie od kolejnych inicjalow skrotu i NIE MA ich wiecej niz inicjalow
+        (Flashscore podaje wszystkie inicjaly: „Rojas C.” to nie „Cristian Felipe Sanchez Rojas”, „Singh D.” nie
+        „Digvijay Pratap Singh”; odwrotnie wolno — „Amariei I. D.” = „Ilinca Amariei”, drugie imie bywa pomijane);
+      - JEDEN kandydat wsrod pelnych nazw tej plci z tym nazwiskiem i tym inicjalem (dwie „Brown O.” — nic);
+      - nigdy nie grali ze soba, tego samego dnia tylko ten sam mecz (dubel z dwoch zrodel);
+      - kariery sie nakladaja albo przerwa <= 1 rok (skrot jest tylko od 2025, pelna nazwa musi grac po 2024).
+    Brak pelnej nazwy = skrot zostaje osobnym zawodnikiem (jak dotad)."""
+    plec = {'ATP': 'M', 'ITF': 'M', 'CH': 'M', 'WTA': 'W', 'ITF-W': 'W'}
+    w = d[['date', 'winner_name', 'loser_name', 'src', 'score']]
+    dl = pd.concat([w.rename(columns={'winner_name': 'n', 'loser_name': 'r'}).assign(wyg=1),
+                    w.rename(columns={'loser_name': 'n', 'winner_name': 'r'}).assign(wyg=0)])
+    skroty = {n for n in dl.n.unique() if _SKROT.match(n)}
+    if not skroty: return d
+    dl = dl.assign(pl=dl.src.map(lambda x: plec.get(x, x)))
+
+    def _wiekszosc(x):
+        v = x.value_counts()
+        if not len(v) or v.iloc[0] < 0.8 * v.sum(): return None
+        return v.index[0] if v.index[0] in ('M', 'W') else None
+    tour = dl.groupby('n').pl.agg(_wiekszosc).to_dict()
+    info = dl.groupby('n').agg(od=('date', 'min'), do=('date', 'max'))
+    rywale = dl.groupby('n').r.apply(set).to_dict()
+    dzien = {}
+    for n, dt, r, wg in zip(dl.n, dl.date, dl.r, dl.wyg):
+        dzien.setdefault(n, {}).setdefault(dt, set()).add((r, wg))
+    # pelne nazwy (bez czlonow jednoliterowych) aktywne po 2024 -> indeks (plec, nazwisko, inicjal pierwszego imienia)
+    idx = {}
+    for n in info.index:
+        if n in skroty or tour.get(n) is None or info.loc[n, 'do'] < pd.Timestamp('2024-01-01'): continue
+        t = _czl_norm(n)
+        if len(t) < 2 or any(len(x) < 2 for x in t): continue
+        for k in range(1, len(t)):
+            idx.setdefault((tour[n], ' '.join(t[k:]), t[0][0]), []).append((n, t[:k]))
+    mapa = {}
+    for s in sorted(skroty):
+        if tour.get(s) is None: continue
+        m = _SKROT.match(s)
+        naz, ini = ' '.join(_czl_norm(m.group(1))), [x for x in _czl_norm(m.group(2))]
+        if len(naz.replace(' ', '')) < 3: continue
+        kand = [n for n, imiona in idx.get((tour[s], naz, ini[0]), [])
+                if len(imiona) <= len(ini) and all(a == b[0] for a, b in zip(ini, imiona))]
+        if len(set(kand)) != 1: continue
+        f = kand[0]
+        if s in rywale.get(f, ()) or f in rywale.get(s, ()): continue
+        if any(dzien[s][x] != dzien[f][x] for x in set(dzien[s]) & set(dzien[f])): continue
+        przerwa = max(info.loc[s, 'od'], info.loc[f, 'od']) - min(info.loc[s, 'do'], info.loc[f, 'do'])
+        if przerwa.days > 365: continue
+        mapa[s] = f
+    if not mapa: return d
+    ALIASY.update(mapa)
+    przed = len(d)
+    d = d.assign(winner_name=d.winner_name.replace(mapa), loser_name=d.loser_name.replace(mapa))
+    # ten sam mecz z dwoch zrodel (skrot i pelna nazwa) -> jeden wiersz
+    org = [a in mapa or b in mapa for a, b in zip(w.winner_name, w.loser_name)]
+    d = d.assign(_zm=org).sort_values('_zm', kind='stable')
+    d = d[~(d.duplicated(['date', 'winner_name', 'loser_name']) & d._zm)].drop(columns='_zm').sort_index()
+    print(f'  tenis: sklejono {len(mapa)} zapisow „Nazwisko I.” (Flashscore ITF) z pelna nazwa, usunieto {przed - len(d)} '
+          f'dubli (np. {", ".join(f"{a} -> {b}" for a, b in list(sorted(mapa.items()))[:3])})')
+    return d
 
 def _scal_warianty(d):
     """23.09.2026, USTERKA U3: ten sam zawodnik zapisany roznie w roznych zrodlach
