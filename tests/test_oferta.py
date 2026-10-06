@@ -165,7 +165,9 @@ def test_zapis_gz_z_odczytem_kontrolnym(monkeypatch, tmp_path):
     wyj = tmp_path / 'kursy_2026-09-30_17-30.csv.gz'
     oferta.main([str(tmp_path / 'oferta-dzisiaj-auto 2026-09-30 17-30.pdf'), '--wyjscie', str(wyj)])
     d = pd.read_csv(wyj, dtype=str)
-    assert list(d.columns) == oferta.KOLUMNY and len(d) == 22
+    # 06.10.2026: plik ma tez kolumne „kontrola” (KONTROLA PDF) — poprawna strona: pusta w kazdym wierszu
+    assert list(d.columns) == oferta.KOLUMNY + ['kontrola'] and len(d) == 22
+    assert d.kontrola.isna().all()
     assert set(d.godzina_pobrania) == {'2026-09-30 17:25'}        # stopka ma pierwszenstwo przed nazwa pliku
 
 
