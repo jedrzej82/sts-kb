@@ -27,3 +27,21 @@ def test_diag_sts_zapisuje_plik(tmp_path, monkeypatch):
     assert os.path.basename(plik).startswith('diag_sts_')
     assert '__NUXT__' in t and 'https://api.sts.pl/offer/events' in t and '"odds"' in t
     assert '403' in t and '404' in t                                  # bledy tez sa w pliku
+
+
+def test_v2_hosty_chunki_i_kod_wokol_slow(tmp_path, monkeypatch):
+    # diag 06.10 13:27: strona STS to aplikacja (HTML 133 134 znaki bez oferty), main-*.js 1,3 MB — adres oferty
+    # skladany w kodzie albo w doladowywanych chunk-*.js; v1 znalazla tylko adresy tresci promocyjnych
+    js = ('const e={apiUrl:"https://"+"sportsbook-api.sts.pl",ws:"wss://push.sts.pl/x"};import("./chunk-ABCD1234.js");'
+          'fetch(`${e.apiUrl}/offer/v1/events`);h="cdn.example.com"')
+    assert kb.sts_hosty(js) == {'push.sts.pl': 1, 'sportsbook-api.sts.pl': 1, 'cdn.example.com': 1}
+    assert kb.sts_chunki(js) == ['https://www.sts.pl/nextweb-assets/chunk-ABCD1234.js']
+    assert any('/offer/v1/events' in k for k in kb.sts_konteksty(js, 'offer'))
+    odp = {'https://www.sts.pl/': (200, 'text/html', '<script src="/nextweb-assets/main-64DEX74Q.js"></script>'),
+           'https://www.sts.pl/nextweb-assets/main-64DEX74Q.js': (200, 'application/javascript', js),
+           'https://www.sts.pl/nextweb-assets/chunk-ABCD1234.js': (200, 'application/javascript', 'm="marketId";u="/api/offer/x"'),
+           'https://sportsbook-api.sts.pl/': (200, 'application/json', '{"ok":1}')}
+    monkeypatch.setattr(kb, '_sts_pobierz', lambda u, h=None, limit=0: odp.get(u, (404, 'text/html', 'nie ma')))
+    monkeypatch.setattr(kb.time, 'sleep', lambda s: None)
+    t = open(kb.diag_sts(['--diag-sts', '--katalog', str(tmp_path)]), encoding='utf-8').read()
+    assert 'chunk-ABCD1234.js' in t and 'sportsbook-api.sts.pl' in t and '/api/offer/x' in t and '{"ok":1}' in t
