@@ -248,8 +248,15 @@ def sts_adresy(tekst):
 _HOST_W_ADRESIE = re.compile(r"(?:https?|wss?):\\?/\\?/([a-z0-9][a-z0-9.-]*\.[a-z]{2,})", re.I)
 _HOST_GOLY = re.compile(r"[\"'`]([a-z0-9][a-z0-9-]*(?:\.[a-z0-9-]+)*\.(?:pl|com|io|net|eu|cloud|bet|app))[\"'`/]", re.I)
 _STS_CHUNK = re.compile(r"[\"'`(/]((?:nextweb-assets/)?(?:chunk|[a-z-]+)-[A-Z0-9]{6,}\.js)", re.I)
-_STS_SLOWA = ('offer', 'odds', 'market', 'apiUrl', 'baseUrl', 'apiBase', 'graphql', 'websocket', 'wss:', 'sportsbook',
-              'betting', 'eventId', 'environment')
+_STS_SLOWA = ('OFFERER_URL', 'offerer', 'sbk-exporter', 'prematch-ws', 'prematchWsOffer', 'offerws', 'LIVE_WS_URL',
+              '/fixtures', '/tournaments', '/sports', '/events', 'apiUrl', 'graphql')
+# 06.10 (diag v2): w kodzie strony jest naglowek wylaczajacy captche — NIGDY go nie uzywamy ani nie zapisujemy;
+# klucze i tokeny z konfiguracji sa w pliku diagnozy zamazywane.
+_STS_SEKRET = re.compile(r'''((?:[Kk]ey|[Tt]oken|disableCaptcha|value)\s*:\s*)(["'`])[^"'`]{6,}\2''')
+
+
+def _bez_sekretow(t):
+    return _STS_SEKRET.sub(lambda m: m.group(1) + m.group(2) + '(ukryty)' + m.group(2), t)
 
 
 def sts_hosty(tekst):
@@ -285,7 +292,7 @@ def sts_konteksty(tekst, slowo, ile=8, szer=110):
 def diag_sts(a):
     kat = a[a.index('--katalog') + 1] if '--katalog' in a else '/sdcard/Download'
     teraz = na_pl(dt.datetime.now(dt.timezone.utc))
-    linie = [f'DIAGNOZA STS v2 {teraz:%Y-%m-%d %H:%M} (czas polski)']
+    linie = [f'DIAGNOZA STS v3 {teraz:%Y-%m-%d %H:%M} (czas polski)']
     hs = dict(H, Accept='text/html,application/xhtml+xml,*/*')
     skrypty, adresy, hosty, kod = [], set(), {}, {}
     for url in STS_STRONY:
@@ -300,9 +307,9 @@ def diag_sts(a):
         skrypty += [s for s in sts_skrypty(t, 'https://www.sts.pl') if s not in skrypty]
         adresy |= set(sts_adresy(t))
     kolejka = list(skrypty)
-    linie.append('\n== SKRYPTY (strona + doladowywane chunk-*.js, do 60)')
+    linie.append('\n== SKRYPTY (strona + doladowywane chunk-*.js, do 250)')
     i = 0
-    while i < len(kolejka) and i < 60:
+    while i < len(kolejka) and i < 250:
         u = kolejka[i]; i += 1
         st, typ, t = _sts_pobierz(u, dict(H, Accept='*/*'))
         if st == 200:
@@ -310,8 +317,8 @@ def diag_sts(a):
             adresy |= set(sts_adresy(t))
             for x, n in sts_hosty(t).items(): hosty[x] = hosty.get(x, 0) + n
             kolejka += [c for c in sts_chunki(t) if c not in kolejka]
-        linie.append(f'   {st} {len(t):>8} {u[:120]}')
-        time.sleep(0.3)
+        if i <= 20 or st != 200: linie.append(f'   {st} {len(t):>8} {u[:120]}')
+        time.sleep(0.15)
     linie.append(f'   (znalezionych plikow: {len(kolejka)}, pobranych: {i})')
     linie.append(f'\n== HOSTY w kodzie: {len(hosty)}')
     linie += [f'   {n:>4} {x}' for x, n in sorted(hosty.items(), key=lambda z: -z[1])[:80]]
@@ -321,16 +328,18 @@ def diag_sts(a):
     linie.append('\n== KOD WOKOL SLOW (jak aplikacja sklada adres oferty)')
     caly = '\n'.join(kod.values())
     for s in _STS_SLOWA:
-        k = sts_konteksty(caly, s)
+        k = sts_konteksty(caly, s, ile=12, szer=160)
         linie.append(f'-- {s}: {len(k)}')
-        linie += ['   ' + x for x in k]
+        linie += ['   ' + _bez_sekretow(x) for x in k]
     linie.append('\n== PROBY (GET, jedna na adres; bez adresow ze zmiennymi)')
     pr = [x for x in adresy if x.startswith(('http', '//')) and not re.search(r'[{}$]', x)]
     pr += ['https://www.sts.pl' + x for x in adresy if x.startswith('/') and not re.search(r'[{}$]', x)]
     pr += [f'https://{x}/' for x, _ in sorted(hosty.items(), key=lambda z: -z[1])
            if re.search(r'(?i)api|offer|feed|sport|bet', x) and 'sts' in x][:15]
+    pr += ['https://offerer.sts.pl/', 'https://sbk.sts.pl/sbk-exporter/v1']
+    pr = sorted(dict.fromkeys(pr), key=lambda x: (not re.search(r'(?i)offer|sbk|event|fixture|sport', x), x))
     hj = dict(H, Origin='https://www.sts.pl', Referer='https://www.sts.pl/')
-    for u in list(dict.fromkeys(pr))[:60]:
+    for u in pr[:60]:
         u = 'https:' + u if u.startswith('//') else u
         st, typ, t = _sts_pobierz(u, hj, limit=200_000)
         jest_json = t.lstrip()[:1] in ('{', '[')
@@ -338,7 +347,7 @@ def diag_sts(a):
         if st == 200 and jest_json: linie.append('      ' + t[:600].replace('\n', ' '))
         time.sleep(0.3)
     plik = f'{kat}/diag_sts_{teraz:%Y-%m-%d_%H-%M}.txt'
-    with open(plik, 'w', encoding='utf-8') as fh: fh.write('\n'.join(linie) + '\n')
+    with open(plik, 'w', encoding='utf-8') as fh: fh.write(_bez_sekretow('\n'.join(linie)) + '\n')
     print('\n'.join(linie[:12]))
     print(f'\nzapisano {plik} — wgraj ten plik na Dysk do folderu baza-wiedzy')
     return plik
