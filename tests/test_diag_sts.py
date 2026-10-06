@@ -45,3 +45,22 @@ def test_v2_hosty_chunki_i_kod_wokol_slow(tmp_path, monkeypatch):
     monkeypatch.setattr(kb.time, 'sleep', lambda s: None)
     t = open(kb.diag_sts(['--diag-sts', '--katalog', str(tmp_path)]), encoding='utf-8').read()
     assert 'chunk-ABCD1234.js' in t and 'sportsbook-api.sts.pl' in t and '/api/offer/x' in t and '{"ok":1}' in t
+
+
+def test_v3_sekrety_zamazane_i_oferta_najpierw(tmp_path, monkeypatch):
+    # diag v2 06.10 13:33: konfiguracja strony ma klucz klienta i naglowek wylaczajacy captche — w pliku diagnozy
+    # zamazane; adresy oferty (offerer, sbk-exporter) odpytywane przed reszta (v2 skonczyla limit na litere „k”)
+    js = ('w=s.OFFERER_URL||"https://offerer.sts.pl",prematchWsOffer:{url:"wss://prematch-ws.sts.pl/ws",httpXApiKey:"ABCDEFGHIJ"},'
+          'disableCaptcha:{name:"X-ab",value:"T7PRWP2W99"};' + ''.join(f'a{i}="https://a{i:03d}.sts.pl/x";' for i in range(80)))
+    odp = {'https://www.sts.pl/': (200, 'text/html', '<script src="/nextweb-assets/main-64DEX74Q.js"></script>'),
+           'https://www.sts.pl/nextweb-assets/main-64DEX74Q.js': (200, 'application/javascript', js),
+           'https://offerer.sts.pl/': (200, 'application/json', '{"sports":[]}')}
+    zapytania = []
+    def pobierz(u, h=None, limit=0):
+        zapytania.append(u)
+        return odp.get(u, (404, 'text/plain', 'nie ma'))
+    monkeypatch.setattr(kb, '_sts_pobierz', pobierz)
+    monkeypatch.setattr(kb.time, 'sleep', lambda s: None)
+    t = open(kb.diag_sts(['--diag-sts', '--katalog', str(tmp_path)]), encoding='utf-8').read()
+    assert 'ABCDEFGHIJ' not in t and 'T7PRWP2W99' not in t and '(ukryty)' in t
+    assert 'https://offerer.sts.pl/' in zapytania and '{"sports":[]}' in t
