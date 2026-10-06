@@ -144,6 +144,53 @@ def bez_wstrzymanych(d, ostrz):
     return d[~zero].reset_index(drop=True)
 
 
+
+_UCIETE = re.compile(r'\s*(?:\.\.\.|…)$')
+_JEDNA_DRUZYNA = re.compile(r'^(?:1\. połowa - )?([12])\. (?:drużyna|zawodnik)\b')
+
+
+def scal_zdarzenia(d, ostrz=None):
+    """06.10.2026 (Raport 12:00 usterka 5): ten sam mecz jako kilka „zdarzen”:
+      - nazwa ucieta w PDF przy dlugim tytule rynku: „Cedevita Olimpija Lublana - Hapoel Jeroz...”,
+        „Washington Commanders - Indianapolis C...” (1. polowa / wynik koncowy) obok pelnej nazwy;
+      - rynki jednej druzyny / zawodnika („1. drużyna - liczba goli”, „2. drużyna - liczba punktów”, „2. zawodnik - liczba
+        gemów”) z sama nazwa i pustym gosciem („Ostrovia Ostrów Wielkopolski”, „Djokovic Novak”) — do 600 kursow w PDF.
+    zdarzenia.py liczylo je jako osobne zdarzenia (BRAK W BAZIE, UNKNOWN), a oferta.py --mecz ich nie widzialo.
+    Przypisanie TYLKO do jednego meczu tego samego dnia, godziny i sportu: ucieta nazwa — pelna nazwa zaczynajaca sie
+    tym samym tekstem; jedna druzyna — mecz, w ktorym jest gospodarzem (1.) albo gosciem (2.). Inaczej bez zmian."""
+    if not len(d): return d
+    d = d.copy()
+    pelne = d[~d.zdarzenie.str.contains(_UCIETE) & d.gosc.astype(str).ne('')]
+    mecze = pelne.drop_duplicates(['data_meczu', 'godzina_meczu', 'sport', 'zdarzenie'])
+    po_czasie = {k: list(zip(g.zdarzenie, g.gospodarz, g.gosc)) for k, g in mecze.groupby(['data_meczu', 'godzina_meczu', 'sport'])}
+    zm, nie = {}, set()
+    for zd, sek, gosp, gosc, k in zip(d.zdarzenie, d.sekcja, d.gospodarz, d.gosc,
+                                       zip(d.data_meczu, d.godzina_meczu, d.sport)):
+        if (zd, sek, k) in zm or (zd, sek, k) in nie: continue
+        kand = []
+        if _UCIETE.search(zd):
+            pref = _UCIETE.sub('', zd).strip()
+            kand = [m for m in po_czasie.get(k, []) if m[0].startswith(pref)]
+        elif str(gosc) == '' and _JEDNA_DRUZYNA.match(str(sek)):
+            strona = 1 if _JEDNA_DRUZYNA.match(str(sek)).group(1) == '1' else 2
+            kand = [m for m in po_czasie.get(k, []) if m[strona] == gosp]
+        else:
+            continue
+        if len({m[0] for m in kand}) == 1:
+            zm[(zd, sek, k)] = kand[0]
+        else:
+            nie.add((zd, sek, k))
+    if zm:
+        nowe = [zm.get((zd, sek, k)) for zd, sek, k in zip(d.zdarzenie, d.sekcja, zip(d.data_meczu, d.godzina_meczu, d.sport))]
+        jest = [x is not None for x in nowe]
+        d.loc[jest, 'zdarzenie'] = [x[0] for x in nowe if x]
+        d.loc[jest, 'gospodarz'] = [x[1] for x in nowe if x]
+        d.loc[jest, 'gosc'] = [x[2] for x in nowe if x]
+    if ostrz is not None and nie:
+        uc = sorted({zd for zd, _, _ in nie if _UCIETE.search(zd)})
+        if uc: ostrz.append(f'nazwa ucieta w PDF bez jednoznacznej pelnej nazwy (zostaje osobno): {", ".join(uc[:5])}')
+    return d
+
 def czytaj(pdf, pobrano=''):
     """PDF oferty -> (DataFrame w KOLUMNY, lista ostrzezen). pobrano = wymuszona chwila kursow (domyslnie stopka PDF)."""
     wiersze, ostrz = [], []
@@ -238,6 +285,7 @@ def czytaj(pdf, pobrano=''):
                                         linia=linia, wybor=e, zdarzenie=zd))
     d = pd.DataFrame(wiersze, columns=KOLUMNY)
     d = bez_wstrzymanych(d, ostrz)
+    d = scal_zdarzenia(d, ostrz)
     # chwila kursow: stopka PDF (np. 20:25), a gdy jej brak — z nazwy pliku (20-30, chwila zapisu na Dysk)
     d['godzina_pobrania'] = pobrano or wygenerowano or pobrano_z_nazwy(pdf)
     if not len(d): ostrz.append('brak kursow — to nie jest PDF oferty STS albo zmienil sie jego uklad')
