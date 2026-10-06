@@ -19,7 +19,7 @@ LITERY = str.maketrans({'ł': 'l', 'Ł': 'L', 'đ': 'd', 'Đ': 'D', 'ø': 'o', '
 # dopasowane do pierwszej druzyny Hammarby), "jong" (holenderskie drugie zespoly: Jong Ajax, Jong PSV)
 # i "primavera" (wloska mlodziez). Sprawdzone na bazie 29.09: w pilce "jong" wystepuje tylko w Jong X,
 # "talang" i "primavera" nigdzie; test symetryczny, wiec zapis identyczny po obu stronach dalej pasuje.
-ZNACZNIK = re.compile(r'^(b|ii|iii|2|3|c|k|u-?1[6-9]|u-?2[0-3]|sub-?2[0-3]|jun|juniors?|res|reserves?|jong|'
+ZNACZNIK = re.compile(r'^(b|ii|iii|2|3|c|k|u-?1[6-9]|u-?2[0-3]|sub-?2[0-3]|jun|juniors?|res|reserves?|rezerwy|jong|'
                       r'young|youth|yth|academy|akademia|talang|primavera|w|women|kobiet[ay]?|damen|femenino|femenil|'
                       r'feminin[oa]?|fem)\.?$', re.I)
 
@@ -37,6 +37,9 @@ def znaczniki(s):
 def _znaczniki(s):
     out = []
     for t0 in re.split(r'[\s]+', s.strip()):
+        # 06.10.2026: Superbet pisze rezerwy „Racing Club (R)” — samo „R” w nawiasie (bez nawiasu to inicjal: „Bhosale R”)
+        if re.fullmatch(r'\(R\)', t0, re.I):
+            out.append('rezerwy'); continue
         t0 = t0.strip('[](){}<>.,;:')
         # 30.09.2026 (przeglad): „Zenit-2”, „CSKA-2 Moscow” — znacznik po lacznika nie byl widziany i pierwsza druzyna
         # („Zenit”) trafiala w rezerwy. Ostatni czlon po '-' sprawdzamy osobno (bez rozbijania „U-19”, „Sub-21”).
@@ -47,7 +50,7 @@ def _znaczniki(s):
         if t is None: continue
         t = t.lower().rstrip('.')
         if re.match(r'^(k|w|women|kobiet[ay]?|damen|femenino|femenil|feminin[oa]?|fem)$', t): out.append('kobiety')
-        elif re.match(r'^(b|ii|2|res|reserves?|jong)$', t): out.append('rezerwy')
+        elif re.match(r'^(b|ii|2|res|reserves?|rezerwy|jong)$', t): out.append('rezerwy')
         elif re.match(r'^(c|iii|3)$', t): out.append('zespol_c')
         elif re.match(r'^(u|sub)-?\d+$', t): out.append('u' + re.sub(r'\D', '', t))
         else: out.append('mlodziez')
