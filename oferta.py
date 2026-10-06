@@ -191,6 +191,53 @@ def scal_zdarzenia(d, ostrz=None):
         if uc: ostrz.append(f'nazwa ucieta w PDF bez jednoznacznej pelnej nazwy (zostaje osobno): {", ".join(uc[:5])}')
     return d
 
+# ---------------- KONTROLA PDF (06.10.2026, decyzja uzytkownika) ----------------
+# Uklad PDF STS moze sie zmienic bez ostrzezenia; blad odczytu (kurs pod zla etykieta, zgubiona linia) nie moze dojsc
+# do kuponu za pieniadze. Kontrole sprawdzone recznie 06.10 na 6 PDF (13 416 + 9 556 + ... kursow) — wszystkie 0.
+MARZA_2_3 = (1.00, 1.25)      # Mecz 1/X/2 i Zwyciezca meczu 1/2: suma 1/kurs (marza bukmachera)
+MARZA_OU = (1.00, 1.20)       # para O/U tej samej linii
+POMINIETA = 'POMINIETA LINIA z kursami'
+
+
+def kontrola_pdf(d, ostrz=()):
+    """(linia raportu, {zdarzenie: powod}) — mecze z podejrzanym odczytem: NIE za pieniadze (POPRAWKI)."""
+    zle = {}
+    if len(d):
+        k = pd.to_numeric(d.kurs, errors='coerce')
+        x = d.assign(_k=k)
+        sek = x.sekcja.astype(str).str.lower()
+        for nazwa, maska, wyb in (('marza 1X2', sek.eq('mecz'), ('1', 'X', '2')),
+                                  ('marza zwyciezcy', sek.eq('zwycięzca meczu'), ('1', '2'))):
+            p = x[maska].pivot_table(index='zdarzenie', columns='wybor', values='_k', aggfunc='first')
+            if not set(wyb) <= set(p.columns): continue
+            p = p.dropna(subset=list(wyb))
+            m = sum(1 / p[w] for w in wyb)
+            for zd, v in m[(m < MARZA_2_3[0]) | (m > MARZA_2_3[1])].items(): zle.setdefault(zd, f'{nazwa} {v:.3f}')
+        ou = x[x.rynek.astype(str).str.match(r'^[OU]\d+(?:\.\d+)?$')]
+        if len(ou):
+            ou = ou.assign(_s=ou.rynek.str[0], _l=pd.to_numeric(ou.rynek.str[1:], errors='coerce'))
+            q = ou.pivot_table(index=['zdarzenie', '_l'], columns='_s', values='_k', aggfunc='first')
+            if {'O', 'U'} <= set(q.columns):
+                q = q.dropna(subset=['O', 'U'])
+                m = 1 / q.O + 1 / q.U
+                for (zd, l), v in m[(m < MARZA_OU[0]) | (m > MARZA_OU[1])].items(): zle.setdefault(zd, f'marza O/U {l:g} {v:.3f}')
+            for zd, g in ou[ou._s == 'O'].groupby('zdarzenie'):
+                g = g.dropna(subset=['_l']).drop_duplicates('_l').sort_values('_l')
+                if (g._k.diff().dropna() < -0.001).any(): zle.setdefault(zd, 'kurs powyzej nie rosnie z linia')
+        g = x.groupby('zdarzenie').agg(**{c: (c, 'nunique') for c in ('data_meczu', 'godzina_meczu', 'sport', 'liga')})
+        for zd, r in g[(g > 1).any(axis=1)].iterrows():
+            zle.setdefault(zd, 'rozne ' + '/'.join(c for c in g.columns if r[c] > 1))
+    pom = [o for o in ostrz if o.startswith(POMINIETA)]
+    if not zle and not pom:
+        return (f'KONTROLA PDF: OK — {len(d)} kursow, {d.zdarzenie.nunique() if len(d) else 0} zdarzen; pominiete linie 0, '
+                f'marze 1X2/zwyciezcy/O-U w normie, O/U rosnie z linia, dane meczow spojne'), zle
+    czesci = [f'{zd} ({p})' for zd, p in sorted(zle.items())[:15]]
+    linia = (f'KONTROLA PDF: {len(zle)} meczow z podejrzanym odczytem — NIE ZA PIENIADZE: ' + '; '.join(czesci)
+             + (f' i {len(zle) - 15} innych' if len(zle) > 15 else ''))
+    if pom:
+        linia += f' | {len(pom)} linii z kursami pominietych przez parser (uklad PDF sie zmienil?): ' + ' | '.join(pom[:3])
+    return linia, zle
+
 def czytaj(pdf, pobrano=''):
     """PDF oferty -> (DataFrame w KOLUMNY, lista ostrzezen). pobrano = wymuszona chwila kursow (domyslnie stopka PDF)."""
     wiersze, ostrz = [], []
@@ -234,6 +281,8 @@ def czytaj(pdf, pobrano=''):
                     podmecz = _bialy(re.sub(r'\d{1,2}:\d{2}$', '', tekst))
                     continue
                 if not jest_nr:
+                    if re.search(r'(?<![\d.])\d{1,3}\.\d{2}(?![\d.])', tekst):
+                        ostrz.append(f'{POMINIETA} str. {nr_str}: {tekst[:90]}')
                     # tytul rynku zaczyna sie ok. 28 pt od lewej krawedzi szpalty (dlugi bywa pomniejszony do 8.4);
                     # etykiety kolumn stoja nad kursami (zwykle >= 140 pt od krawedzi) i maja inny rozmiar niz tytul
                     tytul = []
@@ -367,9 +416,10 @@ def main(a):
     mecz = a[a.index('--mecz') + 1:a.index('--mecz') + 3] if '--mecz' in a else None
     pdfy = [x for x in a if x.lower().endswith('.pdf')]
     if not pdfy: sys.exit('podaj plik PDF oferty')
-    czesci = []
+    czesci, ostrz_wszystkie = [], []
     for f in pdfy:
         d, ostrz = czytaj(f, pobr or '')
+        ostrz_wszystkie += ostrz
         print(f'{os.path.basename(f)}: {d.zdarzenie.nunique() if len(d) else 0} zdarzen, {len(d)} kursow'
               + (f', {len(ostrz)} ostrzezen' if ostrz else ''))
         for o in ostrz[:20]: print('  UWAGA:', o)
@@ -401,6 +451,12 @@ def main(a):
         if wyj and len(z):
             z.to_csv(wyj, index=False)
         return
+    # 06.10.2026: KONTROLA PDF — linia do Raportu (sekcja DANE); mecze z podejrzanym odczytem oznaczone w kolumnie
+    # „kontrola” pliku kursow i NIE ida na kupon za pieniadze (POPRAWKI)
+    if not mecz and not tryb_zamk:
+        linia, zle = kontrola_pdf(d, ostrz_wszystkie)
+        print(linia)
+        d = d.assign(kontrola=d.zdarzenie.map(zle).fillna(''))
     if wyj:
         if wyj.endswith('.gz'):
             with gzip.open(wyj, 'wt', encoding='utf-8', newline='') as g: d.to_csv(g, index=False)
