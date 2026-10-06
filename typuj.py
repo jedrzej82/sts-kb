@@ -323,6 +323,22 @@ def skrot_w_pucharze_ok(skroty, mt, kraje):
     return all(n in _SKROTY_OGOLNE for n, _ in skroty)
 
 
+def terminarz_potwierdza_pare(h, a, mt, pool, kraje):
+    """06.10.2026 (Raport 18:00 usterka 2, EFL Trophy): „Grimsby Town” -> Grimsby, „Huddersfield Town”/„FC Rochdale”,
+    „Blackpool FC”/„Crewe Alexandra” — kluby z roznych poziomow ligi, wiec kontrola LACZNA przerywala, a odpadly czlon
+    („Town”, „Alexandra”) nie jest na liscie ogolnych. Terminarz 365 ma TEN mecz w pucharze („EFL Trophy”) i jego zapis
+    obu druzyn („Grimsby – Burton Albion”) wskazuje TE SAME kluby z bazy. Dwa niezalezne zapisy (oferta i terminarz)
+    zgodne co do obu druzyn + puchar + kraj = to te kluby. Kazda inna sytuacja = jak dotad NIEPEWNE (noga MNIEJ)."""
+    if not mt or not _PUCHAR.search(str(mt.get('turniej', ''))): return False
+    kt = norm(mt.get('kraj', ''))
+    if not kt or kt in _KRAJE_OGOLNE or not all(k and _ten_sam_kraj(k, kt) for k in kraje): return False
+    import contextlib
+    import io
+    with contextlib.redirect_stdout(io.StringIO()):
+        th, ta = resolve(mt.get('gosp', ''), pool), resolve(mt.get('gosc', ''), pool)
+    return (th, ta) == (h, a) or (th, ta) == (a, h)
+
+
 def _skrot_albo_nic(name, wyn, pula):
     """22.09.2026, USTERKA U1 z przebiegu 21:00: "Independiente Yumbo" (Kolumbia, II liga) zostalo
     policzone jako "Independiente" (Argentyna, Avellaneda) — oczekiwane gole 2,05 : 0,84 z sily
@@ -752,7 +768,7 @@ def _w_kraju(nazwy, kraj, pool, m):
     return next(iter(wyn)) if len(wyn) == 1 else None
 
 
-def _z_meczami(t, m):
+def _z_meczami(t, m, clubelo=None):
     """Nazwa bez meczow w bazie (sam wpis clubelo, np. "Nott'm Forest"), a obok ten sam zapis po kluczu
     Z meczami ("Nottm Forest") — bierzemy ten z meczami. Klucz = te same litery i cyfry, wiec to ten sam klub."""
     if t is None or ((m.HomeTeam == t) | (m.AwayTeam == t)).any(): return t
@@ -769,6 +785,18 @@ def _z_meczami(t, m):
     if len(kand) == 1:
         print(f'  "{t}" nie ma meczow w bazie — uzyto zapisu "{kand[0]}" (ten sam klub, inna pisownia).')
         return kand[0]
+    # 06.10.2026 (Raport 18:00 usterka 3, Newport – Plymouth Argyle): clubelo ma ten klub DWA razy — „Plymouth Argyle”
+    # (bez meczow) i „Plymouth” (mecze E2). Dokladny zapis z oferty trafial w pusty wpis: „liga None”, ROZNE LIGI BEZ ELO.
+    # Bierzemy wpis clubelo TEGO SAMEGO KRAJU z meczami, ktorego nazwa jest poczatkiem nazwy z oferty — tylko gdy jeden.
+    if clubelo is not None and len(clubelo) and 'country' in clubelo:
+        kr = clubelo.loc[clubelo.club == t, 'country']
+        if len(kr):
+            tt, z_m = _tokeny(t), set(pd.unique(pd.concat([m.HomeTeam, m.AwayTeam])))
+            kand = sorted({c for c in clubelo.loc[clubelo.country == kr.iloc[-1], 'club'].unique()
+                           if c != t and c in z_m and 0 < len(_tokeny(c)) < len(tt) and tt[:len(_tokeny(c))] == _tokeny(c)})
+            if len(kand) == 1:
+                print(f'  "{t}" nie ma meczow w bazie (drugi wpis clubelo) — uzyto "{kand[0]}" (ten sam kraj, mecze w bazie).')
+                return kand[0]
     return t
 
 
@@ -842,7 +870,7 @@ def club(home, away, kursy, live=None):
     jh, ja = _jawny_kraj(home, pool, m), _jawny_kraj(away, pool, m)
     h = jh or resolve(home, pool) or _przez_egzonim(home, pool)
     a = ja or resolve(away, pool) or _przez_egzonim(away, pool)
-    h, a = _z_meczami(h, m), _z_meczami(a, m)
+    h, a = _z_meczami(h, m, _elo), _z_meczami(a, m, _elo)
     jawne = (bool(jh) or bool(_PRZYR.match(str(home).strip())), bool(ja) or bool(_PRZYR.match(str(away).strip())))
     h, a = _wariant_kraju(h, a, m, pool, jawne)
     if h is not None and h == a:
@@ -916,6 +944,9 @@ def club(home, away, kursy, live=None):
     if skroty and not wspolna_liga(m, h, a) and skrot_w_pucharze_ok(skroty, mt, (kh, ka)):
         print(f'  PUCHAR KRAJOWY ({mt["kraj"]}, {mt["turniej"]}): {h} i {a} bez wspolnej ligi — w pucharze to normalne; '
               'skrocone nazwy zgubily tylko czlony ogolne, kraj zgodny z terminarzem — dopasowanie przyjete.')
+    elif skroty and not wspolna_liga(m, h, a) and terminarz_potwierdza_pare(h, a, mt, pool, (kh, ka)):
+        print(f'  PUCHAR KRAJOWY ({mt["kraj"]}, {mt["turniej"]}): {h} i {a} bez wspolnej ligi — w pucharze to normalne; '
+              f'terminarz ({mt["gosp"]} – {mt["gosc"]}) wskazuje te same kluby — dopasowanie przyjete.')
     elif skroty and not wspolna_liga(m, h, a):
         sys.exit('NIEPEWNE DOPASOWANIE: ' + '; '.join(f'"{n}" -> {t} (zgubiony czlon rozrozniajacy)' for n, t in skroty)
                  + f', a {h} i {a} nie graly w jednej lidze w ostatnich 2 latach — to prawdopodobnie INNY klub. '
