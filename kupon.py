@@ -25,6 +25,7 @@ TAX = 0.88
 FAZY = {1: {'A': 5, 'B': 3, 'C': 2}, 2: {'A': 8, 'B': 5, 'C': 2}, 3: {'A': 8, 'B': 5, 'C': 2}}
 LIMIT_DZIEN_ZL, LIMIT_DZIEN_KUPONY, BUDZET = 10, 3, 300
 MAKS_NOG_KANDYDATOW = 25
+PILKA_KURS = (1.50, 2.00)  # 06.10.2026 (uzytkownik): codziennie jeden najpewniejszy AKO z pilki noznej w tym zakresie
 MIX_MIN_KURS = 1.50        # ponizej wyplata po podatku < 1,32 x stawki — „mix” bez sensu   # najlepsze wg P — kombinacje 4 z 25 to 12 650, liczy sie w sekundy
 
 
@@ -52,7 +53,7 @@ MARGINES_SZACUNKU = 0.10
 
 def wczytaj(plik):
     d = pd.read_csv(plik)
-    for c, v in (('sport', ''), ('szacunek', 0), ('polski', 0), ('marza', 1.0), ('kryteria', 0)):
+    for c, v in (('sport', ''), ('szacunek', 0), ('polski', 0), ('marza', 1.0), ('kryteria', 0), ('ev_dodatni', 1)):
         d[c] = d[c].fillna(v) if c in d else v   # pusta komorka = wartosc domyslna (NaN psul filtr polski == 0)
     d['p'] = d.p.astype(float); d['kurs'] = d.kurs.astype(float)
     # p_min: dolny kraniec przedzialu P. Jawna kolumna wygrywa; inaczej p - margines dla nog "szacunek".
@@ -117,6 +118,15 @@ def najlepszy(d, rodzaj):
             if o['kurs'] >= MIX_MIN_KURS and o['szacunki'] <= 1:
                 o['sporty'] = d.loc[list(c), 'sport'].nunique(); kand.append(o)
         klucz = lambda o: (round(o['p'], 4), o['sporty'], o['ev'])
+    elif rodzaj == 'PILKA':
+        # 06.10.2026 (decyzja uzytkownika): codziennie JEDEN kupon z pilki noznej, kurs laczny 1,50–2,00, 2–3 nogi
+        # z roznych meczow, NAJWYZSZE laczne P. Nogi: wszystkie, ktore przeszly bramki typuj.py (takze EV <= 0).
+        # Stawka i tak wg CZESCI A (EV <= 0 -> tylko papierowy/bonus) — kupon wybiera najpewniejszy, nie oplacalny.
+        dd = d[d.sport.astype(str).str.lower().isin(['', 'pilka', 'piłka', 'pilka nozna', 'piłka nożna'])]
+        for c in _kombinacje(dd, 2, 3):
+            o = _opis(dd, c)
+            if PILKA_KURS[0] <= o['kurs'] <= PILKA_KURS[1] and o['szacunki'] <= 1: kand.append(o)
+        klucz = lambda o: (round(o['p'], 4), -o['szacunki'], o['ev'])
     else:
         raise ValueError(rodzaj)
     return max(kand, key=klucz) if kand else None
@@ -155,7 +165,8 @@ def main(argv):
     ap.add_argument('--wydane-lacznie', type=float, default=0)
     ap.add_argument('--k5-dzis', type=float, default=0, help='suma stawek K5 postawionych dzis we wczesniejszych przebiegach (limit 8 zl, 6.7)')
     a = ap.parse_args(argv)
-    d = wczytaj(a.plik)
+    wsz = wczytaj(a.plik)
+    d = wsz[wsz.ev_dodatni.astype(int) == 1].reset_index(drop=True)   # K1–K5 i MIX: tylko nogi z EV > 0 (jak dotad)
     print(f'KUPON.PY — {len(d)} nog dopuszczonych, faza {a.faza}, depozyt {a.depozyt:.2f} zl, '
           f'dzis {a.wydane_dzis:.0f} zl / {a.kupony_dzis} kup., lacznie {a.wydane_lacznie:.0f}/{BUDZET} zl')
     wydane, kupony, uzyte = a.wydane_dzis, a.kupony_dzis, set()
@@ -181,6 +192,25 @@ def main(argv):
             print(f'   → DO GRY: stawka {st} zl (wyplata {st * TAX * o["kurs"]:.2f} zl); kurs minimalny {1 / (o["p"] * TAX):.2f}'
                   f' — PRZED POSTAWIENIEM przepisz kursy z aplikacji i przelicz EV')
     print('\n' + linia_mix(najlepszy(d[(d.polski == 0) & (d.marza <= 1.10)], 'MIX'), d))
+    print('\n' + '\n'.join(linie_pilka(wsz, a, wydane, kupony)))
+
+
+def linie_pilka(wsz, a, wydane, kupony):
+    """06.10.2026: AKO PILKA DNIA — najpewniejszy kupon z pilki 1,50–2,00 (zawsze wypisany; stawka wg CZESCI A)."""
+    o = najlepszy(wsz[(wsz.polski == 0) & (wsz.marza <= 1.10)], 'PILKA') or najlepszy(wsz, 'PILKA')
+    if o is None:
+        return [f'AKO PILKA DNIA ({PILKA_KURS[0]:.2f}–{PILKA_KURS[1]:.2f}): brak — za malo nog pilkarskich po bramkach '
+                f'na kurs w tym zakresie (2–3 nogi z roznych meczow)']
+    out = [f'AKO PILKA DNIA ({PILKA_KURS[0]:.2f}–{PILKA_KURS[1]:.2f}): laczne P {o["p"]:.1%} | kurs {o["kurs"]:.2f} | '
+           f'EV {o["ev"]:+.1%} | poziom {o["poziom"]}']
+    for i in o['nogi']:
+        r = wsz.loc[i]
+        out.append(f'   {r.mecz} | {r.rynek} | P {r.p:.1%} | kurs {r.kurs:.2f}' + (' | SZACUNEK' if r.szacunek else ''))
+    st, powod = za_pieniadze(o, 'PILKA', a, wydane, kupony)
+    out.append(f'   → za pieniadze: stawka {st} zl wg CZESCI A' if not powod else
+               f'   → NIE za wlasne pieniadze ({powod}) — najpewniejszy kupon dnia: papierowy albo ze srodkow bonusowych')
+    out.append(f'   (szansa, ze kupon NIE wejdzie: {1 - o["p"]:.0%} — to najpewniejszy kupon dnia, nie pewniak)')
+    return out
 
 
 def linia_mix(o, d):
