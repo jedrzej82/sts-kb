@@ -1067,6 +1067,10 @@ def club(home, away, kursy, live=None):
     LIGA_BEZ_TESTU = liga_bez_testu(m, {dh, da})
     if LIGA_BEZ_TESTU: print(f'\nLIGA BEZ TESTU: {LIGA_BEZ_TESTU} — P informacyjnie, ZADNA noga z tego meczu NIE idzie na kupon.')
     KONTEKST_MECZU.clear(); KONTEKST_MECZU['sr_goli_ligi'] = srednia_goli_ligi(m, {dh, da})
+    # 06.10.2026 (Raport 15:00 usterka 2, Raufoss – IK Start): „ROZNE LIGI BEZ ELO … nie buduj nogi kuponu” bylo tylko
+    # wydrukiem — gosp_O0.5 dostala „NOGA DOPUSZCZONA” i trafila do nogi.csv (ev_dodatni=1). Teraz to blokada w werdykcie.
+    if any(o.startswith('ROZNE LIGI BEZ ELO') for o in ostrz):
+        KONTEKST_MECZU['zakaz_nogi'] = 'ROZNE LIGI BEZ ELO — P nieporownywalne, z tego meczu nie budujemy nogi kuponu'
     if (_sr := KONTEKST_MECZU['sr_goli_ligi']) is not None and _sr >= PROG_LIGA_BRAMKOSTRZELNA:
         print(f'\nLIGA BRAMKOSTRZELNA: srednia {_sr:.2f} gola na mecz (12 mies.) — U3.5 z P >= 70% NIE NA KUPON (Poprawka 146).')
     dz = drugie_zrodlo([(r.MatchDate, r.HomeTeam, r.AwayTeam, int(r.FTHome), int(r.FTAway)) for r in _mm.itertuples()], h, a, rows)
@@ -1220,6 +1224,7 @@ def werdykt_nogi(k, dz):
     """P do kuponu wg Poprawek 48/58 i powod, gdy noga odpada.
     dz = wynik drugie_zrodlo(): {} (brak drugiego zrodla), {rynek: P | None}."""
     if LIGA_BEZ_TESTU: return None, f'LIGA BEZ TESTU — {LIGA_BEZ_TESTU}'
+    if KONTEKST_MECZU.get('zakaz_nogi'): return None, KONTEKST_MECZU['zakaz_nogi']
     if dz is None: return None, 'drugie zrodlo nie liczone'
     if not dz: return None, 'BRAK DRUGIEGO ZRODLA'
     if k not in dz: return None, 'rynek bez drugiego zrodla'
