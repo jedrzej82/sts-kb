@@ -262,8 +262,12 @@ def czytaj(wzor, bez=None):
         if rozne.any():
             zostaw, sprzeczne, serie = [], 0, 0
             for _, gr in d[rozne].groupby(wynik_kl, dropna=False):
-                if gr[['_v1', '_v2']].isna().any().any():
-                    zostaw.append(gr.index[-1]); continue            # wynik nieliczbowy (np. boks KO/TKO)
+                # 07.10.2026 (Raport 18:00 usterka 1): ten sam mecz zapisany raz z wynikiem (108:59), raz bez —
+                # wynik liczbowy wygrywa z pustym; wiersz pusty/nieliczbowy zostaje tylko, gdy zaden nie ma liczb (boks KO/TKO)
+                licz_ = gr[gr._v1.notna() & gr._v2.notna()]
+                if licz_.empty:
+                    zostaw.append(gr.index[-1]); continue
+                gr = licz_
                 dom = gr[(gr._v1 >= gr._v1.max()) & (gr._v2 >= gr._v2.max())]
                 if len(dom): zostaw.append(dom.index[-1]); continue
                 # 30.09.2026 (przeglad): koszykowka/siatkowka/hokej/reczna graja serie dzien po dniu, a zrodlo bywa o dzien
@@ -362,6 +366,7 @@ NAZWA_PL = {'mma': 'mma', 'boxing': 'boks', 'field-hockey': 'hokej na trawie', '
             'lacrosse': 'lacrosse', 'squash': 'squash', 'rugby-league': 'rugby league', 'beach-soccer': 'piłka plażowa',
             'pesapallo': 'pesapallo', 'field-hockey': 'hokej na trawie', 'padel': 'padel', 'kabaddi': 'kabaddi', 'speedway': 'żużel'}
 WYGRANA = {'mma', 'boks', 'krykiet'}   # liczy się zwycięzca, nie punkty
+BEZ_PUNKTOW_OK = {'table-tennis', 'badminton', 'darts', 'snooker', 'esports'}   # 07.10.2026: wynik bez punktow = 1:0 dopuszczalny
 
 
 
@@ -820,6 +825,11 @@ def inne(tylko_github=False):
         pg, pa = pd.to_numeric(r.wg, errors='coerce'), pd.to_numeric(r.wa, errors='coerce')
         sp0 = SPORT[r.sport][0] if r.sport in SPORT else NAZWA_PL.get(r.sport, r.sport.replace('-', ' '))
         if pd.isna(pg) or pd.isna(pa) or sp0 in WYGRANA:
+            # 07.10.2026 (Raport 18:00 usterka 1): 365 dopisal do Toros del Valle – Sabios (kosz, 108:59) drugi wiersz BEZ
+            # wyniku, ale ze znacznikiem zwyciezcy — wchodzil jako 1:0 i rozliczenie widzialo „dwa rozne wyniki”. 1:0 ze
+            # znacznika ma sens tylko tam, gdzie liczy sie sam zwyciezca (MMA, boks, krykiet; gry osobowe bez punktow
+            # w zrodle); w sportach punktowych (kosz, reczna, siatka, hokej, baseball, futbol) wiersz bez wyniku pomijamy.
+            if sp0 not in WYGRANA and r.sport not in BEZ_PUNKTOW_OK: continue
             if str(r.zwyciezca) not in ('1', '2'): continue
             pg, pa = (1, 0) if str(r.zwyciezca) == '1' else (0, 1)
         liga = f'{r.kraj} | {r.turniej}'

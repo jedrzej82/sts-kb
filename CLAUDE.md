@@ -43,7 +43,7 @@ Użytkownik liczy w czasie polskim (UTC+2 latem): 10:00 UTC = 12:00 PL. Przebieg
   z warstwa bledu, tabela `ANOMALIE`; stan/wynik/uwaga bez zmian; `--zaklady zaklady_faktyczne.csv` = FAKTYCZNE zaklady
   STS/LVBET/Superbet — gdy sa wpisy dnia, pieniadze Bilansu tylko z nich, kupony systemu = zalecenia; plik tylko na Dysku); CLV: `clv.py`; porownanie kursow STS/SUPERBET/LVBET i linia „GRAJ U:” kazdego kuponu (Telegram): `kursy3.py kupon` (dane z telefonu: `termux/kursy_bukmacherow.py` -> `kursy_bukmacherow_*.csv.gz` na Dysku; mecz tylko jednoznaczny, roznica >35% = podejrzany); kursy z PDF oferty i kurs_zamkniecia: `oferta.py`.
 - Dodatkowe zrodla statystyk (TRYB OBSERWACJI, nic w przebiegu ich nie uzywa do czasu backtestu i decyzji uzytkownika):
-  `termux/zrodla.py` na telefonie (Elo reprezentacji, FotMob xG/sklady, Sofascore, Transfermarkt, Understat, Tennis Abstract,
+  `termux/zrodla.py` na telefonie (Elo reprezentacji, FotMob xG/strzaly/sklady, Sofascore — domyslnie WYLACZONY (403 challenge; `--sofascore` wlacza), Transfermarkt, Understat, Tennis Abstract,
   darty, NHL+bramkarze, pogoda, sedziowie, 90minut.pl: II/III liga i CLJ jako zrodla_90minut_mecze) -> jeden `zrodla_*.zip` na uruchomienie w podfolderze baza-wiedzy/zrodla/
   (NIE w folderze przebiegu); w zipie diagnoza `zrodla_diag_*.txt` i probki `zrodla_surowe_*.jsonl.gz`;
   instalacja: `termux/instaluj_zrodla.sh`.

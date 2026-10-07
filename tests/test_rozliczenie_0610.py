@@ -56,3 +56,23 @@ def test_aliasy_auto_pamietaja_poprzednie_dni(tmp_path):
     s = dopasuj._stare_aliasy(str(plik), nowe, '2026-10-07')
     assert list(s.nazwa) == ['Club Leandro Niceforo Alem']        # dzisiejszy dowod wygrywa przy tej samej nazwie
     assert dopasuj._stare_aliasy(str(tmp_path / 'brak.csv'), nowe, '2026-10-07').empty
+
+
+def test_wiersz_bez_wyniku_w_sporcie_punktowym_nie_jest_1_0(tmp_path, monkeypatch):
+    # Raport 07.10 18:00 nr 1: 365 dopisal do „Toros del Valle – Sabios de Manizales” (kosz, 108:59) wiersz bez wyniku
+    # ze znacznikiem zwyciezcy -> 1:0 -> „kilka meczow tej pary tego dnia (rozne wyniki)”. Boks: 1:0 ze zwyciezcy zostaje.
+    import gzip
+    import zewn
+    z = tmp_path / 'zewn'
+    z.mkdir()
+    k = 'data,sport,kraj,turniej,runda,gosp,gosc,wg,wa,okresy_g,okresy_a,zwyciezca,nawierzchnia\n'
+    w = (k + '2026-10-06,basketball,Colombia,LBP,Round,Toros del Valle,Sabios de Manizales,108,59,,,1,\n'
+         + '2026-10-06,basketball,Colombia,LBP,Round,Toros del Valle,Sabios de Manizales,,,,,1,\n'
+         + '2026-10-06,boxing,World,Boxing,,Boxer A,Boxer B,,,,,2,\n')
+    with gzip.open(z / 'wyniki_365_inne_2026-10.csv.gz', 'wt', encoding='utf-8') as f: f.write(w)
+    monkeypatch.setattr(zewn, 'ZD', str(z))
+    d = zewn.inne()
+    kosz = d[d.gosp == 'Toros del Valle']
+    assert len(kosz) == 1 and float(kosz.pg.iloc[0]) == 108
+    boks = d[d.gosp == 'Boxer A']
+    assert len(boks) == 1 and (float(boks.pg.iloc[0]), float(boks.pa.iloc[0])) == (0, 1)

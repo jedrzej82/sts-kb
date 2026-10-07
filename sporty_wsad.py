@@ -32,7 +32,9 @@ def wczytaj_liste(sciezka, min_pol):
         if not linia.strip() or linia.lstrip().startswith('#'): continue
         p = [c.strip() for c in linia.split('\t')]
         p = [c[1:-1] if len(c) >= 2 and c[0] == c[-1] and c[0] in '"\'' else c for c in p]
-        if len(p) < min_pol or not all(p[:min_pol]):
+        # 07.10.2026 (Raport 18:00 usterka 4): lista z kursy_*.csv.gz zawierala wiersze rynkow zawodnika pilki recznej
+        # („Anzic Aljus” – „nan”) — „nan”/„None” to brak rywala, nie nazwa druzyny: wiersz zly (KOD 2), nie mecz
+        if len(p) < min_pol or not all(p[:min_pol]) or any(c.lower() in ('nan', 'none', 'null') for c in p[:min_pol]):
             out.append((linia, None, []))
             continue
         opcje = [o for c in p[min_pol:] for o in shlex.split(c)]

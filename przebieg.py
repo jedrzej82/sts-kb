@@ -183,7 +183,9 @@ def rozpakuj_dzienniki(zrodlo=HERE, cel=None):
 # (wyniki_*, terminarze, arkusze). paczka.gs pakuje wszystko w paczka.zip. Dozwolone sciezki w paczce — nic innego
 # nie jest rozpakowywane (zip z Dysku nie moze nadpisac kodu repo).
 _PACZKA_WZORCE = (r'zewn/wyniki_[a-z0-9]+_[a-z]+_\d{4}-\d{2}\.csv\.gz', r'zewn/terminarz_(fs|365)\.csv\.gz',
-                  r'statystyki_[a-z_]+\.csv\.gz', r'absencje\.csv\.gz', r'dzienniki\.zip')
+                  r'statystyki_[a-z_]+\.csv\.gz', r'absencje\.csv\.gz', r'dzienniki\.zip',
+                  # 07.10.2026 (Raport 18:00 usterka 6): faktyczne zaklady w paczce — bez osobnego pobrania z Dysku
+                  r'zaklady_faktyczne\.csv')
 
 
 def rozpakuj_paczke(zrodlo=HERE):

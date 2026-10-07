@@ -6,9 +6,10 @@ wstecznego i decyzji uzytkownika (CLAUDE.md: reguly nigdy nie wyprzedzaja kodu).
 
 Zrodla (D = raz dziennie, P = kazde uruchomienie):
   1  eloratings.net    D  Elo reprezentacji                                  -> zrodla_elo_reprezentacji_*.csv.gz
-  2  FotMob            P  mecze dnia; dla meczow w ciagu 3,5 h i zakonczonych: xG, sklady, nieobecni, stadion, sedzia
+  2  FotMob            P  mecze dnia; dla meczow w ciagu 3,5 h i zakonczonych (dzis/wczoraj/przedwczoraj): xG, strzaly,
+                          sklady, nieobecni, stadion, sedzia; osobne limity przed/po meczu, najpierw ligi z listy priorytetu
                                                                               -> zrodla_fotmob_mecze_*, zrodla_fotmob_szczegoly_*
-  3  Sofascore         P  mecze/wyniki 7 sportow (wczoraj+dzis); pilka w ciagu 3,5 h: sklad potwierdzony, nieobecni
+  3  Sofascore         P  WYLACZONY domyslnie (07.10: od 03.10 kazda proba = 403 "challenge"; --sofascore wlacza) — mecze/wyniki 7 sportow (wczoraj+dzis); pilka w ciagu 3,5 h: sklad potwierdzony, nieobecni
                                                                               -> zrodla_sofascore_mecze_*, zrodla_sofascore_sklady_*
   4  Transfermarkt     D  kontuzjowani i wartosci kadr, 25 lig                -> zrodla_transfermarkt_*
   5  Understat         D  xG meczow 6 lig (--historia: sezony od 2014)        -> zrodla_understat_*
@@ -25,7 +26,7 @@ Wszystko z jednego uruchomienia w JEDNYM pliku zrodla_RRRR-MM-DD_GG-MM.zip, wysy
 baza-wiedzy/zrodla/ (nie do folderu przebiegu). W zipie tez zrodla_diag_*.txt (status kazdego zrodla) i
 zrodla_surowe_*.jsonl.gz (do 4 surowych odpowiedzi na zrodlo, przyciete) — z nich poprawiamy parsery bez zrzutow ekranu.
 
-Uzycie:  python zrodla.py [--katalog /sdcard/Download] [--tylko fotmob,nhl] [--historia] [--budzet-min 12] [--wszystkie-dzienne] [--bez-wysylki]
+Uzycie:  python zrodla.py [--katalog /sdcard/Download] [--tylko fotmob,nhl] [--historia] [--budzet-min 12] [--wszystkie-dzienne] [--bez-wysylki] [--sofascore]
          Setka Cup (s24): cron sam pobiera 21 dni wstecz przy pierwszym uruchomieniu i dociaga zaleglosci w kolejnych."""
 import csv
 import datetime as dt
@@ -49,7 +50,23 @@ H_HTML = {'User-Agent': UA, 'Accept': 'text/html,application/xhtml+xml,*/*;q=0.8
 CTX = ssl.create_default_context()
 STAN = os.path.expanduser('~/.zrodla_stan.json')
 OKNO_H = 3.5            # szczegoly dla meczow zaczynajacych sie w ciagu tylu godzin
-MAKS_SZCZEGOLY = 60     # na zrodlo i uruchomienie
+MAKS_SZCZEGOLY = 60     # Sofascore: sklady na uruchomienie
+# FotMob matchDetails (07.10.2026, analiza 27 zipow 03–07.10): wspolny limit 60 nie starczal — mecze zakonczone sprzed
+# 2 dni przepadaly. Osobne limity, przed meczem najpierw (sklady sa pilne), po meczu do 3 dni wstecz. Przebieg zuzywal
+# najwyzej ~264 s z 720 s; szczegoly FotMob maja wlasny limit czasu i przerywaja, gdy w budzecie zostaje < REZERWA_S.
+FM_MAKS_PRZED, FM_MAKS_PO = 80, 140
+FM_LIMIT_S = 360        # najwyzej tyle sekund na szczegoly FotMob w jednym uruchomieniu
+REZERWA_S = 60          # przerwij pobieranie szczegolow, gdy do konca budzetu zostaje mniej
+FM_DNI_PO = 3           # mecze zakonczone: dzis, wczoraj, przedwczoraj
+# Kolejnosc szczegolow (zrodla.py na telefonie nie ma oferty STS — prosta lista priorytetu wg kraju FotMob 'ccode'):
+# INT = reprezentacje i puchary europejskie; potem kraje lig top/czesto w ofercie STS; w kraju kolejnosc FotMob
+# (najwyzsza liga pierwsza). Mlodziezowe, kobiece i rezerwy na koncu grupy.
+FM_PRIORYTET = (('INT', 'ENG', 'ESP', 'GER', 'ITA', 'FRA', 'POL'),
+                ('NED', 'POR', 'TUR', 'BEL', 'SCO', 'AUT', 'SUI', 'DEN', 'SWE', 'NOR', 'GRE', 'CZE'),
+                ('BRA', 'ARG', 'USA', 'MEX', 'CRO', 'SRB', 'ROU', 'UKR', 'HUN', 'SVK', 'SVN', 'BUL', 'ISR', 'CYP',
+                 'FIN', 'IRL', 'WAL', 'NIR', 'ISL', 'JPN', 'KOR', 'AUS', 'KSA', 'CHI', 'COL', 'URU', 'ECU', 'PAR', 'PER'))
+FM_DRUGORZEDNE = re.compile(r'women|female|frauen|femenin|feminin|kobiet|\bu-?1\d\b|\bu-?2[0-3]\b|youth|reserve|primavera|'
+                            r'juvenil|junior|amateur|regional', re.I)
 SURowe_NA_ZRODLO = 4
 SUROWE_LIMIT = {'90minut': 10}   # 03.10.2026: strony lig 90minut potrzebne w calosci do sprawdzenia parsera
 SURowe_MAKS_B = 300_000
@@ -106,6 +123,9 @@ class Sesja:
 
     def czas(self):
         return time.time() < self.koniec
+
+    def zostalo(self):
+        return self.koniec - time.time()
 
     def get(self, zrodlo, url, naglowki=H_JSON, proby=2, pauza=0.4, curl=None):
         """(kod HTTP, tekst) — nigdy nie rzuca; kod 0 = blad sieci, -1 = koniec budzetu czasu.
@@ -251,13 +271,20 @@ def _nazwisko(p):
 
 def fotmob_szczegoly(j):
     """Wydobycie odporne na zmiany ukladu JSON-a FotMob: szukamy kluczy w calym drzewie."""
-    w = {'xg_gosp': '', 'xg_gosc': '', 'sklad_status': '', 'sklad_gosp': '', 'sklad_gosc': '', 'nieobecni_gosp': '',
+    w = {'xg_gosp': '', 'xg_gosc': '', 'strzaly_gosp': '', 'strzaly_gosc': '', 'celne_gosp': '', 'celne_gosc': '',
+         'sklad_status': '', 'sklad_gosp': '', 'sklad_gosc': '', 'nieobecni_gosp': '',
          'nieobecni_gosc': '', 'stadion': '', 'miasto': '', 'lat': '', 'lon': '', 'sedzia': ''}
     if not j: return w
     for d in chodz(j):
         if not w['xg_gosp'] and (d.get('key') == 'expected_goals' or str(d.get('title', '')).lower().startswith('expected goals')) \
                 and isinstance(d.get('stats'), list) and len(d['stats']) == 2:
             w['xg_gosp'], w['xg_gosc'] = d['stats']
+        if isinstance(d.get('stats'), list) and len(d['stats']) == 2:   # strzaly z tej samej odpowiedzi (bez nowych zapytan)
+            klucz, tytul = str(d.get('key', '')).lower(), str(d.get('title', '')).strip().lower()
+            for pole, klucze, tytuly in (('strzaly', ('total_shots', 'totalshots'), ('total shots',)),
+                                         ('celne', ('shotsontarget', 'shots_on_target'), ('shots on target',))):
+                if not w[f'{pole}_gosp'] and (klucz in klucze or tytul in tytuly):
+                    w[f'{pole}_gosp'], w[f'{pole}_gosc'] = d['stats']
         if not w['sklad_status']:
             for k in ('lineupType', 'lineupSource', 'lineupStatus'):
                 if isinstance(d.get(k), str): w['sklad_status'] = d[k]; break
@@ -389,6 +416,37 @@ def pogoda_na_godzine(odp, mecze):
     return out
 
 
+def teraz_utc():
+    """Czas pobrania (kolumna pobrano_utc): ISO UTC z sekundami, np. 2026-10-07T10:03:12Z."""
+    return dt.datetime.now(dt.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+
+def fm_priorytet(m):
+    """Klucz sortowania meczow FotMob: (grupa kraju z FM_PRIORYTET, rozgrywki drugorzedne). Mniejszy = wczesniej."""
+    kraj = str(m.get('kraj') or '').upper()
+    grupa = next((i for i, g in enumerate(FM_PRIORYTET) if kraj in g), len(FM_PRIORYTET))
+    return grupa, bool(FM_DRUGORZEDNE.search(str(m.get('liga') or '')))
+
+
+def fm_wybor(mecze, teraz, gotowe, dzis):
+    """(przed, po) — mecze do szczegolow FotMob w kolejnosci priorytetu, przyciete do FM_MAKS_PRZED / FM_MAKS_PO.
+    Przed: start w [teraz, teraz + OKNO_H], w grupie wg godziny. Po: zakonczone z dat dzis..dzis-(FM_DNI_PO-1),
+    jeszcze nie pobrane; w grupie najstarsze najpierw (najszybciej wypadaja z okna)."""
+    widz, przed, po = set(), [], []
+    od = str(dzis - dt.timedelta(days=FM_DNI_PO - 1))
+    for m in mecze:
+        if m.get('mecz_id') in widz: continue
+        widz.add(m.get('mecz_id'))
+        t = utc_z(m.get('start_utc'))
+        if t and teraz <= t <= teraz + dt.timedelta(hours=OKNO_H) and not m.get('zakonczony'):
+            przed.append((fm_priorytet(m), t, m))
+        elif m.get('zakonczony') and f"fm{m['mecz_id']}" not in gotowe and str(m.get('data', '')) >= od:
+            po.append((fm_priorytet(m), t or dt.datetime.max, m))
+    przed.sort(key=lambda x: x[:2])
+    po.sort(key=lambda x: x[:2])
+    return [x[2] for x in przed[:FM_MAKS_PRZED]], [x[2] for x in po[:FM_MAKS_PO]]
+
+
 def utc_z(x):
     """ISO / znacznik czasu -> datetime UTC (naive) albo None."""
     if x in (None, ''): return None
@@ -411,22 +469,33 @@ def z_elo(s, w):
 
 def z_fotmob(s, w, dzis, teraz, gotowe):
     mecze = []
-    for d in sorted({dzis - dt.timedelta(days=1), dzis, (teraz + dt.timedelta(hours=OKNO_H)).date()}):
+    dni = {dzis - dt.timedelta(days=k) for k in range(FM_DNI_PO)} | {(teraz + dt.timedelta(hours=OKNO_H)).date()}
+    for d in sorted(dni):
         j = s.get_json('fotmob', f'https://www.fotmob.com/api/data/matches?date={d:%Y%m%d}')
         if j is None: j = s.get_json('fotmob', f'https://www.fotmob.com/api/matches?date={d:%Y%m%d}')
-        mecze += fotmob_mecze(j, str(d))
+        pob = teraz_utc()
+        mecze += [{**m, 'pobrano_utc': pob} for m in fotmob_mecze(j, str(d))]
     w['fotmob_mecze'] = mecze
-    wyb = [m for m in mecze if (lambda t: t and teraz <= t <= teraz + dt.timedelta(hours=OKNO_H))(utc_z(m['start_utc']))]
-    wyb += [m for m in mecze if m['zakonczony'] and f"fm{m['mecz_id']}" not in gotowe]
-    out = []
-    for m in wyb[:MAKS_SZCZEGOLY]:
-        j = s.get_json('fotmob', f"https://www.fotmob.com/api/data/matchDetails?matchId={m['mecz_id']}")
-        if j is None: j = s.get_json('fotmob', f"https://www.fotmob.com/api/matchDetails?matchId={m['mecz_id']}")
-        if j is None: continue
-        out.append({'mecz_id': m['mecz_id'], 'liga': m['liga'], 'kraj': m['kraj'], 'gosp': m['gosp'], 'gosc': m['gosc'],
-                    'start_utc': m['start_utc'], 'zakonczony': m['zakonczony'], 'wynik': m['wynik'], **fotmob_szczegoly(j)})
-        if m['zakonczony']: gotowe.add(f"fm{m['mecz_id']}")
+    przed, po = fm_wybor(mecze, teraz, gotowe, dzis)
+    out, licz, start = [], {'przed': 0, 'po': 0}, time.time()
+    koniec, przerwa = start + FM_LIMIT_S, ''
+    for etap, lista in (('przed', przed), ('po', po)):
+        for m in lista:
+            if s.zostalo() < REZERWA_S: przerwa = f'budzet (< {REZERWA_S} s do konca)'; break
+            if time.time() >= koniec: przerwa = f'limit czasu szczegolow {FM_LIMIT_S} s'; break
+            j = s.get_json('fotmob', f"https://www.fotmob.com/api/data/matchDetails?matchId={m['mecz_id']}")
+            if j is None: j = s.get_json('fotmob', f"https://www.fotmob.com/api/matchDetails?matchId={m['mecz_id']}")
+            if j is None: continue
+            out.append({'mecz_id': m['mecz_id'], 'liga': m['liga'], 'kraj': m['kraj'], 'gosp': m['gosp'], 'gosc': m['gosc'],
+                        'start_utc': m['start_utc'], 'zakonczony': m['zakonczony'], 'wynik': m['wynik'], 'etap': etap,
+                        'pobrano_utc': teraz_utc(), **fotmob_szczegoly(j)})
+            licz[etap] += 1
+            if m['zakonczony']: gotowe.add(f"fm{m['mecz_id']}")
+        if przerwa: break
     w['fotmob_szczegoly'] = out
+    s.diag.append(f"fotmob szczegoly: przed meczem {licz['przed']}/{len(przed)} (limit {FM_MAKS_PRZED}), "
+                  f"po meczu {licz['po']}/{len(po)} (limit {FM_MAKS_PO}), czas {time.time() - start:.0f} s"
+                  + (f', PRZERWANE: {przerwa}' if przerwa else ''))
 
 
 def z_sofa(s, w, dzis, teraz):
@@ -447,7 +516,9 @@ def z_sofa(s, w, dzis, teraz):
     mecze = []
     for sport in SOFA_SPORTY:
         for d in (dzis - dt.timedelta(days=1), dzis):
-            mecze += sofa_mecze(jget(f'{baza}/sport/{sport}/scheduled-events/{d}'), sport, str(d))
+            j = jget(f'{baza}/sport/{sport}/scheduled-events/{d}')
+            pob = teraz_utc()
+            mecze += [{**m, 'pobrano_utc': pob} for m in sofa_mecze(j, sport, str(d))]
     w['sofascore_mecze'] = mecze
     out = []
     for m in [m for m in mecze if m['sport'] == 'football' and m['status'] == 'notstarted'
@@ -455,7 +526,7 @@ def z_sofa(s, w, dzis, teraz):
         lu = jget(f"{baza}/event/{m['id']}/lineups")
         ev = jget(f"{baza}/event/{m['id']}")
         out.append({'id': m['id'], 'turniej': m['turniej'], 'kategoria': m['kategoria'], 'gosp': m['gosp'], 'gosc': m['gosc'],
-                    'start_utc': utc_z(m['start_ts']).isoformat(), **sofa_sklad(lu, ev)})
+                    'start_utc': utc_z(m['start_ts']).isoformat(), 'pobrano_utc': teraz_utc(), **sofa_sklad(lu, ev)})
     w['sofascore_sklady'] = out
 
 
@@ -535,12 +606,14 @@ def z_darty(s, w, dzis):
 def z_nhl(s, w, dzis):
     out = []
     for d in (dzis - dt.timedelta(days=1), dzis, dzis + dt.timedelta(days=1)):
-        out += nhl_mecze(s.get_json('nhl', f'https://api-web.nhle.com/v1/score/{d}'), str(d))
+        j = s.get_json('nhl', f'https://api-web.nhle.com/v1/score/{d}')
+        pob = teraz_utc()
+        out += [{**m, 'pobrano_utc': pob} for m in nhl_mecze(j, str(d))]
     w['nhl'] = out
     br = []
     for d in (dzis, dzis + dt.timedelta(days=1)):   # strona bez daty pokazuje wczorajsze mecze (diagnoza 03.10)
         kod, t = s.get('nhl', f'https://www.dailyfaceoff.com/starting-goalies/{d}', H_HTML)
-        if kod == 200: br += bramkarze(t)
+        if kod == 200: br += [{**b, 'pobrano_utc': teraz_utc()} for b in bramkarze(t)]
     w['nhl_bramkarze'] = br
 
 
@@ -561,16 +634,19 @@ def z_pogoda(s, w):
         url = ('https://api.open-meteo.com/v1/forecast?latitude=' + ','.join(str(m['lat']) for m in cz) +
                '&longitude=' + ','.join(str(m['lon']) for m in cz) +
                '&hourly=temperature_2m,precipitation,wind_speed_10m&forecast_days=2&timezone=UTC')
-        out += pogoda_na_godzine(s.get_json('pogoda', url), cz)
+        j = s.get_json('pogoda', url)
+        pob = teraz_utc()
+        out += [{**x, 'pobrano_utc': pob} for x in pogoda_na_godzine(j, cz)]
     w['pogoda'] = out
 
 
 def sedziowie(w):
     out = [{'zrodlo': 'sofascore', 'mecz_id': r['id'], 'gosp': r['gosp'], 'gosc': r['gosc'], 'start_utc': r['start_utc'],
-            'sedzia': r['sedzia'], 'mecze': r['sedzia_mecze'], 'zolte': r['sedzia_zolte'], 'czerwone': r['sedzia_czerwone']}
+            'sedzia': r['sedzia'], 'mecze': r['sedzia_mecze'], 'zolte': r['sedzia_zolte'], 'czerwone': r['sedzia_czerwone'],
+            'pobrano_utc': r.get('pobrano_utc', '')}
            for r in w.get('sofascore_sklady', []) if r.get('sedzia')]
     out += [{'zrodlo': 'fotmob', 'mecz_id': r['mecz_id'], 'gosp': r['gosp'], 'gosc': r['gosc'], 'start_utc': r['start_utc'],
-             'sedzia': r['sedzia'], 'mecze': '', 'zolte': '', 'czerwone': ''}
+             'sedzia': r['sedzia'], 'mecze': '', 'zolte': '', 'czerwone': '', 'pobrano_utc': r.get('pobrano_utc', '')}
             for r in w.get('fotmob_szczegoly', []) if r.get('sedzia') and not r.get('zakonczony')]
     return out
 
@@ -849,6 +925,14 @@ def wyslij(zp, a):
     print('rclone -> gdrive:zrodla/', 'OK' if r.returncode == 0 else f'BLAD {r.returncode}: {r.stderr[-300:]}')
 
 
+SOFA_WYLACZONY = 'WYLACZONE domyslnie (od 03.10 kazda proba 403 "challenge"; nie obchodzimy zabezpieczen; wlacz: --sofascore)'
+
+
+def sofa_wlaczony(a):
+    """Sofascore tylko na wyrazne zyczenie: --sofascore albo --tylko z 'sofascore'."""
+    return '--sofascore' in a or ('--tylko' in a and 'sofascore' in a[a.index('--tylko') + 1].split(','))
+
+
 def main(a):
     kat = a[a.index('--katalog') + 1] if '--katalog' in a else '/sdcard/Download'
     budzet = float(a[a.index('--budzet-min') + 1]) if '--budzet-min' in a else 12.0
@@ -868,6 +952,8 @@ def main(a):
                ('understat', lambda: z_understat(s, w, dzis, '--historia' in a)), ('transfermarkt', lambda: z_transfermarkt(s, w))]
     for nazwa, f in zadania:
         if nazwa not in tylko: continue
+        if nazwa == 'sofascore' and not sofa_wlaczony(a):
+            bledy[nazwa] = SOFA_WYLACZONY; continue
         if nazwa in DZIENNE and stan.get(nazwa) == str(dzis) and '--wszystkie-dzienne' not in a and '--tylko' not in a:
             bledy[nazwa] = 'pominiete (juz pobrane dzis)'; continue
         if not s.czas(): bledy[nazwa] = 'pominiete (koniec budzetu czasu)'; continue
@@ -886,6 +972,7 @@ def main(a):
     for nazwa in WSZYSTKIE:
         if nazwa not in tylko: continue
         linie.append(f'{nazwa:<14} HTTP {json.dumps(s.kody.get(nazwa, {}))} {bledy.get(nazwa, "")}')
+    linie += s.diag
     for n, r in w.items():
         linie.append(f'  {n:<22} {len(r)} wierszy')
     with open(os.path.join(tmp, f'zrodla_diag_{zn}.txt'), 'w', encoding='utf-8') as f:

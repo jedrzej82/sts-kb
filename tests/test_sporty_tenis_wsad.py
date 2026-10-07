@@ -111,3 +111,12 @@ def test_tenis_wsad_stan_raz_i_reset_slownikow(tmp_path, monkeypatch, capsys):
     assert capsys.readouterr().out == ('##### 1/2 Ann Li | Belinda Bencic\nDopasowano: Ann Li Belinda Bencic\nKOD: 0\n'
                                        '##### 2/2 X | Nikt\nDopasowano: X Nikt\nBrak zawodnika w bazie\nKOD: 1\n')
     assert not tenis.NCOUNT and not tenis.ALIASY                # po wsadzie modul czysty
+
+
+def test_wiersz_z_rywalem_nan_to_zly_wiersz(tmp_path):
+    # Raport 07.10 18:00 nr 4: „piłka ręczna<TAB>Anzic Aljus<TAB>nan” (rynek zawodnika) liczony jak mecz z druzyna „nan”
+    import sporty_wsad
+    f = tmp_path / 'l.tsv'
+    f.write_text('piłka ręczna\tAnzic Aljus\tnan\npiłka ręczna\tKiel\tFlensburg\nhokej\tNone\tIlves\n', encoding='utf-8')
+    w = sporty_wsad.wczytaj_liste(str(f), 3)
+    assert [x[1] is None for x in w] == [True, False, True]
