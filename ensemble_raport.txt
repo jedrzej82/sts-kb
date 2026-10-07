@@ -1,41 +1,36 @@
-Backtest 2025-08-01..2026-09-20: 21504 meczów, 126 lig | pokrycie DC 63%, Elo 39%, pi 71%
-Uczenie wag: do 2026-05-19 (10746), test: od 2026-05-19 (10758)
-Najlepsze wagi (DC, Elo, pi) na części uczącej: (np.float64(0.5), np.float64(0.0), np.float64(0.5)) logloss 2.9357
+Backtest 2025-08-01..2026-10-07: 99067 meczów, 526 lig | pokrycie DC 59%, Elo 8%, pi 70%
+Uczenie wag: do 2026-03-01 (49227), test: od 2026-03-01 (49840)
+Najlepsze wagi (DC, Elo, pi) na części uczącej: (np.float64(0.4), np.float64(0.0), np.float64(0.6)) logloss 2.9494
 
 Porównanie na części TESTOWEJ (logloss 1X2+O2.5+BTTS+O1.5, niżej = lepiej):
-  stary blend DC/Elo 0.5/0.5   2.9885  (n=4630)
-  sam DC                       2.9877  (n=4630)
-  sam Elo                      2.9746  (n=4630)
-  sam pi                       2.9755  (n=4630)
-  ZESPÓŁ v5n                   2.9690  (n=4630)
+  stary blend DC/Elo 0.5/0.5   2.9689  (n=41376)
+  sam DC                       2.9694  (n=41376)
+  sam Elo                      2.9334  (n=41376)
+  sam pi                       2.9515  (n=41376)
+  ZESPÓŁ v5n                   2.9306  (n=41376)
 
 Kalibracja na części TESTOWEJ — typy z P ≥ 70% (wszystkie rynki):
   surowe P:
-                 n     P  traf
-b                             
-[0.7, 0.75)   9361 0.726 0.730
-[0.75, 0.8)   6931 0.773 0.772
-[0.8, 0.85)   4509 0.824 0.817
-[0.85, 0.9)   4101 0.876 0.872
-[0.9, 0.95)   4674 0.924 0.926
-[0.95, 1.01)   962 0.964 0.942
+                  n     P  traf
+b                              
+[0.7, 0.75)   74566 0.725 0.729
+[0.75, 0.8)   60628 0.773 0.775
+[0.8, 0.85)   40214 0.824 0.820
+[0.85, 0.9)   36668 0.876 0.870
+[0.9, 0.95)   39188 0.924 0.922
+[0.95, 1.01)  10469 0.964 0.958
   po rekalibracji (mapa z części uczącej):
-                 n     P  traf
-b                             
-[0.7, 0.75)   9801 0.727 0.728
-[0.75, 0.8)   7462 0.773 0.775
-[0.8, 0.85)   4048 0.821 0.810
-[0.85, 0.9)   4627 0.878 0.871
-[0.9, 0.95)   4412 0.929 0.928
-[0.95, 1.01)  1123 0.959 0.963
-  Brier wszystkie rynki: surowe 0.2023 → po rekalibracji 0.2011
+                  n     P  traf
+b                              
+[0.7, 0.75)   69927 0.726 0.724
+[0.75, 0.8)   67483 0.771 0.769
+[0.8, 0.85)   47993 0.824 0.818
+[0.85, 0.9)   34474 0.873 0.876
+[0.9, 0.95)   43309 0.925 0.926
+[0.95, 1.01)   5190 0.960 0.962
+  Brier wszystkie rynki: surowe 0.2005 → po rekalibracji 0.2005
 
 Wagi końcowe (cały okres): (np.float64(0.4), np.float64(0.0), np.float64(0.6))
 
 Ligi, w których model PRZESZACOWUJE typy ≥75% o >5 pp (n≥60) — ostrożnie w AKO:
-                           div   n    P  traf  różnica_pp
- Russia | Russian First League 103 0.89  0.76      -13.47
-             Ecuador | Serie B  65 0.85  0.74      -10.85
-Paraguay | Division Intermedia 108 0.86  0.76      -10.24
-          Norway | OBOS-ligaen  64 0.89  0.80       -9.62
-                          JAP2 126 0.86  0.78       -8.23
+  brak
