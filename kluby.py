@@ -225,6 +225,9 @@ SCAL_RECZNIE = {
     # Atletico Mineiro: 365scores pisze tak klub w Campeonato Mineiro (osobna liga w bazie, ostatni mecz 03.2026),
     # w BRA ten sam klub to „Atletico-MG” — oferta trafiala w martwy wpis ze stanowej ligi.
     ('Brazil | Mineiro', 'Atlético Mineiro'): 'Atletico-MG',
+    # 07.10.2026 (Raport 21:00 usterka 2): „RB Bragantino” z Paulisty (ostatni mecz 02.2026) to ten sam klub co
+    # „Bragantino” w BRA (Serie A) — oferta „RB Bragantino – Mirassol” trafiala w martwy wpis ze stanowej ligi.
+    ('Brazil | Paulista', 'RB Bragantino'): 'Bragantino',
     # TP-47 (FS, Kakkonen 2026: TP-47 - Vaajakoski 04.10) = „TP-47 Tornio” (365 i oferta STS, ten sam mecz 04.10).
     ('Finland | Kakkonen', 'TP-47'): 'TP-47 Tornio',
 }

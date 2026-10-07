@@ -426,7 +426,7 @@ def _kandydaci_tenis(nazwa, pula):
     inicjal nie zastapi nazwiska („Linette M.” != „Cinalli L. M.”). Wczesniej sporty.resolve wybieral po
     cichu jednego z kilku („Hurkacz” -> „Nika Hurkacz”, w puli byl tez Hubert)."""
     import tenis
-    n = len(tenis._czl_norm(nazwa))
+    n = len(tenis._czl_norm(nazwa, True))
     if not n: return set()
     return {p for p in pula if (lambda z: z[0] >= n and z[1] >= 1)(tenis._zgodnosc(nazwa, p))}
 

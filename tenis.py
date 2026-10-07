@@ -373,8 +373,13 @@ def _pelne_dla_skrotu(skrot, players):
 
 
 
-def _czl_norm(s):
-    return [norm(t) for t in str(s).replace('.', ' ').split() if norm(t)]
+def _czl_norm(s, myslnik=False):
+    # 07.10.2026 (Raport 21:00 usterka 1): myslnik=True dzieli tez po lacznikach — „Struff Jan-Lennard” ma czlony
+    # jan + lennard jak „Jan Lennard Struff” w bazie (dotad „janlennard” pasowal do „jan” tylko jako przedrostek,
+    # a od przedrostka min. 4 litery przestal). Uzywane w porownaniu czlonow (_zgodnosc), nie w scalaniu skrotow.
+    s = str(s).replace('.', ' ')
+    if myslnik: s = s.replace('-', ' ')
+    return [norm(t) for t in s.split() if norm(t)]
 
 
 def _czlon_pasuje(a, b):
@@ -395,7 +400,7 @@ def _wspolne_czlony(zrodlo, kandydat):
 
 def _zgodnosc(zrodlo, kandydat):
     """(zgodne czlony wg _wspolne_czlony, w tym zgodne jako PELNE slowa po obu stronach)."""
-    tz, tk = _czl_norm(zrodlo), list(_czl_norm(kandydat))
+    tz, tk = _czl_norm(zrodlo, True), list(_czl_norm(kandydat, True))
     n = pelne = 0
     for z in tz:
         for i, k in enumerate(tk):

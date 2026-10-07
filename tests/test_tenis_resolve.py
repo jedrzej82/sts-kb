@@ -25,4 +25,5 @@ def test_aktywny_rozstrzyga_inicjal(monkeypatch):
 def test_pelne_slowo_nie_inicjal_ani_krotki_przedrostek():
     assert tenis._zgodnosc('Linette M.', 'Cinalli L. M.')[1] == 0          # M == M to inicjal, nie nazwisko
     assert tenis._zgodnosc('Hurkacz', 'Jia Hu')[1] == 0                    # „Hu” to nie „Hurkacz”
-    assert tenis._zgodnosc('Auger-Aliassime F.', 'Felix Auger Aliassime')[1] == 1
+    # 07.10.2026: lacznik dzieli czlony — auger + aliassime to dwa pelne slowa (dotad jedno sklejone „augeraliassime”)
+    assert tenis._zgodnosc('Auger-Aliassime F.', 'Felix Auger Aliassime')[1] == 2
