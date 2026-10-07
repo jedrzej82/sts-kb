@@ -76,3 +76,15 @@ def test_fetch_te_same_pobrania_rownolegle(monkeypatch):
 def test_gs_placeholder():
     t = open(os.path.join(os.path.dirname(przebieg.__file__), 'apps_script', 'paczka.gs'), encoding='utf-8').read()
     assert "PACZKA_FOLDER_ID = 'WKLEJ_ID_FOLDERU_BAZA_WIEDZY'" in t and 'paczka_manifest.csv' in t
+
+
+def test_zaklady_faktyczne_w_paczce(tmp_path):
+    # 07.10.2026 (Raport 18:00 usterka 6): zaklady_faktyczne.csv z paczki trafia do kb/ (bez osobnego pobrania);
+    # paczka.gs bierze tylko aktualny plik, nie „POPRZEDNIA WERSJA”
+    zf = b'data,bukmacher,stawka\n2026-10-07,STS,6\n'
+    (tmp_path / 'paczka.zip').write_bytes(_paczka(dict(PLIKI, **{'zaklady_faktyczne.csv': zf})))
+    assert przebieg.rozpakuj_paczke(str(tmp_path)) == 5
+    assert (tmp_path / 'zaklady_faktyczne.csv').read_bytes() == zf
+    gs = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'apps_script', 'paczka.gs'),
+              encoding='utf-8').read()
+    assert "nazwa === 'zaklady_faktyczne.csv'" in gs

@@ -2,7 +2,7 @@
  * PACZKA STS — samodzielny dodatek do projektu Apps Script „wyniki STS” (30.09.2026).
  * Co 15 minut pakuje WSZYSTKIE dane, ktore przebieg pobiera z folderu „baza-wiedzy”, w JEDEN plik paczka.zip:
  *   zewn/wyniki_*_RRRR-MM.csv.gz (biezacy miesiac; w dniach 1-3 takze poprzedni), zewn/terminarz_fs.csv.gz, zewn/terminarz_365.csv.gz,
- *   statystyki_*.csv.gz i absencje.csv.gz (z arkusze.gs), dzienniki.zip (z dzienniki.gs).
+ *   statystyki_*.csv.gz i absencje.csv.gz (z arkusze.gs), dzienniki.zip (z dzienniki.gs), zaklady_faktyczne.csv (07.10.2026).
  * PO CO: kazde pobranie przez konektor Dysku kosztuje przebieg ok. 1,5 minuty; 30.09 18:00 poszlo na to ponad 100 min
  * i przebieg nie zdazyl z kuponami. Jedna paczka = jedno pobranie. przebieg.py sam ja rozpakowuje i sprawdza
  * (manifest z rozmiarami, gzip, zip) — przy bledzie przebieg pobiera pliki pojedynczo, jak dotad.
@@ -36,6 +36,8 @@ function paczkaSciezka_(nazwa, miesiace) {
   if (m) return miesiace.indexOf(m[1]) >= 0 ? 'zewn/' + nazwa : '';
   if (nazwa === 'terminarz_fs.csv.gz' || nazwa === 'terminarz_365.csv.gz') return 'zewn/' + nazwa;
   if (/^statystyki_[a-z_]+\.csv\.gz$/.test(nazwa) || nazwa === 'absencje.csv.gz' || nazwa === 'dzienniki.zip') return nazwa;
+  // 07.10.2026: faktyczne zaklady (tylko aktualny plik; „zaklady_faktyczne POPRZEDNIA WERSJA …” nie wchodzi)
+  if (nazwa === 'zaklady_faktyczne.csv') return nazwa;
   return '';
 }
 
