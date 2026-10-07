@@ -117,7 +117,10 @@ def scal_warianty(d, cicho=False):
 # reczna: Liga Mistrzow / Liga Nationala), Czechy (K) w hokeju. NIE scalamy par, ktore okazaly sie roznymi klubami
 # („Zaglebie Lubin W” z I ligi i „Zaglebie W” z Superligi).
 SCAL_SPORTY = {('hokej', 'Zemgale'): 'HK Zemgale/Jlss', ('hokej', 'Troja/Ljungby'): 'If Troja/Ljungby',
-               ('piłka ręczna', 'Din. Bucuresti'): 'Dinamo Bucuresti', ('hokej', 'Czech Republic W'): 'Czechia (W)'}
+               ('piłka ręczna', 'Din. Bucuresti'): 'Dinamo Bucuresti', ('hokej', 'Czech Republic W'): 'Czechia (W)',
+               # 07.10.2026 (Raport 06.10 21:00, zdarzenia.py CONFLICT Harem Spor – Fenerbahce Koleji): TBL, do 05.2026
+               # „Fenerbahce Koleji”, od 09.2026 zrodlo pisze „Fenerbahce 2” — ta sama liga, okresy rozlaczne
+               ('koszykówka', 'Fenerbahce Koleji'): 'Fenerbahce 2'}
 
 
 def scal_recznie(d):
