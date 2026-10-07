@@ -60,3 +60,10 @@ def test_reprezentacje_elo_niezbiezne_blokuje_noge():
     assert sporty.werdykt_meczu(True, 0.54, 25)[0] == 0.54                      # kluby jak dotad
     assert sporty.werdykt_meczu(True, 0.54, sporty.REPREZENTACJE_MIN_MECZOW, reprezentacje=True)[0] == 0.54
     assert sporty._kraj('Italy') and sporty._kraj('Finland') and not sporty._kraj('Trefl Gdansk')
+
+
+def test_pojedynczy_znak_to_inna_druzyna():
+    # Raport 01.10 (audyt): „Odense Q” (kobiety, Kvindeligaen) -> „Odense” (mezczyzni, DEN)
+    pula = {'Odense', 'Chievo', 'Wisla Plock'}
+    assert _r('Odense Q', pula) is None
+    assert _r('Chievo Verona', pula) == 'Chievo'                  # czlon wieloliterowy — jak dotad (z ostrzezeniem)

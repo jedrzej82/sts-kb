@@ -372,6 +372,12 @@ def _skrot_albo_nic(name, wyn, pula):
               f'w bazie tez: {", ".join(inne[:4])}{" ..." if len(inne) > 4 else ""}. '
               f'Nie da sie ustalic, ktory to klub — noga MNIEJ.')
         return None
+    # 07.10.2026 (audyt usterek, Raport 01.10): „Odense Q” (kobiecy klub z Kvindeligaen) -> „Odense” (meski, DEN). Odpadajacy
+    # POJEDYNCZY znak, ktory nie jest znacznikiem (B, II, W), to oznaczenie innej druzyny — nie zgadujemy.
+    if any(len(t) == 1 and not _znaczniki(t) for t in odp):
+        print(f'  ODRZUCONO: "{name}" -> "{wyn}" gubi oznaczenie {", ".join(t for t in odp if len(t) == 1)} — '
+              f'to moze byc inna druzyna klubu, noga MNIEJ.')
+        return None
     print(f'  UWAGA: "{name}" dopasowane do KROTSZEJ nazwy "{wyn}" — pominieto czlon '
           f'rozrozniajacy. Rdzen jest w bazie jednoznaczny, ale sprawdz, czy to ten sam klub.')
     _SKROTY[name] = wyn
