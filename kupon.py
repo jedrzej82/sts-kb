@@ -242,6 +242,11 @@ def linie_niski(wsz):
     for i in o['nogi']:
         r = wsz.loc[i]
         out.append(f'   {r.mecz} | {r.rynek} | P {r.p - NISKI_KOREKTA:.1%} | kurs {r.kurs:.2f}')
+    if o['kurs'] * TAX <= 1:
+        # 07.10.2026 (test na ofertach STS 02–06.10): najnizsze kursy dnia (1,01–1,05) daja kurs laczny 1,07–1,14 — kupon
+        # wchodzi, ale po podatku 12% wyplata jest MNIEJSZA od stawki (prog: kurs laczny > 1,14)
+        out.append(f'   → UWAGA: kurs laczny {o["kurs"]:.2f} — nawet wygrany kupon po podatku 12% zwraca mniej niz stawke '
+                   f'(potrzeba > {1 / TAX:.2f})')
     out.append(f'   → zapisz w ako_log jako papierowy (tag AKON); szansa, ze NIE wejdzie: {1 - o["p"]:.0%}; '
                f'3 dni z rzedu samym przypadkiem: ok. {o["p"] ** 3:.0%}')
     return out

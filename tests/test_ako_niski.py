@@ -31,3 +31,11 @@ def test_za_malo_nog_brak():
 def test_najwyzej_10_nog():
     w = _w([(f'A{i} - B{i}', 'O0.5', 0.97, 1.04, 'pilka', 0) for i in range(14)])
     assert len(kupon.ako_niski(w)['nogi']) == 10
+
+
+def test_ostrzezenie_gdy_wygrana_mniejsza_od_stawki():
+    # test na ofertach 02–06.10: 8 nog po 1,01–1,03 = kurs 1,11; 1,11 x 0,88 < 1
+    w = _w([(f'A{i} - B{i}', 'O0.5', 0.99, 1.013, 'pilka', 0) for i in range(8)])
+    assert any('mniej niz stawke' in x for x in kupon.linie_niski(w))
+    w = _w([(f'A{i} - B{i}', 'O0.5', 0.97, 1.10, 'pilka', 0) for i in range(8)])
+    assert not any('mniej niz stawke' in x for x in kupon.linie_niski(w))
