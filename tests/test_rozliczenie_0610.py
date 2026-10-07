@@ -28,7 +28,9 @@ def test_ehc_to_czlon_ogolny_hokej():
     assert sporty.resolve('Independiente Yumbo', {'Independiente', 'Visp'}, 'hokej') is None
 
 
-def test_kotwica_z_inicjalem_i_czlonem_ogolnym():
+def test_kotwica_z_inicjalem_i_czlonem_ogolnym(monkeypatch):
+    import typuj
+    monkeypatch.delitem(typuj.ALIASES, typuj.norm('Club Leandro Niceforo Alem'), raising=False)   # sama kotwica, bez aliasu
     W = _W(pilka=[(D, 'Leandro N. Alem', 'Centro Español', 1, 5, '365'), (D, 'Leandro N. Alem', 'CSR Espanol', 1, 5, 'fs'),
                   (D, 'Claypole', 'Deportivo Espanol', 1, 1, '365')])
     r = dict(sport='pilka', zdarzenie='Club Leandro Niceforo Alem - Centro SR Espanol', rynek='X2', data=D, uwaga='mecz 2026-10-06 19:00')

@@ -519,7 +519,11 @@ def resolve(name, pool):
         _rdzen = lambda s: {t for t in _tokeny(s) if t not in _OGOLNE and not _znaczniki(t) and t not in ('ii', 'b', 'res', 'reserves', 'reserve')}
         rn = _rdzen(name)
         rez = [p for p in sorted(pool) if _znaczniki(p) == ('rezerwy',) and _rdzen(p) and _rdzen(p) <= rn]
-        if rn and len(rez) == 1: return rez[0]
+        # jak nizej przy skrocie: czlon z oferty, ktorego nie ma w kandydacie, nalezy do INNEGO klubu w bazie
+        # („Wisła II Płock” -> „Wisla II” = rezerwy Wisly Krakow, a w bazie jest „Wisla Plock”) — nie zgadujemy
+        if rn and len(rez) == 1 and not (rn - _rdzen(rez[0]) and any(
+                p != rez[0] and rn <= set(_tokeny(p)) and not _znaczniki(p) for p in pool)):
+            return rez[0]
     if k in ALIASES_KLUBY and ALIASES_KLUBY[k] in pool: return ALIASES_KLUBY[k]
     if k in _WARIANTY and _WARIANTY[k] in pool: return _WARIANTY[k]   # nazwa zrodlowa sklejonego klubu (build_kb)
     c = [p for p in by.values() if _zaw_nazwy(name, p)]
