@@ -4,7 +4,8 @@ dopisywane dziennie do tenis_delta.csv (także Challenger/ITF — baza rośnie z
   python3 tenis.py "Zawodnik A" "Zawodnik B" [--hard|--clay|--grass] [--bo5]
   python3 tenis.py --backtest            — kalibracja na 2024–2025
   python3 tenis.py --wynik RRRR-MM-DD "Zwycięzca" "Przegrany" NAWIERZCHNIA POZIOM   — dopisanie wyniku (np. ITF, WTA)"""
-import os, sys, subprocess, difflib, re, unicodedata, pickle, numpy as np, pandas as pd
+import os, sys, subprocess, difflib, re, unicodedata, numpy as np, pandas as pd
+import pamiec
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 HIST = os.path.join(HERE, 'tenis_hist.csv')  # ATP+WTA 1968–dziś (hist_import.py)
@@ -571,7 +572,9 @@ def state():
     p = os.path.join(HERE, 'cache', 'tenis_state.pkl'); os.makedirs(os.path.dirname(p), exist_ok=True)
     # 23.09.2026: takze czas modyfikacji tego skryptu — zmiana sklejania nazwisk musi uniewaznic cache
     mt = max(os.path.getmtime(f) for f in (HIST, DELTA, os.path.abspath(__file__)) if os.path.exists(f))
-    if os.path.exists(p) and os.path.getmtime(p) > mt: return pickle.load(open(p, 'rb'))
+    if os.path.exists(p) and os.path.getmtime(p) > mt:
+        st = pamiec.wczytaj(p)   # 07.10.2026: rownolegle procesy — nieczytelny plik = przeliczenie, nie Traceback
+        if st is not None: return st
     ALIASY.clear()
     st, _ = run_elo(load())
     # warianty nazw sklejonych w load(): "Joao Lucas Reis Da Silva" -> "João Reis Da Silva" itd.;
@@ -582,7 +585,7 @@ def state():
         while v in ALIASY and n < 10: v = ALIASY[v]; n += 1
         al[k_] = v
     st['alias'] = al
-    pickle.dump(st, open(p, 'wb')); return st
+    return pamiec.zapisz(p, st)
 
 
 def calibrate(p):

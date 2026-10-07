@@ -425,7 +425,9 @@ _OGOLNE = frozenset('fc cf sc ac as ss sv fk nk sk bk hk hc mhk vk kk rk ok ks c
                     'county rugby ishockey ik if '
                     # 30.09.2026 (Raport 12:00, usterka 1): skroty formy prawnej/sekcji z oferty STS bez znaczenia rozrozniajacego
                     # ("BC Lietkabelis", "Besiktas JK", "BM Logrono La Rioja", "Tatabanya KC", "CB Canarias")
-                    'bc kc bm cb jk'.split())
+                    'bc kc bm cb jk '
+                    # 07.10.2026 (Raport 07.10 12:00, usterka 4): „EHC Visp”, „EHC Olten” (Eishockey-Club; Flashscore: Visp, Olten)
+                    'ehc'.split())
 
 
 # Poprawka 54 (24.09.2026): STS podaje druzyny NCAA z przydomkiem („Coastal Carolina Chanticleers”,

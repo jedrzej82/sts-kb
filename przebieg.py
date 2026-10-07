@@ -417,7 +417,9 @@ MAKS_WIEK_KALIBRACJI_DNI = 7
 def kontrola_kalibracji():
     """29.09.2026: pliki kalibracji (ensemble_wagi.json, korekta_rynkow_v5n.csv) mialy jeden commit z 21.09
     i byly dopasowane na bazie sprzed naprawy 19 392 dat (Poprawka 47). Nic tego nie zglaszalo.
-    Znacznik daty to pole "data" w ensemble_wagi.json (zapisuje je ensemble.py). Tylko ostrzezenie."""
+    Znacznik daty to pole "data" w ensemble_wagi.json (zapisuje je ensemble.py). Tylko ostrzezenie.
+    07.10.2026 (Raport 07.10 12:00, usterka 1): „przelicz w bloku poniedzialkowym” nie dzialalo — ensemble.py liczy ponad
+    20 min, a przebieg startuje z repo, wiec przeliczenie w przebiegu i tak by przepadlo. Przelicza sesja serwisowa (PR)."""
     import json
     try:
         d = dt.date.fromisoformat(json.load(open(os.path.join(HERE, 'ensemble_wagi.json')))['data'])
@@ -427,8 +429,8 @@ def kontrola_kalibracji():
     wiek = (DZIS - d).days
     print(f'  kalibracja (ensemble_wagi.json): {d} ({wiek} d)'
           + ('' if wiek <= MAKS_WIEK_KALIBRACJI_DNI else
-             f'  UWAGA: starsza niz {MAKS_WIEK_KALIBRACJI_DNI} dni — przelicz w bloku poniedzialkowym: '
-             f'python3 ensemble.py && python3 korekta_rynkow.py (wpisz do USTERKI)'))
+             f'  UWAGA: starsza niz {MAKS_WIEK_KALIBRACJI_DNI} dni — przeliczenie (ensemble.py ponad 20 min) robi sesja '
+             f'serwisowa PR-em do main, NIE przebieg: wpisz do USTERKI jako „utrzymanie”'))
 
 
 def archiwum_arkuszy():

@@ -359,13 +359,17 @@ def _po_kotwicy(okno, h, g, gosp, gosc, rozwiaz, kol_h, kol_a, d0=None):
 
 def _czlony_zawarte(nazwa, rywal):
     """Wszystkie czlony nazwy z oferty (bez znakow diakrytycznych, >= 3 litery, bez znacznikow rezerw/kobiet) sa czlonami
-    nazwy rywala, a znaczniki (rezerwy, kobiety, U19) sa takie same po obu stronach."""
+    nazwy rywala, a znaczniki (rezerwy, kobiety, U19) sa takie same po obu stronach.
+    07.10.2026 (Raport 07.10 12:00, usterka 5: „Club Leandro Niceforo Alem” wobec „Leandro N. Alem”, 365 i Flashscore):
+    czlony ogolne z oferty (Club, FC — sporty._OGOLNE) nie musza byc u rywala, a czlon moze odpowiadac INICJALOWI
+    rywala („Niceforo” ~ „N.”); co najmniej jeden czlon musi sie zgadzac w calosci."""
     import sporty
     from nazwy import znaczniki
     if set(znaczniki(nazwa)) != set(znaczniki(rywal)): return False
     cz = lambda t: {sporty.norm(x) for x in re.split(r'[\s\-/.]+', str(t)) if len(sporty.norm(x)) >= 3}
-    a, b = cz(nazwa), cz(rywal)
-    return bool(a) and a <= b
+    a, b = cz(nazwa) - sporty._OGOLNE, cz(rywal)
+    ini = {sporty.norm(x)[0] for x in re.findall(r'(?<![\w])(\w)\.', str(rywal)) if sporty.norm(x)}
+    return bool(a & b) and all(t in b or t[0] in ini for t in a)
 
 
 def _cicho_bez_uwag(rozwiaz, nazwa, pula):

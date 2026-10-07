@@ -8,8 +8,9 @@
                                                          # laczne P z siatki; kurs = kurs BUILDERA z aplikacji
   python3 typuj.py A B --live 60 1:0 [--czerwona-gosp] [--czerwona-gosc]   # na żywo: minuta i wynik
 Wynik: prawdopodobieństwa (skalibrowane backtestem), statystyki formy/H2H/rożnych/kartek, ostrzeżenia."""
-import os, sys, re, sqlite3, pickle, difflib, unicodedata, datetime as dt
+import os, sys, re, sqlite3, difflib, unicodedata, datetime as dt
 import functools
+import pamiec
 import numpy as np, pandas as pd
 from model import fit_dc, dc_lambdas, fit_elo_glm, elo_lambdas, markets, blend, load_calibration, calibrate, live_markets, p_pary
 import json
@@ -595,8 +596,8 @@ def cached(key, fn):
     # 30.09.2026 (przeglad): klucz byl sama data — dopasowania DC/GLM/pi z pierwszego wywolania dnia zostawaly
     # w cache/ i nie widzialy wynikow dopisanych pozniej (przebudowa bazy). Teraz klucz zawiera stan kb.sqlite.
     p = os.path.join(HERE, 'cache', f'{key}_{stan_bazy()}.pkl'); os.makedirs(os.path.dirname(p), exist_ok=True)
-    if os.path.exists(p): return pickle.load(open(p, 'rb'))
-    v = fn(); pickle.dump(v, open(p, 'wb')); return v
+    v = pamiec.wczytaj(p) if os.path.exists(p) else None   # 07.10.2026: zapis atomowy (rownolegle procesy)
+    return v if v is not None else pamiec.zapisz(p, fn())
 
 
 def team_stats(m, team, n=10):
