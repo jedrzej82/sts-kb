@@ -93,7 +93,7 @@ def test_ako_pilka_dnia_najpewniejszy_15_20(tmp_path, capsys):
                          ('E - F', '12', 0.80, 1.30, 0, 0, '', '', 'pilka', 0),
                          ('G - H', 'O1.5', 0.70, 1.45, 0, 0, '', '', 'pilka', 1),
                          ('I - J', 'Z1', 0.95, 1.40, 0, 0, '', '', 'hokej', 1)])       # hokej — nie do AKO PILKA
-    kupon.main([f])
+    kupon.main([f, '--depozyt', '45.35'])
     out = capsys.readouterr().out
     linia = next(x for x in out.splitlines() if x.startswith('AKO PILKA DNIA'))
     assert 'kurs 1.56' in linia and 'laczne P 70.4%' in linia      # A-B 1X 1.20 x E-F 12 1.30 = 1.56; P 0.88 x 0.80
@@ -105,7 +105,7 @@ def test_ako_pilka_dnia_najpewniejszy_15_20(tmp_path, capsys):
 
 def test_ako_pilka_dnia_brak(tmp_path, capsys):
     import kupon
-    kupon.main([_nogi(tmp_path, [('A - B', '1X', 0.88, 1.10, 0, 0, '', '', 'pilka', 0)])])
+    kupon.main([_nogi(tmp_path, [('A - B', '1X', 0.88, 1.10, 0, 0, '', '', 'pilka', 0)]), '--depozyt', '45.35'])
     assert 'AKO PILKA DNIA (1.50–2.00): brak' in capsys.readouterr().out
 
 
@@ -115,11 +115,11 @@ def test_ako_bonus_lvbet_min_175(tmp_path, capsys):
                          ('C - D', 'U4.5', 0.86, 1.20, 0, 0, '', '', 'pilka', 0),
                          ('E - F', '12', 0.80, 1.20, 0, 0, '', '', 'pilka', 0),
                          ('G - H', 'O1.5', 0.60, 1.80, 1, 0, '', '', 'pilka', 1)])     # szacunek — nie do bonusu
-    kupon.main([f])
+    kupon.main([f, '--depozyt', '45.35'])
     out = capsys.readouterr().out.split('AKO BONUS LVBET')[1]
     assert '1. P 60.5% | kurs STS 1.80' in out                       # 1.25 x 1.20 x 1.20 = 1.80 >= 1.75; P 0.88 x 0.86 x 0.80
     assert 'G - H' not in out and 'trzy takie kupony pod rzad: ok. 22%' in out
-    kupon.main([_nogi(tmp_path, [('A - B', '1X', 0.88, 1.25, 0, 0, '', '', 'pilka', 0)])])
+    kupon.main([_nogi(tmp_path, [('A - B', '1X', 0.88, 1.25, 0, 0, '', '', 'pilka', 0)]), '--depozyt', '45.35'])
     assert 'AKO BONUS LVBET (kurs >= 1.75): brak' in capsys.readouterr().out
 
 

@@ -8,8 +8,9 @@
                                                          # laczne P z siatki; kurs = kurs BUILDERA z aplikacji
   python3 typuj.py A B --live 60 1:0 [--czerwona-gosp] [--czerwona-gosc]   # na żywo: minuta i wynik
 Wynik: prawdopodobieństwa (skalibrowane backtestem), statystyki formy/H2H/rożnych/kartek, ostrzeżenia."""
-import os, sys, re, sqlite3, pickle, difflib, unicodedata, datetime as dt
+import os, sys, re, sqlite3, difflib, unicodedata, datetime as dt
 import functools
+import pamiec
 import numpy as np, pandas as pd
 from model import fit_dc, dc_lambdas, fit_elo_glm, elo_lambdas, markets, blend, load_calibration, calibrate, live_markets, p_pary
 import json
@@ -371,6 +372,12 @@ def _skrot_albo_nic(name, wyn, pula):
               f'w bazie tez: {", ".join(inne[:4])}{" ..." if len(inne) > 4 else ""}. '
               f'Nie da sie ustalic, ktory to klub — noga MNIEJ.')
         return None
+    # 07.10.2026 (audyt usterek, Raport 01.10): „Odense Q” (kobiecy klub z Kvindeligaen) -> „Odense” (meski, DEN). Odpadajacy
+    # POJEDYNCZY znak, ktory nie jest znacznikiem (B, II, W), to oznaczenie innej druzyny — nie zgadujemy.
+    if any(len(t) == 1 and not _znaczniki(t) for t in odp):
+        print(f'  ODRZUCONO: "{name}" -> "{wyn}" gubi oznaczenie {", ".join(t for t in odp if len(t) == 1)} — '
+              f'to moze byc inna druzyna klubu, noga MNIEJ.')
+        return None
     print(f'  UWAGA: "{name}" dopasowane do KROTSZEJ nazwy "{wyn}" — pominieto czlon '
           f'rozrozniajacy. Rdzen jest w bazie jednoznaczny, ale sprawdz, czy to ten sam klub.')
     _SKROTY[name] = wyn
@@ -511,6 +518,18 @@ def resolve(name, pool):
             if _znaczniki(p) == _znaczniki(name): kob.setdefault(norm(_bez(p)), set()).add(p)
         kb_ = norm(_bez(name))
         if kb_ and len(kob.get(kb_, ())) == 1: return next(iter(kob[kb_]))
+    # 07.10.2026 (audyt usterek, Raporty 23.09 19:06 U2 i 21:00 nr 3): rezerwy „CA Banfield II”, „Atletico Lanus II” — baza
+    # „Banfield Res.”, „Lanus Res.” (Argentina Reserva). Kandydat z TYM SAMYM znacznikiem, ktorego rdzen (bez znacznikow
+    # i czlonow ogolnych) zawiera sie w rdzeniu nazwy z oferty — tylko gdy jest dokladnie jeden.
+    if _znaczniki(name) == ('rezerwy',):
+        _rdzen = lambda s: {t for t in _tokeny(s) if t not in _OGOLNE and not _znaczniki(t) and t not in ('ii', 'b', 'res', 'reserves', 'reserve')}
+        rn = _rdzen(name)
+        rez = [p for p in sorted(pool) if _znaczniki(p) == ('rezerwy',) and _rdzen(p) and _rdzen(p) <= rn]
+        # jak nizej przy skrocie: czlon z oferty, ktorego nie ma w kandydacie, nalezy do INNEGO klubu w bazie
+        # („Wisła II Płock” -> „Wisla II” = rezerwy Wisly Krakow, a w bazie jest „Wisla Plock”) — nie zgadujemy
+        if rn and len(rez) == 1 and not (rn - _rdzen(rez[0]) and any(
+                p != rez[0] and rn <= set(_tokeny(p)) and not _znaczniki(p) for p in pool)):
+            return rez[0]
     if k in ALIASES_KLUBY and ALIASES_KLUBY[k] in pool: return ALIASES_KLUBY[k]
     if k in _WARIANTY and _WARIANTY[k] in pool: return _WARIANTY[k]   # nazwa zrodlowa sklejonego klubu (build_kb)
     c = [p for p in by.values() if _zaw_nazwy(name, p)]
@@ -595,8 +614,8 @@ def cached(key, fn):
     # 30.09.2026 (przeglad): klucz byl sama data — dopasowania DC/GLM/pi z pierwszego wywolania dnia zostawaly
     # w cache/ i nie widzialy wynikow dopisanych pozniej (przebudowa bazy). Teraz klucz zawiera stan kb.sqlite.
     p = os.path.join(HERE, 'cache', f'{key}_{stan_bazy()}.pkl'); os.makedirs(os.path.dirname(p), exist_ok=True)
-    if os.path.exists(p): return pickle.load(open(p, 'rb'))
-    v = fn(); pickle.dump(v, open(p, 'wb')); return v
+    v = pamiec.wczytaj(p) if os.path.exists(p) else None   # 07.10.2026: zapis atomowy (rownolegle procesy)
+    return v if v is not None else pamiec.zapisz(p, fn())
 
 
 def team_stats(m, team, n=10):
@@ -1316,6 +1335,10 @@ def value(rows, kursy, dz=None, mecz=None, szacunek=False, polski=False):
     print('\nWARTOŚĆ (kurs użyty dopiero po wyliczeniu P; podatek 12%):')
     for k, o in kursy.items():
         if k not in d:   # 05.10.2026: literowka w kodzie rynku nie moze przejsc po cichu
+            # 07.10.2026 (Raport 15:00 nr 4): O3.5/U1.5/O4.5 itp. to POPRAWNE kody (P145.3: podawane do P rynku z pary O/U),
+            # tylko spoza listy rynkow liczonych do kuponu — komunikat „sprawdz zapis” wprowadzal przebieg w blad (P140.3)
+            if re.fullmatch(r'(gosp_|gość_|gosc_)?[OU]\d+\.5', k):
+                print(f'  {k}: rynek spoza listy liczonej do kuponu (kod poprawny) — uzyty tylko do P rynku z pary O/U, bez EV'); continue
             print(f'  {k}: brak rynku — UWAGA: model nie zna kodu „{k}” (sprawdz zapis; znane: {", ".join(sorted(d))})'); continue
         p = d[k]; ev, kelly = ev_kelly(p, o)
         print(f'  {k} @ {o}: P={p:.1%}, kurs sprawiedliwy={1 / p / TAX:.2f}, EV={ev:+.1%}, ¼ Kelly={kelly / 4:.1%} bankrollu'

@@ -103,6 +103,28 @@ def cal_apply(sport, f, p):
     return float(np.interp(p, c.p_model, c.p_kalibr))
 
 
+def para(k):
+    """Rynek wzajemnie wykluczajacy sie z k (pary z markets(): przed kalibracja suma P = 1)."""
+    if k == 'A wygra': return 'B wygra'
+    if k == 'B wygra': return 'A wygra'
+    if k.startswith('suma'): return k.replace('>', '<') if '>' in k else k.replace('<', '>')
+    side, h = k.split()
+    return f'{"B" if side == "A" else "A"} {"+" if h.startswith("-") else "-"}{h[1:]}'
+
+
+def skalibruj(sport, mk):
+    """07.10.2026 (Raport 22.09 13:00, nr 2): cal_apply nakladana OSOBNO na kazdy rynek psula pary
+    wzajemnie wykluczajacych sie wynikow (np. „A wygra” 49,8% i „B wygra” 49,8%, suma 99,6%).
+    Po kalibracji kazda para (zwyciezca A/B, handicap A -h / B +h oraz B -h / A +h, suma > L / suma < L)
+    jest normalizowana do 100%: P_k = c_k / (c_k + c_para). Para, ktora juz sumowala sie do 1, zostaje bez zmian."""
+    c = {k: cal_apply(sport, fam(k), v) for k, v in mk.items()}
+    out = {}
+    for k, v in c.items():
+        q = c.get(para(k))
+        out[k] = v / (v + q) if q is not None and v + q > 0 else v
+    return out
+
+
 def backtest():
     rows_out = []
     for sport, od in (('snooker', '2024-01-01'), ('dart', None), ('tenis stołowy', None), ('siatkówka', None), ('siatkówka plażowa', None), ('badminton', None)):
@@ -166,20 +188,31 @@ def main(a):
         import sporty as sp
         sport = a[1].lower(); d = data(sport); R, N = elo_frames(d, sport)
         A, B = sp.resolve(a[2], set(R)) or a[2], sp.resolve(a[3], set(R)) or a[3]
+        # 07.10.2026 (Raport 21.09 20:27 nr 3, Raport 22.09 13:20 U4; POPRAWKA 11): przy 0 meczach
+        # zawodnika skrypt liczyl pelna siatke rynkow z domyslnego Elo 1500 (~50%) i konczyl kodem 0 —
+        # wiarygodnie wygladajace liczby bez danych. Teraz jak sporty.py: przerwanie, kod != 0, zero tabel P.
+        brak = [t for t in (A, B) if N.get(t, 0) == 0]
+        if brak:
+            sys.exit(f'BRAK W BAZIE: {", ".join(brak)} — noga MNIEJ / NIE NA KUPON (analiza przerwana).\n'
+                     f'Sprawdz nazwe: python3 sporty.py druzyny {sport} FRAGMENT')
+        n_min = min(N[A], N[B])
         n = int(a[a.index('--do') + 1]) if '--do' in a else (6 if sport == 'dart' else 5)
         if sport == 'dart': p, src = p_leg_dart(A, B, pd.Timestamp.today() + pd.Timedelta(days=1), R)
         else: p, src = 1 / (1 + 10 ** ((R.get(B, 1500) - R.get(A, 1500)) / 400)), 'Elo frame\'owe'
         mk, S = markets(p, n)
         jed = 'frame' if sport == 'snooker' else 'leg' if sport == 'dart' else 'set'
         print(f'{sport}: {A} ({N.get(A, 0)} m.) – {B} ({N.get(B, 0)} m.) | P {jed}a dla {A}: {p:.1%} | do {n} wygranych | źródło: {src}')
-        for k, v in mk.items():
+        if n_min < 5:
+            print(f'  BRAK DANYCH RYWALA (N={n_min}): najslabiej opisany zawodnik ma {n_min} mecz(e) w bazie — Elo bliskie')
+            print('  domyslnemu 1500, ponizsze P to artefakt braku danych, nie pomiar.')
+        for k, v in skalibruj(sport, mk).items():
             nm = k.replace('A ', A + ' ').replace('B ', B + ' ')
-            print(f'  {nm:<44} {cal_apply(sport, fam(k), v):6.1%}')
+            print(f'  {nm:<44} {v:6.1%}')
         top = sorted(S.items(), key=lambda kv: -kv[1])[:6]
         print('  najbardziej prawdopodobne wyniki: ' + ', '.join(f'{x}:{y} {v:.1%}' for (x, y), v in top))
-        for t in (A, B):
-            if t not in R: print(f'  UWAGA: {t} — brak w bazie (python3 sporty.py druzyny {sport} FRAGMENT)')
         if sport == 'dart': print('  Dart: baza tylko od 02.2026 (posiadacze kart PDC) — przy <10 meczach traktuj P jako szacunek.')
+        # 07.10.2026 (Raport 22.09 13:20 U4): przy N<5 linia WERDYKT w formacie sporty.py (werdykt_meczu).
+        if n_min < 5: print(f'\nWERDYKT: NIE NA KUPON — za malo meczow; brak danych rywala ({n_min} mecz(e))')
 
 
 if __name__ == '__main__':

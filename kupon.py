@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Skladanie kuponow W KODZIE wg INSTRUKCJI v7 (faza 4, 29.09.2026) — zamiast liczenia kombinacji w prozie.
-  python3 kupon.py nogi.csv [--depozyt 45.35] [--faza 1] [--wydane-dzis 0] [--kupony-dzis 0] [--wydane-lacznie 9] [--k5-dzis 0]
+  python3 kupon.py nogi.csv --depozyt KWOTA [--faza 1] [--wydane-dzis 0] [--kupony-dzis 0] [--wydane-lacznie 9] [--k5-dzis 0]
 
 nogi.csv — jedna noga na wiersz, TYLKO nogi dopuszczone przez kod (linia „✔ NOGA DOPUSZCZONA” / „WERDYKT: NOGA
 DOPUSZCZONA”), z P do kuponu z tej linii:
@@ -170,12 +170,16 @@ def za_pieniadze(o, rodzaj, a, wydane_dzis, kupony_dzis):
 
 def main(argv):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('plik'); ap.add_argument('--depozyt', type=float, default=45.35)
+    # 07.10.2026 (audyt usterek, Raport 02.10 21:00 nr 7): domyslny depozyt 45,35 zl byl wpisany na sztywno — przebieg bez
+    # --depozyt liczyl stawki Kelly z nieaktualnej kwoty (uzytkownik potwierdzil 50 zl 06.10). Depozyt tylko jawnie.
+    ap.add_argument('plik'); ap.add_argument('--depozyt', type=float, default=None)
     ap.add_argument('--faza', type=int, default=1, choices=(1, 2, 3))
     ap.add_argument('--wydane-dzis', type=float, default=0); ap.add_argument('--kupony-dzis', type=int, default=0)
     ap.add_argument('--wydane-lacznie', type=float, default=0)
     ap.add_argument('--k5-dzis', type=float, default=0, help='suma stawek K5 postawionych dzis we wczesniejszych przebiegach (limit 8 zl, 6.7)')
     a = ap.parse_args(argv)
+    if a.depozyt is None or a.depozyt <= 0:
+        sys.exit('BLAD: podaj --depozyt (aktualny stan konta z Bilansu/POPRAWEK) — bez niego stawki Kelly bylyby z nieaktualnej kwoty')
     wsz = wczytaj(a.plik)
     d = wsz[wsz.ev_dodatni.astype(int) == 1].reset_index(drop=True)   # K1–K5 i MIX: tylko nogi z EV > 0 (jak dotad)
     print(f'KUPON.PY — {len(d)} nog dopuszczonych, faza {a.faza}, depozyt {a.depozyt:.2f} zl, '
@@ -205,6 +209,47 @@ def main(argv):
     print('\n' + linia_mix(najlepszy(d[(d.polski == 0) & (d.marza <= 1.10)], 'MIX'), d))
     print('\n' + '\n'.join(linie_pilka(wsz, a, wydane, kupony)))
     print('\n' + '\n'.join(linie_bonus(wsz)))
+    print('\n' + '\n'.join(linie_niski(wsz)))
+
+
+# 07.10.2026 (prosba uzytkownika): AKO NISKI KURS — 6–10 nog pilkarskich o wysokim P na jednym kuponie. Backtest 219 dni
+# (03–10.2026, 41 376 meczow spoza czesci uczacej): pojedyncze nogi P 0,90–0,97 sa skalibrowane (0,943 -> 0,943), ale WYBOR
+# najpewniejszych nog dnia zawyza: 8 nog P kuponu 80,7%, weszlo 69,9% (ok. 1,8 pp na noge) — stad korekta 2 pp na noge.
+# „3 dni z rzedu” wypada w 32% okresow (8 nog) samym przypadkiem. Przy marzy ~5% na noge i podatku 12% zwrot szacowany
+# −40% … −55% — dlatego TYLKO PAPIEROWY; za pieniadze dopiero po decyzji uzytkownika (3 dni z rzedu) i z EV > 0 na kursach.
+NISKI_NOGI = (6, 10)
+NISKI_MIN_P = 0.90
+NISKI_KOREKTA = 0.02
+
+
+def ako_niski(wsz):
+    """Najwiecej (do 10) nog pilkarskich z roznych meczow o P - 2 pp >= 90%, malejaco po P; None, gdy < 6."""
+    x = wsz[(wsz.sport.astype(str).str.lower().isin(['pilka', 'piłka', ''])) & (wsz.szacunek.astype(int) == 0)]
+    x = x.assign(pk=x.p - NISKI_KOREKTA)
+    x = x[x.pk >= NISKI_MIN_P].sort_values('pk', ascending=False).drop_duplicates('mecz').head(NISKI_NOGI[1])
+    if len(x) < NISKI_NOGI[0]: return None
+    p, kurs = float(x.pk.prod()), float(x.kurs.prod())
+    return dict(nogi=list(x.index), p=p, kurs=kurs, ev=p * kurs * TAX - 1)
+
+
+def linie_niski(wsz):
+    o = ako_niski(wsz)
+    if o is None:
+        return [f'AKO NISKI KURS ({NISKI_NOGI[0]}–{NISKI_NOGI[1]} nog, P >= {NISKI_MIN_P:.0%} po korekcie −{NISKI_KOREKTA * 100:.0f} pp): brak — '
+                f'za malo pewnych nog pilkarskich z roznych meczow']
+    out = [f'AKO NISKI KURS ({len(o["nogi"])} nog): laczne P {o["p"]:.1%} (po korekcie −{NISKI_KOREKTA * 100:.0f} pp/noga) | '
+           f'kurs {o["kurs"]:.2f} | EV {o["ev"]:+.1%} | PAPIEROWY (nowy typ — obserwacja)']
+    for i in o['nogi']:
+        r = wsz.loc[i]
+        out.append(f'   {r.mecz} | {r.rynek} | P {r.p - NISKI_KOREKTA:.1%} | kurs {r.kurs:.2f}')
+    if o['kurs'] * TAX <= 1:
+        # 07.10.2026 (test na ofertach STS 02–06.10): najnizsze kursy dnia (1,01–1,05) daja kurs laczny 1,07–1,14 — kupon
+        # wchodzi, ale po podatku 12% wyplata jest MNIEJSZA od stawki (prog: kurs laczny > 1,14)
+        out.append(f'   → UWAGA: kurs laczny {o["kurs"]:.2f} — nawet wygrany kupon po podatku 12% zwraca mniej niz stawke '
+                   f'(potrzeba > {1 / TAX:.2f})')
+    out.append(f'   → zapisz w ako_log jako papierowy (tag AKON); szansa, ze NIE wejdzie: {1 - o["p"]:.0%}; '
+               f'3 dni z rzedu samym przypadkiem: ok. {o["p"] ** 3:.0%}')
+    return out
 
 
 def linie_bonus(wsz, ile=3):

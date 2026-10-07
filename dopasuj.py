@@ -330,6 +330,24 @@ def _produkcja():
     return rozwiaz, pule
 
 
+DNI_PAMIECI = 14   # okno dorozliczenia nog: alias z dnia typowania musi dotrwac do rozliczenia
+
+
+def _stare_aliasy(plik, nowe, dzis):
+    """Wiersze poprzedniego aliasy_auto.csv z ostatnich DNI_PAMIECI dni, ktorych (modul, nazwa) nie ma w nowych."""
+    if not os.path.exists(plik): return nowe.iloc[0:0]
+    try:
+        s = pd.read_csv(plik, dtype=str, keep_default_na=False)
+    except (OSError, ValueError, pd.errors.ParserError):
+        return nowe.iloc[0:0]
+    if not {'modul', 'nazwa', 'cel', 'data'} <= set(s.columns): return nowe.iloc[0:0]
+    od = (pd.Timestamp(dzis) - pd.Timedelta(days=DNI_PAMIECI)).strftime('%Y-%m-%d')
+    juz = set(zip(nowe.modul, nowe.nazwa))
+    zostaje = [d >= od and (m, n) not in juz for d, m, n in zip(s.data, s.modul, s.nazwa)]
+    s = s[pd.Series(zostaje, index=s.index, dtype=bool)]
+    return s.reindex(columns=nowe.columns, fill_value='')
+
+
 def auto(kursy, zewn, wyjscie):
     """03.10.2026 (prosba uzytkownika: nazwy maja ZAWSZE pasowac): uczenie w kazdym przebiegu, bez recznego kroku.
     Do aliasy_auto.csv (wczytywany po aliasy.csv — reczne wpisy wygrywaja) trafiaja tylko:
@@ -364,6 +382,10 @@ def auto(kursy, zewn, wyjscie):
         if lg.empty: break
         wynik.append(lg); zastosuj(lg)
     out = pd.concat(wynik, ignore_index=True)
+    # 07.10.2026 (Raport 07.10 12:00, usterka 5): plik byl NADPISYWANY aliasami z biezacej oferty — alias, ktorym typowano
+    # noge wczoraj („Club Leandro Niceforo Alem” -> „Leandro N. Alem”), znikal, zanim nastepnego dnia noge rozliczano.
+    # Aliasy z ostatnich DNI_PAMIECI dni zostaja (dzisiejszy dowod wygrywa przy tej samej nazwie).
+    out = pd.concat([out, _stare_aliasy(wyjscie, out, dzis)], ignore_index=True)
     out.to_csv(wyjscie, index=False)
     linie = [f'NAZWY AUTO: {len(out)} aliasow (wyniki: {len(wynik[0])}, kotwica ligowa: {len(out) - len(wynik[0])}) -> {wyjscie}']
     linie += [f'  do przegladu (skrot z kolizja): {r.nazwa} -> {r.cel} [{r.inne_z_rdzeniem}]' for r in al.attrs['przeglad'].itertuples()]

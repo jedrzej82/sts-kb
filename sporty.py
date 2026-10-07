@@ -425,7 +425,9 @@ _OGOLNE = frozenset('fc cf sc ac as ss sv fk nk sk bk hk hc mhk vk kk rk ok ks c
                     'county rugby ishockey ik if '
                     # 30.09.2026 (Raport 12:00, usterka 1): skroty formy prawnej/sekcji z oferty STS bez znaczenia rozrozniajacego
                     # ("BC Lietkabelis", "Besiktas JK", "BM Logrono La Rioja", "Tatabanya KC", "CB Canarias")
-                    'bc kc bm cb jk'.split())
+                    'bc kc bm cb jk '
+                    # 07.10.2026 (Raport 07.10 12:00, usterka 4): „EHC Visp”, „EHC Olten” (Eishockey-Club; Flashscore: Visp, Olten)
+                    'ehc'.split())
 
 
 # Poprawka 54 (24.09.2026): STS podaje druzyny NCAA z przydomkiem („Coastal Carolina Chanticleers”,
@@ -1099,7 +1101,13 @@ def zmiana_ligi(d, sport, t, start=None):
     return stara, nowa, int(teraz.iloc[0])
 
 
-def werdykt_meczu(skala_ok, p_dz, n, ligi=(), zmiany=()):
+# 07.10.2026 (audyt usterek, Raport 23.09 20:00 nr 7): reprezentacje graja kilka-kilkanascie meczow rocznie — Elo
+# Wloch (1693, 34 mecze) bylo nizsze niz Finlandii (1707, 25), a ostrzezenie ELO NIEZBIEZNE konczylo sie na 25 meczach
+# i noga przechodzila. Mecz dwoch reprezentacji: noga tylko, gdy obie maja co najmniej tyle meczow w bazie.
+REPREZENTACJE_MIN_MECZOW = 60
+
+
+def werdykt_meczu(skala_ok, p_dz, n, ligi=(), zmiany=(), reprezentacje=False):
     """29.09.2026: jedna linia WERDYKT zamiast bramek rozrzuconych po wyjsciu (wspolna skala, drugie
     zrodlo z Poprawek 48/51, dane rywala z Poprawki 15). Zwraca (P do kuponu | None, lista powodow).
     ligi — ligi obu druzyn/graczy (Poprawka 60: LIGI_BEZ_PRZEWAGI); zmiany — [(druzyna, stara, nowa, n)] (02.10)."""
@@ -1109,6 +1117,8 @@ def werdykt_meczu(skala_ok, p_dz, n, ligi=(), zmiany=()):
     if not skala_ok: powody.append('rozne ligi bez wspolnej skali')
     if p_dz is None: powody.append('brak zgodnego drugiego zrodla')
     if n < 5: powody.append(f'brak danych rywala ({n} mecz(e))')
+    elif reprezentacje and n < REPREZENTACJE_MIN_MECZOW:
+        powody.append(f'reprezentacje: Elo niezbiezne ({n} mecz(e) < {REPREZENTACJE_MIN_MECZOW})')
     return (None if powody else p_dz), powody
 
 
@@ -1326,7 +1336,7 @@ def main(a):
             print(f'  ZMIANA LIGI (awans/spadek): {t}: {stara} -> {nowa}, {k} mecz(e) w nowej lidze — Elo z innej ligi, '
                   f'P NIEPOROWNYWALNE z rynkiem (02.10: Krefeld, Dresdner Eislowen); nie buduj nogi kuponu, takze papierowej.')
         p_k, powody = werdykt_meczu(ok_, p_dz, n, _ligi_druzyny(d[d.sport == sport], h, 1) | _ligi_druzyny(d[d.sport == sport], g, 1),
-                                    zmiany)
+                                    zmiany, reprezentacje=_kraj(h) and _kraj(g))
         # 03.10.2026 (KROK 6.4 + KROK 4.5). Dwie bramki, obie tylko odrzucajace:
         # (a) P "z dogrywka" nie opisuje rynku 1/X/2, ktory jest czasem regulaminowym (P121.2).
         #     03.10 na 11 nogach hokeja i recznej STS mial w ofercie WYLACZNIE 1/X/2, a doslowne
@@ -1350,7 +1360,9 @@ def main(a):
                   + '; EV licz z TEGO P: P × kurs × 0,88 − 1')
     elif a[0] == 'typ':
         from clv import dopisz_typ   # opcjonalnie KURS_TYPU [PIENIADZE] na koncu (P56.3, CLV)
-        row = dict(data=a[1], sport=a[2].lower(), gosp=a[3], gosc=a[4], rynek=a[5], p=float(a[6]), trafiony=None)
+        # 07.10.2026 (Raport 15:00 nr 5): „1”/„2” w sporty_typy znaczy zwyciezca Z DOGRYWKA (_rynek_typu -> Z1/Z2), ale w ako_log
+        # i w P121.2 ten sam napis to czas regulaminowy — przebieg poprawial wiersze recznie. Zapis od razu jednoznaczny.
+        row = dict(data=a[1], sport=a[2].lower(), gosp=a[3], gosc=a[4], rynek=re.sub(r'^((?:AKOP|ODRZ)_)?([12])$', r'\1Z\2', a[5].strip()), p=float(a[6]), trafiony=None)
         print('zapisano', dopisz_typ(LOG, row, a[7:9]))
     elif a[0] == 'rozlicz':
         if not os.path.exists(LOG): sys.exit('brak prognoz')

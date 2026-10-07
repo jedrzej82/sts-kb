@@ -472,3 +472,25 @@ sporty,Bathco BM Torrelavega,Bm Torrelavega,"Rozliczenie sporty_typy 19.09 — p
 sporty,Viveros Herol BM Nava,Bm Nava,"Rozliczenie sporty_typy 19.09 — pilka reczna ASOBAL: Viveros Herol = sponsor; w wynikach 365 Bm Nava",2026-10-06
 typuj,Tatran Liptovsky Mikulas,Taran Liptovsky Mikulas,"ako_log 05.10 (Slowacja 2. liga, Tatran L. Mikulas – STK Samorin): 365scores pisze z literowka „Taran Liptovsky Mikulas”, Flashscore „L. Mikulas”",2026-10-06
 sporty,Fenerbahce Koleji,Fenerbahce 2,"Raport 06.10 21:00 (zdarzenia CONFLICT, TBL): od 09.2026 zrodlo pisze „Fenerbahce 2”; historia scalona w sporty.SCAL_SPORTY",2026-10-07
+typuj,Salisbury FC,Salisbury City,"audyt usterek 07.10 (Raport 03.10 15:00 nr 1): obecny klub w National League S zapisany w 365 jako Salisbury City (2025-26); stary Salisbury (EC, 2014) to upadly Salisbury City FC",2026-10-07
+typuj,CF Algeciras,Algeciras CF,"audyt usterek 07.10 (Raport 04.10 15:00 nr 4): Primera RFEF 2025-26 jako Algeciras CF; Algeciras (SP2) tylko 2003-04",2026-10-07
+typuj,Maccabi Ironi Kiryat Gat,Maccabi Kiryat Gat,"audyt usterek 07.10 (Raport 01.10 15:00 nr 2): Israel National League jako Maccabi Kiryat Gat",2026-10-07
+typuj,MS Kafr Qasim,MS Kfar Kassem,"audyt usterek 07.10 (Raport 01.10 15:00 nr 2): Israel National League jako MS Kfar Kassem",2026-10-07
+sporty,Bnei Herzliya,Bnei Hertzliya,"audyt usterek 07.10 (Raport 06.10 18:00 nr 5): Wikidata mapowala na Maccabi Ironi Raanana (inny klub); Winner League w bazie jako Bnei Hertzliya",2026-10-07
+typuj,Ayr United,Ayr,"audyt usterek 07.10: dotad dopasowanie tylko przez terminarz; w bazie Ayr (SC1/SC2), jedyny kandydat",2026-10-07
+typuj,KTP Kotka,FC KTP,"audyt usterek 07.10: dotad dopasowanie tylko przez terminarz; w bazie FC KTP (Ykkosliiga 2026), jedyny kandydat",2026-10-07
+typuj,Mikkelin Palloilijat,MP Mikkeli,"audyt usterek 07.10: dotad dopasowanie tylko przez terminarz; w bazie MP Mikkeli (Ykkonen/Ykkosliiga), jedyny kandydat",2026-10-07
+typuj,CRB Maceio,CRB,"audyt usterek 07.10: dotad dopasowanie tylko przez terminarz; w bazie CRB (BRA2/Alagoano), jedyny kandydat",2026-10-07
+typuj,CS Dock Sud,Sportivo Dock Sud,"audyt usterek 07.10: dotad dopasowanie tylko przez terminarz; w bazie Sportivo Dock Sud (Primera B Metropolitana), jedyny kandydat",2026-10-07
+typuj,CA Tembetary,Atlético Tembetary,"audyt usterek 07.10: dotad dopasowanie tylko przez terminarz; w bazie Atlético Tembetary (Division Intermedia), jedyny kandydat",2026-10-07
+typuj,Paraguari AC,CA Paraguarí,"audyt usterek 07.10: dotad dopasowanie tylko przez terminarz; w bazie CA Paraguarí (Division Intermedia), jedyny kandydat",2026-10-07
+typuj,Atletico FC Cali,Atlético FC,"audyt usterek 07.10: dotad dopasowanie tylko przez terminarz; w bazie Atlético FC (Colombia Primera B (nie Atlético FC [ecuador])), jedyny kandydat",2026-10-07
+typuj,Club Leandro Niceforo Alem,Leandro N. Alem,"audyt usterek 07.10: dotad dopasowanie tylko przez terminarz; w bazie Leandro N. Alem (Primera C; Rozliczenie 06.10 (Raport 07.10 12:00 nr 5)), jedyny kandydat",2026-10-07
+sporty,IFK Helsinki,HIFK,"audyt usterek 07.10: dotad dopasowanie tylko przez terminarz; w bazie HIFK (Liiga), jedyny kandydat",2026-10-07
+sporty,Valmiera Glass Via,Valmiera,"audyt usterek 07.10: dotad dopasowanie tylko przez terminarz; w bazie Valmiera (ENBL / Latvian-Estonian League), jedyny kandydat",2026-10-07
+sporty,ALM Evreux,Evreux Basket,"audyt usterek 07.10: dotad dopasowanie tylko przez terminarz; w bazie Evreux Basket (LNB Pro B), jedyny kandydat",2026-10-07
+sporty,PAUC Handball,Pays d'Aix handball,"audyt usterek 07.10: dotad dopasowanie tylko przez terminarz; w bazie Pays d'Aix handball (Lidl Starligue), jedyny kandydat",2026-10-07
+sporty,GOG Handbold,GOG,"audyt usterek 07.10: dotad dopasowanie tylko przez terminarz; w bazie GOG (Herre Handbold Ligaen), jedyny kandydat",2026-10-07
+sporty,Rouen Metropole,Rouen,"audyt usterek 07.10: dotad dopasowanie tylko przez terminarz; w bazie Rouen (LNB Pro B), jedyny kandydat",2026-10-07
+sporty,JA Vichy-Clermont,Vichy,"audyt usterek 07.10: dotad dopasowanie tylko przez terminarz; w bazie Vichy (LNB Pro B), jedyny kandydat",2026-10-07
+sezon,Derthona Basket,Derthona Basket Tortona,"Raport 07.10 15:00 nr 3: arkusz statystyki_koszykowka pisze pelna nazwe (Lega A, Eurocup); sporty.py dopasowywal przez Wikidata",2026-10-07

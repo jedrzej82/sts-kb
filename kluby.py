@@ -72,6 +72,10 @@ SCAL_RECZNIE = {
     ('England | Non League Premier', 'Kettering'): 'Kettering Town',
     ('Ireland | Division 1', 'Athlone Town'): 'Athlone',
     ('SC2', 'FC Edinburgh'): 'Edinburgh City',          # Edinburgh City -> FC Edinburgh (2022) -> Edinburgh City
+    # 07.10.2026 (audyt usterek, Raport 04.10 15:00 nr 4 i 05.10 12:00 nr 1): zrodlo zmienilo pisownie po spadku / w nowym sezonie;
+    # okresy rozlaczne, jeden klub w kraju o tym rdzeniu
+    ('Poland | Division 2', 'Leczna'): 'Gornik Leczna',     # POL2 do 05.2026 jako Gornik Leczna, II liga 2026/27: Leczna
+    ('IRN', 'Sanat Mes Kerman'): 'Mes Kerman',             # IRN do 2023, Azadegan 2025-26: Mes Kerman
     # ta sama para, kariery z dwoch lig jednoczesnie (zrodlo pisze klub inaczej w kazdej lidze), zero wspolnych dni:
     ('N2', 'Emmen'): 'FC Emmen',                           # dotad tylko alias typuj (aliasy.csv 03.10)
     ('N2', 'FC Dordrecht'): 'Dordrecht',

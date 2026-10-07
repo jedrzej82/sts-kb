@@ -58,3 +58,15 @@ zrodla_*.zip
 zrodla_diag_*.txt
 zrodla_surowe_*.jsonl.gz
 aliasy_auto.csv
+# 07.10.2026 (audyt usterek, Raport 04.10 12:00 ANEKS nr 9 i 30.09): pliki robocze przebiegu i Rozliczenia z Dysku
+nogi_*.csv
+lista_*.txt
+lista_meta.csv
+lista_sporty.tsv
+wsad_*/
+wsad_*.log
+sp_out/
+dopasuj_out.txt
+Rozliczenie *.csv
+aliasy_auto_przed.csv
+.claude/worktrees/

@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Tenis: Elo ogólne + Elo na nawierzchni (styl FiveThirtyEight) z bazy tenis_hist.csv (ATP i WTA 1968–dziś, TennisCourtLog) + wyniki
 dopisywane dziennie do tenis_delta.csv (także Challenger/ITF — baza rośnie z każdym dniem).
-  python3 tenis.py "Zawodnik A" "Zawodnik B" [--hard|--clay|--grass] [--bo5]
+  python3 tenis.py "Zawodnik A" "Zawodnik B" [--hard|--clay|--grass] [--bo5] [--kurs Z1=1.40 --kurs Z2=2.90] [--nogi nogi.csv]
+      — linia WERDYKT (P do kuponu = P_skalibr − 3 pp, min. 70%); z --nogi noga z EV > 0 trafia do nogi.csv (07.10.2026)
   python3 tenis.py --backtest            — kalibracja na 2024–2025
   python3 tenis.py --wynik RRRR-MM-DD "Zwycięzca" "Przegrany" NAWIERZCHNIA POZIOM   — dopisanie wyniku (np. ITF, WTA)"""
-import os, sys, subprocess, difflib, re, unicodedata, pickle, numpy as np, pandas as pd
+import os, sys, subprocess, difflib, re, unicodedata, numpy as np, pandas as pd
+import pamiec
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 HIST = os.path.join(HERE, 'tenis_hist.csv')  # ATP+WTA 1968–dziś (hist_import.py)
@@ -380,7 +382,9 @@ def _czlon_pasuje(a, b):
     albo jeden jest inicjalem drugiego ("S." i "Sofia")."""
     if a == b: return True
     if len(a) == 1 or len(b) == 1: return a[:1] == b[:1]
-    return a.startswith(b) or b.startswith(a)
+    # 07.10.2026 (audyt usterek, Raport 05.10 12:00 nr 4): „Kim Eunchae” -> „Eun Ha Kim” (inna zawodniczka, ostatni mecz
+    # 2001) — „Eun” liczyl sie jako przedrostek „Eunchae”. Przedrostek tylko od 4 liter („Alex” ~ „Alexander”).
+    return (a.startswith(b) or b.startswith(a)) and min(len(a), len(b)) >= 4
 
 
 def _wspolne_czlony(zrodlo, kandydat):
@@ -571,7 +575,9 @@ def state():
     p = os.path.join(HERE, 'cache', 'tenis_state.pkl'); os.makedirs(os.path.dirname(p), exist_ok=True)
     # 23.09.2026: takze czas modyfikacji tego skryptu — zmiana sklejania nazwisk musi uniewaznic cache
     mt = max(os.path.getmtime(f) for f in (HIST, DELTA, os.path.abspath(__file__)) if os.path.exists(f))
-    if os.path.exists(p) and os.path.getmtime(p) > mt: return pickle.load(open(p, 'rb'))
+    if os.path.exists(p) and os.path.getmtime(p) > mt:
+        st = pamiec.wczytaj(p)   # 07.10.2026: rownolegle procesy — nieczytelny plik = przeliczenie, nie Traceback
+        if st is not None: return st
     ALIASY.clear()
     st, _ = run_elo(load())
     # warianty nazw sklejonych w load(): "Joao Lucas Reis Da Silva" -> "João Reis Da Silva" itd.;
@@ -582,7 +588,7 @@ def state():
         while v in ALIASY and n < 10: v = ALIASY[v]; n += 1
         al[k_] = v
     st['alias'] = al
-    pickle.dump(st, open(p, 'wb')); return st
+    return pamiec.zapisz(p, st)
 
 
 def calibrate(p):
@@ -618,7 +624,8 @@ def main():
         print(f'mecze testowe {len(c)}, trafność faworyta {hit.mean():.1%}, Brier {((pw - 1) ** 2).mean():.4f}')
         print(cal.to_string(index=False, float_format=lambda x: f'{x:.3f}')); return
     surf = 'Clay' if '--clay' in a else 'Grass' if '--grass' in a else 'Hard'
-    names = [x for x in a if not x.startswith('--')]
+    _wart = {i + 1 for i, x in enumerate(a) if x in ('--kurs', '--nogi')}   # wartosci opcji to nie nazwiska (07.10.2026)
+    names = [x for i, x in enumerate(a) if not x.startswith('--') and i not in _wart]
     st = state(); pl = set(st['R']); NCOUNT.update(st['N']); ALIASY.update(st.get('alias', {})); OSTATNI.update(st['last'])
     A, B = resolve(names[0], pl), resolve(names[1], pl)
     print(f'Dopasowano: {A} | {B} (nawierzchnia {surf})')
@@ -646,6 +653,69 @@ def main():
         print(f'Faworyt: {fav}  P_model {max(p, 1 - p):.1%}  P_skalibr {pc:.1%}')
     stale = [x for x in (A, B) if (pd.Timestamp.today() - st['last'].get(x)).days > 90]
     if stale: print('OSTRZEŻENIE: dane nieaktualne (>90 dni) dla:', ', '.join(stale), '— sprawdź formę 2026 w sieci, korekta maks. ±6 pp.')
+    werdykt(names, A, B, fav, pc, _nmin, stale, a)
+
+
+# 07.10.2026 (decyzja uzytkownika „od razu”): tenis do nog kuponu jak sporty.py — linia WERDYKT i --nogi. Model tenisa
+# zawyzal na rozliczonych typach 19.09–07.10 (P 66,6%, weszlo 63,4%, n=82), wiec P do kuponu = P_skalibr − 3 pp,
+# a noga tylko od 70%. Do nogi.csv tylko z kursem i EV > 0 po podatku (bez nog EV <= 0: AKO PILKA DNIA to pilka).
+KOREKTA_KUPON = 0.03
+MIN_P_KUPON = 0.70
+TAX = 0.88
+
+
+def _kursy(a):
+    k = {}
+    for i, x in enumerate(a):
+        if x == '--kurs' and i + 1 < len(a) and '=' in a[i + 1]:
+            r, v = a[i + 1].split('=', 1)
+            r = r.strip().upper().removeprefix('Z')
+            if r in ('1', '2'):
+                try: k[r] = float(v.replace(',', '.'))
+                except ValueError: pass
+    return k
+
+
+def werdykt(names, A, B, fav, pc, nmin, stale, a):
+    """Linia WERDYKT (jak sporty.py) i — z --nogi PLIK oraz kursem faworyta — wiersz nogi dla kupon.py."""
+    strona = '1' if fav == A else '2'
+    pk = pc - KOREKTA_KUPON
+    powody = []
+    if nmin < 5: powody.append(f'brak danych rywala ({nmin} mecz(e))')
+    if not os.path.exists(CAL): powody.append('brak kalibracji (tenis_kalibracja.csv)')
+    if stale: powody.append('dane nieaktualne (>90 dni): ' + ', '.join(stale))
+    if not powody and pk < MIN_P_KUPON: powody.append(f'P do kuponu {pk:.1%} < {MIN_P_KUPON:.0%} (P_skalibr − {KOREKTA_KUPON * 100:.0f} pp)')
+    print()
+    if powody:
+        print('WERDYKT: NIE NA KUPON — ' + '; '.join(powody))
+        return None
+    kurs = _kursy(a).get(strona)
+    if kurs is None:
+        print(f'WERDYKT: NOGA DOPUSZCZONA — {fav} (Z{strona}), P do kuponu {pk:.1%} (P_skalibr − {KOREKTA_KUPON * 100:.0f} pp); '
+              f'podaj --kurs Z{strona}=KURS, zeby policzyc EV')
+        return pk
+    ev = pk * kurs * TAX - 1
+    print(f'WERDYKT: NOGA DOPUSZCZONA — {fav} (Z{strona}) @ {kurs}, P do kuponu {pk:.1%} (P_skalibr − {KOREKTA_KUPON * 100:.0f} pp), '
+          f'EV {ev:+.1%}' + ('' if ev > 0 else '  ✘ EV ≤ 0 po podatku — nie do nogi.csv'))
+    if '--nogi' in a and ev > 0:
+        plik = a[a.index('--nogi') + 1]
+        _dopisz_noge(plik, f'{names[0]} - {names[1]}', f'Z{strona}', pk, kurs)
+        print(f'  noga dopisana do {plik}')
+    return pk
+
+
+def _dopisz_noge(plik, mecz, rynek, p, kurs):
+    """Wiersz dla kupon.py w ukladzie typuj._dopisz_noge (kolumny wg naglowka istniejacego pliku); sport=tenis."""
+    import csv
+    kol = ['mecz', 'rynek', 'p', 'kurs', 'szacunek', 'polski', 'marza', 'kryteria', 'sport', 'ev_dodatni']
+    nowy = not os.path.exists(plik)
+    if not nowy:
+        with open(plik, encoding='utf-8') as fh: kol = next(csv.reader(fh), kol) or kol
+    w = dict(mecz=mecz, rynek=rynek, p=f'{p:.4f}', kurs=kurs, szacunek=0, polski=0, marza='', kryteria='', sport='tenis', ev_dodatni=1)
+    with open(plik, 'a', encoding='utf-8', newline='') as fh:
+        wr = csv.writer(fh)
+        if nowy: wr.writerow(kol)
+        wr.writerow([w.get(c, '') for c in kol])
 
 
 if __name__ == '__main__':

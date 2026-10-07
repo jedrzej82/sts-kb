@@ -95,6 +95,17 @@ def _ujednolic(rodzaj, x):
     return x
 
 
+def _klucz_porownawczy(d, klucz):
+    """07.10.2026 (audyt usterek, Raport 29.09 21:00 nr 3): „Mołdawia” i „Moldawia” (dwie delty, rozne pisownie) byly
+    dwoma typami — ten sam typ liczyl sie podwojnie w kalibracji i CLV. Klucz do usuwania duplikatow: bez znakow
+    diakrytycznych, malymi literami, pojedyncze spacje. Zapisane wartosci zostaja z wybranego wiersza."""
+    import unicodedata
+    def n(v):
+        v = unicodedata.normalize('NFKD', str(v).replace('ł', 'l').replace('Ł', 'L'))
+        return re.sub(r'\s+', ' ', ''.join(c for c in v if not unicodedata.combining(c))).strip().lower()
+    return [f'_k_{c}' for c in klucz], {f'_k_{c}': d[c].map(n) for c in klucz}
+
+
 def scal(katalog, cel=HERE):
     """Laczy delty kazdego rodzaju w jeden plik. Zwraca {rodzaj: (plikow, wierszy, po_scaleniu)}."""
     wynik = {}
@@ -120,18 +131,21 @@ def scal(katalog, cel=HERE):
         n0 = len(d)
         if kol_wyn not in d: d[kol_wyn] = ''
         d = d.fillna('')
+        kn, kol_n = _klucz_porownawczy(d, klucz)
+        d = d.assign(**kol_n)
         zamk = None
         if 'kurs_zamkniecia' in d:
             # 01.10.2026: kurs_zamkniecia dopisuja delty „ako_log zamkniecia …” (oferta.py) — kazda z kolejnego PDF przed
             # meczem; wygrywa NAJPOZNIEJSZY niepusty, nawet gdy reszte wiersza bierzemy z pliku z wynikiem
-            z = d[d.kurs_zamkniecia != ''].sort_values('_kol', kind='stable').drop_duplicates(klucz, keep='last')
-            zamk = z.set_index(klucz).kurs_zamkniecia
+            z = d[d.kurs_zamkniecia != ''].sort_values('_kol', kind='stable').drop_duplicates(kn, keep='last')
+            zamk = z.set_index(kn).kurs_zamkniecia
         d = (d[d._zamk == 0].assign(_ma=(d[kol_wyn] != '').astype(int)).sort_values(['_ma', '_kol'], kind='stable')
-             .drop_duplicates(klucz, keep='last').drop(columns=['_ma', '_kol', '_zamk']))
+             .drop_duplicates(kn, keep='last').drop(columns=['_ma', '_kol', '_zamk']))
         if zamk is not None and len(zamk):
-            k = pd.MultiIndex.from_frame(d[klucz])
+            k = pd.MultiIndex.from_frame(d[kn])
             nowe = zamk.reindex(k)
             d['kurs_zamkniecia'] = [n if isinstance(n, str) and n else s for n, s in zip(nowe, d.kurs_zamkniecia)]
+        d = d.drop(columns=kn)
         if rodzaj in KOLUMNY_LOGU:      # stare uklady wnosily wlasne kolumny (liga, status, tag…) — zostaje uklad logu
             d = d.reindex(columns=KOLUMNY_LOGU[rodzaj], fill_value='')
         d = d.sort_values([c for c in ('data', 'godzina_uruchomienia', 'tag', 'nr_kuponu', 'noga_nr') if c in d], kind='stable')
@@ -359,13 +373,17 @@ def _po_kotwicy(okno, h, g, gosp, gosc, rozwiaz, kol_h, kol_a, d0=None):
 
 def _czlony_zawarte(nazwa, rywal):
     """Wszystkie czlony nazwy z oferty (bez znakow diakrytycznych, >= 3 litery, bez znacznikow rezerw/kobiet) sa czlonami
-    nazwy rywala, a znaczniki (rezerwy, kobiety, U19) sa takie same po obu stronach."""
+    nazwy rywala, a znaczniki (rezerwy, kobiety, U19) sa takie same po obu stronach.
+    07.10.2026 (Raport 07.10 12:00, usterka 5: „Club Leandro Niceforo Alem” wobec „Leandro N. Alem”, 365 i Flashscore):
+    czlony ogolne z oferty (Club, FC — sporty._OGOLNE) nie musza byc u rywala, a czlon moze odpowiadac INICJALOWI
+    rywala („Niceforo” ~ „N.”); co najmniej jeden czlon musi sie zgadzac w calosci."""
     import sporty
     from nazwy import znaczniki
     if set(znaczniki(nazwa)) != set(znaczniki(rywal)): return False
     cz = lambda t: {sporty.norm(x) for x in re.split(r'[\s\-/.]+', str(t)) if len(sporty.norm(x)) >= 3}
-    a, b = cz(nazwa), cz(rywal)
-    return bool(a) and a <= b
+    a, b = cz(nazwa) - sporty._OGOLNE, cz(rywal)
+    ini = {sporty.norm(x)[0] for x in re.findall(r'(?<![\w])(\w)\.', str(rywal)) if sporty.norm(x)}
+    return bool(a & b) and all(t in b or t[0] in ini for t in a)
 
 
 def _cicho_bez_uwag(rozwiaz, nazwa, pula):

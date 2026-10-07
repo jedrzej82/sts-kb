@@ -108,3 +108,12 @@ def test_najpewniejszy_mix():
     linia = kupon.linia_mix(o, d)
     assert linia.startswith('NAJPEWNIEJSZY MIX: ') and 'EV -' in linia and 'NIE zalecenie' in linia
     assert kupon.linia_mix(None, d).startswith('NAJPEWNIEJSZY MIX: brak')
+
+
+def test_depozyt_tylko_jawnie(tmp_path):
+    # 07.10.2026 (audyt usterek, Raport 02.10 21:00 nr 7): bez --depozyt kupon.py liczyl stawki z wpisanych na sztywno 45,35 zl
+    f = tmp_path / 'nogi.csv'
+    f.write_text('zdarzenie,rynek,p,kurs\n')
+    with pytest.raises(SystemExit) as e:
+        kupon.main([str(f)])
+    assert 'depozyt' in str(e.value)

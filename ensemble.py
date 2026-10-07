@@ -5,7 +5,8 @@ Wybiera wagi zespołu (log-linear na λ) na części UCZĄCEJ, sprawdza na czę�
 potem liczy wagi końcowe i mapy kalibracji izotonicznej na całości (nowsze mecze ważniejsze, półokres 180 dni).
 Wyniki: ensemble_wagi.json, kalibracja_mapa_v5n.csv, ensemble_raport.txt. Bez kursów.
   python3 ensemble.py [START=2025-08-01] [KONIEC=dziś]"""
-import os, sys, json, pickle, sqlite3, itertools, numpy as np, pandas as pd
+import os, sys, json, sqlite3, itertools, numpy as np, pandas as pd
+import pamiec
 from model import fit_dc, dc_lambdas, fit_elo_glm, elo_lambdas, markets
 from pi import prepare, fit_pi_glm, pi_lambdas
 
@@ -33,7 +34,8 @@ def build_rows(tag=''):
     from typuj import stan_bazy   # 30.09.2026: klucz ze stanem kb.sqlite, jak cache typuj.py
     # 30.09.2026: v3 — pi ze sciagnietymi srednimi lig; wiersze maja tez nazwy druzyn i rozne (test_ostatnie.py ocenia na nich model produkcyjny)
     cp = os.path.join(HERE, 'cache', f'bt_v5n3{tag}_{START}_{END}_{stan_bazy()}.pkl')
-    if os.path.exists(cp): return pickle.load(open(cp, 'rb'))
+    bt = pamiec.wczytaj(cp) if os.path.exists(cp) else None   # 07.10.2026: zapis atomowy
+    if bt is not None: return bt
     os.makedirs(os.path.dirname(cp), exist_ok=True)   # 29.09.2026: na swiezym klonie cache/ nie istnial -> FileNotFoundError
     m = pd.read_sql('select * from matches', sqlite3.connect(os.path.join(HERE, 'kb.sqlite')), parse_dates=['MatchDate'])
     m = m.dropna(subset=['FTHome', 'FTAway'])
@@ -57,7 +59,7 @@ def build_rows(tag=''):
                                  ldc=ldc, lel=lel, lpi=lpi, rho=mdl['rho'] if mdl else -0.05,
                                  gosp=r.HomeTeam, gosc=r.AwayTeam, hc=getattr(r, 'HomeCorners', np.nan), ac=getattr(r, 'AwayCorners', np.nan)))
         print(ms.date(), len(rows), flush=True)
-    bt = pd.DataFrame(rows); pickle.dump(bt, open(cp, 'wb')); return bt
+    bt = pd.DataFrame(rows); return pamiec.zapisz(cp, bt)
 
 
 def comb(r, w):
