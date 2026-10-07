@@ -109,6 +109,24 @@ def _tok_osoba(s):
     return s.split()
 
 
+def _tok_osoba_warianty(s):
+    """07.10.2026 (Raport 24.09 21:00 nr 1): czlon z lacznikiem daje DWA zapisy — rozdzielony i sklejony.
+    STS pisze „Wang Xinyu”, arkusz „Xin-Yu Wang”: [xin, yu, wang] i [xinyu, wang]. Pierwszy wariant = _tok_osoba."""
+    import itertools
+    s = unicodedata.normalize('NFKD', str(s)).encode('ascii', 'ignore').decode().lower()
+    s = s.replace("'", '').replace('.', ' ')
+    opcje = []
+    for g in s.split():
+        czl = [x for x in g.split('-') if x]
+        if not czl: continue
+        opcje.append((czl, [''.join(czl)]) if len(czl) > 1 else (czl,))
+    wyn = []
+    for k in itertools.islice(itertools.product(*opcje), 16):
+        t = [x for grupa in k for x in grupa]
+        if t not in wyn: wyn.append(t)
+    return wyn
+
+
 def _warianty(nazwa):
     """Nazwa z oferty z polskimi miastami zamienionymi na kazdy zapis zrodlowy (lista list czlonow)."""
     import itertools
@@ -179,6 +197,14 @@ def znajdz(wiersze, nazwa, liga=None, sport=None):
         if len({norm(w['druzyna']) for w in tr}) == 1:
             return max(tr, key=mec), 0.95
         if tr: return None, 0.0                       # kilka roznych druzyn — nie zgadujemy
+    # (3t) 07.10.2026 tenis: czlon z lacznikiem rozdzielony albo sklejony („Wang Xinyu” = „Xin-Yu Wang”).
+    #      Ten sam zestaw czlonow w dowolnej kolejnosci; kilku roznych zawodnikow — nie zgadujemy.
+    if sport == 'tenis':
+        qv = {tuple(sorted(v)) for v in _tok_osoba_warianty(nazwa)}
+        tr = [w for w in kand if any(tuple(sorted(v)) in qv for v in _tok_osoba_warianty(w['druzyna']))]
+        if len({norm(w['druzyna']) for w in tr}) == 1:
+            return max(tr, key=mec), 0.95
+        if tr: return None, 0.0
     # (3b) polska nazwa miasta, ktorej w arkuszu nie ma wcale ("Panathinaikos Ateny" -> "Panathinaikos")
     t0 = [x for x in cel.split() if x not in _MIASTA_PL]
     if len(t0) < len(cel.split()) and (len(t0) >= 2 or (len(t0) == 1 and len(t0[0]) >= 9)):
@@ -238,20 +264,24 @@ def znajdz(wiersze, nazwa, liga=None, sport=None):
                 return tr[0], 0.85
     # (5) tenis: „Mensik J.” vs „Jakub Mensik” — nazwisko i WSZYSTKIE inicjaly imion
     if sport == 'tenis':
-        tq = _tok_osoba(nazwa)
-        if len(tq) >= 2:
-            tr = []
-            for w in kand:
-                tw = _tok_osoba(w['druzyna'])
-                if len(tw) < 2: continue
-                for naz_q, ini_q in ((tq[:1], tq[1:]), (tq[-1:], tq[:-1])):      # "Nazwisko I." albo "I. Nazwisko"
-                    for naz_w, im_w in ((tw[-1:], tw[:-1]), (tw[:1], tw[1:])):
-                        if naz_q == naz_w and len(ini_q) == len(im_w) and \
-                                all(len(i) <= 2 and im.startswith(i) for i, im in zip(ini_q, im_w)):
-                            tr.append(w)
-            if len({norm(w['druzyna']) for w in tr}) == 1:
-                return tr[0], 0.8
+        # 07.10.2026: obie strony we wszystkich wariantach lacznika („Wang X.” = „Xin-Yu Wang”)
+        tr = []
+        for w in kand:
+            if any(_inicjaly_pasuja(tq, tw) for tq in _tok_osoba_warianty(nazwa) if len(tq) >= 2
+                   for tw in _tok_osoba_warianty(w['druzyna']) if len(tw) >= 2):
+                tr.append(w)
+        if len({norm(w['druzyna']) for w in tr}) == 1:
+            return tr[0], 0.8
     return None, 0.0
+
+
+def _inicjaly_pasuja(tq, tw):
+    for naz_q, ini_q in ((tq[:1], tq[1:]), (tq[-1:], tq[:-1])):      # "Nazwisko I." albo "I. Nazwisko"
+        for naz_w, im_w in ((tw[-1:], tw[:-1]), (tw[:1], tw[1:])):
+            if naz_q == naz_w and len(ini_q) == len(im_w) and \
+                    all(len(i) <= 2 and im.startswith(i) for i, im in zip(ini_q, im_w)):
+                return True
+    return False
 
 
 def wymagaj(wiersze, nazwa, liga=None, sport=None):
@@ -279,17 +309,80 @@ def _bez_przedrostkow(nazwa):
     return t
 
 
-def _kandydaci_ligowi(W, nazwa):
-    """Wiersze arkusza, ktorych nazwa = nazwa z oferty bez przedrostkow (albo odwrotnie: arkusz ma przedrostek)."""
+# 07.10.2026 (Raport 27.09 21:00 nr 4): „Everton Vina del Mar” (STS) = „Everton De Vina” (arkusz, Primera CHI).
+# RDZEN = pierwszy znaczacy czlon nazwy; czlony-laczniki (de/del/la...) i formy prawne pomijane. Krotsza nazwa musi
+# sie w calosci zawierac w dluzszej, a nadmiarowe czlony dluzszej nie moga byc znacznikiem innej druzyny
+# (rezerwy, kobiety, mlodziez: „Real Madrid Castilla”, „Chelsea (K)”, „Barcelona B” to NIE pierwsze druzyny).
+# Wspolne musza byc co najmniej DWA czlony (rdzen + miasto): „Bohemians Praha” (Czechy) to nie „Bohemians”
+# (Dublin), a samo „Santa”/„Real”/„Inter” nie wskazuje klubu. Jedyny wyjatek: nazwa z oferty trafila juz w CALY
+# klub z innej ligi („Everton” = Everton, Premier League) — wtedy w lidze rywala wolno jej wskazac dluzsza nazwe
+# o tym samym rdzeniu („Everton De Vina”), patrz _kotwica_ligowa. Taki kandydat jest uzywany WYLACZNIE z kotwica
+# ligowa (rywal rozpoznany jednoznacznie, jedyny kandydat w jego lidze) — sam znajdz() go nie zwraca.
+_LACZNIKI = frozenset('de del la las los el da do dos das di y'.split())
+_ZNACZNIKI_INNEJ = frozenset('castilla atletic mestalla promesas reserves reserve reserva reservas res women woman '
+                             'ladies femenino femenina feminino feminina femminile frauen dames damen kobiety youth '
+                             'juniors junior academy jong primavera sub amateur amateurs'.split())
+
+
+def _rdzen(nazwa):
+    """Czlony znaczace. Przedrostki ligowe (club/ca/cd...) ZOSTAJA: „Racing Club” (ARG) to nie „Racing Santander”.
+    Apostrof nie dzieli czlonu („Newell's” -> newells, a nie newell + s)."""
+    return [x for x in _tok(str(nazwa).replace("'", '').replace('’', '')) if x not in _LACZNIKI and x not in _OGOLNE]
+
+
+def _rdzen_pasuje(a, b, min_wspolne=2):
+    """a — nazwa z oferty, b — nazwa z arkusza; min_wspolne=1 tylko z _kotwica_ligowa (a = krotsza)."""
+    ta, tb = _rdzen(a), _rdzen(b)
+    if not ta or not tb or ta[0] != tb[0] or len(ta[0]) < 4: return False
+    if min(len(ta), len(tb)) < min_wspolne or (len(tb) < 2 and len(ta) > len(tb)): return False
+    d, k = (ta, tb) if len(ta) >= len(tb) else (tb, ta)
+    odp = list(d)
+    for x in k:
+        if x not in odp: return False
+        odp.remove(x)
+    return all(x.isalpha() and len(x) >= 3 and x not in _ZNACZNIKI_INNEJ for x in odp)
+
+
+def _kandydaci_ligowi(W, nazwa, rdzen=False):
+    """Wiersze arkusza, ktorych nazwa = nazwa z oferty bez przedrostkow (albo odwrotnie: arkusz ma przedrostek).
+    rdzen=True (tylko gdy rywal jest rozpoznany): takze wiersze o wspolnym rdzeniu (_rdzen_pasuje)."""
     cel = sorted(_bez_przedrostkow(nazwa))
     if len(''.join(cel)) < 4: return []
-    return [w for w in W if sorted(_bez_przedrostkow(w['druzyna'])) == cel]
+    return [w for w in W if sorted(_bez_przedrostkow(w['druzyna'])) == cel
+            or (rdzen and _rdzen_pasuje(nazwa, w['druzyna']))]
+
+
+def _jednoznaczny(W, wiersz):
+    """Ta sama nazwa w arkuszu = jeden klub (jedno team_id; liga + puchary to ten sam klub). „Universidad Catolica”
+    (ECU, 10197) i „Universidad Catolica” (CHI, 1245) to dwa kluby — taki rywal nie jest kotwica.
+    Arkusz bez team_id: jak dotad, nazwa wystarcza."""
+    n = norm(wiersz['druzyna'])
+    return len({str(w.get('team_id') or '').strip() for w in W if norm(w['druzyna']) == n} - {''}) <= 1
+
+
+def _kotwica_ligowa(W, wiersz_rywala, nazwa, wiersz0):
+    """07.10.2026 (Raport 27.09 21:00 nr 4): rywal rozpoznany jednoznacznie, a „nazwa” trafila (wiersz0) w druzyne
+    z INNEJ ligi. Gdy w lidze rywala jest dokladnie jeden kandydat o tym samym rdzeniu — on (to ten mecz);
+    kilku — 'NIEJEDNOZNACZNE'; zaden — None (zostaje wiersz0, jak dotad: mecz miedzyligowy / pucharowy)."""
+    if not _jednoznaczny(W, wiersz_rywala): return None
+    nr = norm(wiersz_rywala['druzyna'])
+    ligi_r = {w['liga'] for w in W if norm(w['druzyna']) == nr}
+    n0 = norm(wiersz0['druzyna'])
+    if any(w['liga'] in ligi_r for w in W if norm(w['druzyna']) == n0): return None   # jest wspolna liga
+    tr = [w for w in W if w['liga'] in ligi_r and norm(w['druzyna']) not in (nr, n0)
+          and _rdzen_pasuje(nazwa, w['druzyna'], min_wspolne=1)]
+    if not tr: return None
+    if len({norm(w['druzyna']) for w in tr}) > 1: return 'NIEJEDNOZNACZNE'
+    return max(tr, key=lambda w: f(w.get('mecze'), 0) or 0)
 
 
 def para_po_lidze(W, a, b):
-    """(wiersz_a, wiersz_b) albo None. Uzywane tylko, gdy znajdz() nie trafil choc jednej druzyny."""
-    ka = [znajdz(W, a)[0]] if znajdz(W, a)[0] else _kandydaci_ligowi(W, a)
-    kb = [znajdz(W, b)[0]] if znajdz(W, b)[0] else _kandydaci_ligowi(W, b)
+    """(wiersz_a, wiersz_b) albo None. Uzywane tylko, gdy znajdz() nie trafil choc jednej druzyny.
+    07.10.2026: kandydaci o wspolnym rdzeniu tylko po stronie nierozpoznanej i tylko, gdy druga strona jest
+    rozpoznana przez znajdz() — dwie nazwy „po rdzeniu” naraz nie tworza kotwicy."""
+    za, zb = znajdz(W, a)[0], znajdz(W, b)[0]
+    ka = [za] if za else _kandydaci_ligowi(W, a, rdzen=bool(zb) and _jednoznaczny(W, zb))
+    kb = [zb] if zb else _kandydaci_ligowi(W, b, rdzen=bool(za) and _jednoznaczny(W, za))
     pary = [(x, y) for x in ka for y in kb if x['liga'] == y['liga'] and norm(x['druzyna']) != norm(y['druzyna'])]
     if len({(norm(x['druzyna']), norm(y['druzyna'])) for x, y in pary}) != 1: return None
     if len({x['liga'] for x, _ in pary}) != 1: return None
@@ -318,6 +411,22 @@ def pilka(a, b):
     else:
         h0 = wymagaj(W, a)
         g0 = wymagaj(W, b)
+    # 07.10.2026 (Raport 27.09 21:00 nr 4): „Universidad de Chile” – „Everton” trafialo w Everton z Premier League.
+    # Gdy obie nazwy trafily w rozne ligi, a w lidze jednej strony jest dokladnie jeden kandydat o tym samym
+    # rdzeniu nazwy drugiej strony — bierzemy go; kilku kandydatow (albo kotwica w obie strony) — NIE ZNALEZIONO.
+    # Bez kandydata w lidze rywala — jak dotad (mecz miedzyligowy, P_sezon informacyjnie).
+    zm = []
+    for i, (rywal, nazwa, w0) in enumerate(((h0, b, g0), (g0, a, h0))):
+        k = _kotwica_ligowa(W, rywal, nazwa, w0)
+        if k is not None: zm.append((i, k))
+    if zm:
+        if len(zm) > 1 or zm[0][1] == 'NIEJEDNOZNACZNE':
+            raise SystemExit(f'NIE ZNALEZIONO: {a!r} – {b!r}: kilku kandydatow w lidze rywala — nie zgaduje')
+        i, k = zm[0]
+        print(f'  dopasowano po lidze rywala ({k["liga"]}): „{(b, a)[i]}” → „{k["druzyna"]}” '
+              f'(zamiast „{(g0, h0)[i]["druzyna"]}” z {(g0, h0)[i]["liga"]})')
+        if i == 0: g0 = k
+        else: h0 = k
     nh, ng = norm(h0['druzyna']), norm(g0['druzyna'])
     if nh == ng:
         raise SystemExit(f'NIE ZNALEZIONO: {a!r} i {b!r} wskazuja te sama druzyne ({h0["druzyna"]}) — pomijam')
