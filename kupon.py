@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Skladanie kuponow W KODZIE wg INSTRUKCJI v7 (faza 4, 29.09.2026) — zamiast liczenia kombinacji w prozie.
-  python3 kupon.py nogi.csv [--depozyt 45.35] [--faza 1] [--wydane-dzis 0] [--kupony-dzis 0] [--wydane-lacznie 9] [--k5-dzis 0]
+  python3 kupon.py nogi.csv --depozyt KWOTA [--faza 1] [--wydane-dzis 0] [--kupony-dzis 0] [--wydane-lacznie 9] [--k5-dzis 0]
 
 nogi.csv — jedna noga na wiersz, TYLKO nogi dopuszczone przez kod (linia „✔ NOGA DOPUSZCZONA” / „WERDYKT: NOGA
 DOPUSZCZONA”), z P do kuponu z tej linii:
@@ -170,12 +170,16 @@ def za_pieniadze(o, rodzaj, a, wydane_dzis, kupony_dzis):
 
 def main(argv):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('plik'); ap.add_argument('--depozyt', type=float, default=45.35)
+    # 07.10.2026 (audyt usterek, Raport 02.10 21:00 nr 7): domyslny depozyt 45,35 zl byl wpisany na sztywno — przebieg bez
+    # --depozyt liczyl stawki Kelly z nieaktualnej kwoty (uzytkownik potwierdzil 50 zl 06.10). Depozyt tylko jawnie.
+    ap.add_argument('plik'); ap.add_argument('--depozyt', type=float, default=None)
     ap.add_argument('--faza', type=int, default=1, choices=(1, 2, 3))
     ap.add_argument('--wydane-dzis', type=float, default=0); ap.add_argument('--kupony-dzis', type=int, default=0)
     ap.add_argument('--wydane-lacznie', type=float, default=0)
     ap.add_argument('--k5-dzis', type=float, default=0, help='suma stawek K5 postawionych dzis we wczesniejszych przebiegach (limit 8 zl, 6.7)')
     a = ap.parse_args(argv)
+    if a.depozyt is None or a.depozyt <= 0:
+        sys.exit('BLAD: podaj --depozyt (aktualny stan konta z Bilansu/POPRAWEK) — bez niego stawki Kelly bylyby z nieaktualnej kwoty')
     wsz = wczytaj(a.plik)
     d = wsz[wsz.ev_dodatni.astype(int) == 1].reset_index(drop=True)   # K1–K5 i MIX: tylko nogi z EV > 0 (jak dotad)
     print(f'KUPON.PY — {len(d)} nog dopuszczonych, faza {a.faza}, depozyt {a.depozyt:.2f} zl, '

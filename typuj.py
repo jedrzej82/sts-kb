@@ -512,6 +512,14 @@ def resolve(name, pool):
             if _znaczniki(p) == _znaczniki(name): kob.setdefault(norm(_bez(p)), set()).add(p)
         kb_ = norm(_bez(name))
         if kb_ and len(kob.get(kb_, ())) == 1: return next(iter(kob[kb_]))
+    # 07.10.2026 (audyt usterek, Raporty 23.09 19:06 U2 i 21:00 nr 3): rezerwy „CA Banfield II”, „Atletico Lanus II” — baza
+    # „Banfield Res.”, „Lanus Res.” (Argentina Reserva). Kandydat z TYM SAMYM znacznikiem, ktorego rdzen (bez znacznikow
+    # i czlonow ogolnych) zawiera sie w rdzeniu nazwy z oferty — tylko gdy jest dokladnie jeden.
+    if _znaczniki(name) == ('rezerwy',):
+        _rdzen = lambda s: {t for t in _tokeny(s) if t not in _OGOLNE and not _znaczniki(t) and t not in ('ii', 'b', 'res', 'reserves', 'reserve')}
+        rn = _rdzen(name)
+        rez = [p for p in sorted(pool) if _znaczniki(p) == ('rezerwy',) and _rdzen(p) and _rdzen(p) <= rn]
+        if rn and len(rez) == 1: return rez[0]
     if k in ALIASES_KLUBY and ALIASES_KLUBY[k] in pool: return ALIASES_KLUBY[k]
     if k in _WARIANTY and _WARIANTY[k] in pool: return _WARIANTY[k]   # nazwa zrodlowa sklejonego klubu (build_kb)
     c = [p for p in by.values() if _zaw_nazwy(name, p)]

@@ -381,7 +381,9 @@ def _czlon_pasuje(a, b):
     albo jeden jest inicjalem drugiego ("S." i "Sofia")."""
     if a == b: return True
     if len(a) == 1 or len(b) == 1: return a[:1] == b[:1]
-    return a.startswith(b) or b.startswith(a)
+    # 07.10.2026 (audyt usterek, Raport 05.10 12:00 nr 4): „Kim Eunchae” -> „Eun Ha Kim” (inna zawodniczka, ostatni mecz
+    # 2001) — „Eun” liczyl sie jako przedrostek „Eunchae”. Przedrostek tylko od 4 liter („Alex” ~ „Alexander”).
+    return (a.startswith(b) or b.startswith(a)) and min(len(a), len(b)) >= 4
 
 
 def _wspolne_czlony(zrodlo, kandydat):
