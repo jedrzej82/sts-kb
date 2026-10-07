@@ -142,3 +142,14 @@ def test_sofascore_wylaczony_domyslnie(tmp_path, monkeypatch):
     assert len(linie) == 1 and 'WYLACZONE' in linie[0] and '--sofascore' in linie[0]
     assert 'fotmob szczegoly: przed meczem 0/0' in diag
     assert z.sofa_wlaczony(['--sofascore']) and not z.sofa_wlaczony(['--tylko', 'fotmob'])
+
+
+def test_instalator_dodaje_godzinowe_sklady():
+    # 07.10.2026: dodatkowy cron co godzine 12:20–21:20 tylko FotMob (sklady ok. 60 min przed meczem); bez dubli przy ponownej instalacji
+    import os
+    import subprocess
+    p = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'termux', 'instaluj_zrodla.sh')
+    s = open(p, encoding='utf-8').read()
+    assert subprocess.run(['bash', '-n', p]).returncode == 0
+    assert '20 12-21 * * *' in s and '--tylko fotmob' in s and '40 11,14,17,20 * * *' in s
+    assert "grep -v 'zrodla.sh'" in s and 'echo "$LINIA2"' in s
