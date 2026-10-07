@@ -209,6 +209,42 @@ def main(argv):
     print('\n' + linia_mix(najlepszy(d[(d.polski == 0) & (d.marza <= 1.10)], 'MIX'), d))
     print('\n' + '\n'.join(linie_pilka(wsz, a, wydane, kupony)))
     print('\n' + '\n'.join(linie_bonus(wsz)))
+    print('\n' + '\n'.join(linie_niski(wsz)))
+
+
+# 07.10.2026 (prosba uzytkownika): AKO NISKI KURS — 6–10 nog pilkarskich o wysokim P na jednym kuponie. Backtest 219 dni
+# (03–10.2026, 41 376 meczow spoza czesci uczacej): pojedyncze nogi P 0,90–0,97 sa skalibrowane (0,943 -> 0,943), ale WYBOR
+# najpewniejszych nog dnia zawyza: 8 nog P kuponu 80,7%, weszlo 69,9% (ok. 1,8 pp na noge) — stad korekta 2 pp na noge.
+# „3 dni z rzedu” wypada w 32% okresow (8 nog) samym przypadkiem. Przy marzy ~5% na noge i podatku 12% zwrot szacowany
+# −40% … −55% — dlatego TYLKO PAPIEROWY; za pieniadze dopiero po decyzji uzytkownika (3 dni z rzedu) i z EV > 0 na kursach.
+NISKI_NOGI = (6, 10)
+NISKI_MIN_P = 0.90
+NISKI_KOREKTA = 0.02
+
+
+def ako_niski(wsz):
+    """Najwiecej (do 10) nog pilkarskich z roznych meczow o P - 2 pp >= 90%, malejaco po P; None, gdy < 6."""
+    x = wsz[(wsz.sport.astype(str).str.lower().isin(['pilka', 'piłka', ''])) & (wsz.szacunek.astype(int) == 0)]
+    x = x.assign(pk=x.p - NISKI_KOREKTA)
+    x = x[x.pk >= NISKI_MIN_P].sort_values('pk', ascending=False).drop_duplicates('mecz').head(NISKI_NOGI[1])
+    if len(x) < NISKI_NOGI[0]: return None
+    p, kurs = float(x.pk.prod()), float(x.kurs.prod())
+    return dict(nogi=list(x.index), p=p, kurs=kurs, ev=p * kurs * TAX - 1)
+
+
+def linie_niski(wsz):
+    o = ako_niski(wsz)
+    if o is None:
+        return [f'AKO NISKI KURS ({NISKI_NOGI[0]}–{NISKI_NOGI[1]} nog, P >= {NISKI_MIN_P:.0%} po korekcie −{NISKI_KOREKTA * 100:.0f} pp): brak — '
+                f'za malo pewnych nog pilkarskich z roznych meczow']
+    out = [f'AKO NISKI KURS ({len(o["nogi"])} nog): laczne P {o["p"]:.1%} (po korekcie −{NISKI_KOREKTA * 100:.0f} pp/noga) | '
+           f'kurs {o["kurs"]:.2f} | EV {o["ev"]:+.1%} | PAPIEROWY (nowy typ — obserwacja)']
+    for i in o['nogi']:
+        r = wsz.loc[i]
+        out.append(f'   {r.mecz} | {r.rynek} | P {r.p - NISKI_KOREKTA:.1%} | kurs {r.kurs:.2f}')
+    out.append(f'   → zapisz w ako_log jako papierowy (tag AKON); szansa, ze NIE wejdzie: {1 - o["p"]:.0%}; '
+               f'3 dni z rzedu samym przypadkiem: ok. {o["p"] ** 3:.0%}')
+    return out
 
 
 def linie_bonus(wsz, ile=3):
