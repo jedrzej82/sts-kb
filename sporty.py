@@ -1360,7 +1360,9 @@ def main(a):
                   + '; EV licz z TEGO P: P × kurs × 0,88 − 1')
     elif a[0] == 'typ':
         from clv import dopisz_typ   # opcjonalnie KURS_TYPU [PIENIADZE] na koncu (P56.3, CLV)
-        row = dict(data=a[1], sport=a[2].lower(), gosp=a[3], gosc=a[4], rynek=a[5], p=float(a[6]), trafiony=None)
+        # 07.10.2026 (Raport 15:00 nr 5): „1”/„2” w sporty_typy znaczy zwyciezca Z DOGRYWKA (_rynek_typu -> Z1/Z2), ale w ako_log
+        # i w P121.2 ten sam napis to czas regulaminowy — przebieg poprawial wiersze recznie. Zapis od razu jednoznaczny.
+        row = dict(data=a[1], sport=a[2].lower(), gosp=a[3], gosc=a[4], rynek=re.sub(r'^((?:AKOP|ODRZ)_)?([12])$', r'\1Z\2', a[5].strip()), p=float(a[6]), trafiony=None)
         print('zapisano', dopisz_typ(LOG, row, a[7:9]))
     elif a[0] == 'rozlicz':
         if not os.path.exists(LOG): sys.exit('brak prognoz')

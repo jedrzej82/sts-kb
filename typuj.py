@@ -1335,6 +1335,10 @@ def value(rows, kursy, dz=None, mecz=None, szacunek=False, polski=False):
     print('\nWARTOŚĆ (kurs użyty dopiero po wyliczeniu P; podatek 12%):')
     for k, o in kursy.items():
         if k not in d:   # 05.10.2026: literowka w kodzie rynku nie moze przejsc po cichu
+            # 07.10.2026 (Raport 15:00 nr 4): O3.5/U1.5/O4.5 itp. to POPRAWNE kody (P145.3: podawane do P rynku z pary O/U),
+            # tylko spoza listy rynkow liczonych do kuponu — komunikat „sprawdz zapis” wprowadzal przebieg w blad (P140.3)
+            if re.fullmatch(r'(gosp_|gość_|gosc_)?[OU]\d+\.5', k):
+                print(f'  {k}: rynek spoza listy liczonej do kuponu (kod poprawny) — uzyty tylko do P rynku z pary O/U, bez EV'); continue
             print(f'  {k}: brak rynku — UWAGA: model nie zna kodu „{k}” (sprawdz zapis; znane: {", ".join(sorted(d))})'); continue
         p = d[k]; ev, kelly = ev_kelly(p, o)
         print(f'  {k} @ {o}: P={p:.1%}, kurs sprawiedliwy={1 / p / TAX:.2f}, EV={ev:+.1%}, ¼ Kelly={kelly / 4:.1%} bankrollu'

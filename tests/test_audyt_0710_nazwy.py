@@ -67,3 +67,28 @@ def test_pojedynczy_znak_to_inna_druzyna():
     pula = {'Odense', 'Chievo', 'Wisla Plock'}
     assert _r('Odense Q', pula) is None
     assert _r('Chievo Verona', pula) == 'Chievo'                  # czlon wieloliterowy — jak dotad (z ostrzezeniem)
+
+
+def test_sporty_typ_zapisuje_z1_z2(tmp_path, monkeypatch):
+    # Raport 07.10 15:00 nr 5: `sporty.py typ ... hokej ... 2 0.748` zapisywal „2”, a P z WERDYKT jest z dogrywka
+    zap = []
+    import clv
+    monkeypatch.setattr(clv, 'dopisz_typ', lambda log, row, extra: zap.append(row) or row)
+    for r in ('2', 'AKOP_1', '1_60min', 'X', 'Z2'):
+        sporty.main(['typ', '2026-10-07', 'hokej', 'Vaasan Sport', 'Ilves Tampere', r, '0.748'])
+    assert [z['rynek'] for z in zap] == ['Z2', 'AKOP_Z1', '1_60min', 'X', 'Z2']
+    assert sporty._rynek_typu('AKOP_Z1') == 'Z1' and sporty._rynek_typu('Z2') == 'Z2'   # rozliczenie bez zmian
+
+
+def test_kod_ou_spoza_listy_nie_jest_literowka(capsys):
+    # Raport 07.10 15:00 nr 4: --kurs O3.5 dawalo „model nie zna kodu (sprawdz zapis)”, choc P145.3 kaze go podawac
+    typuj.value([('U3.5', 0.67, 0.67)], {'U3.5': 1.48, 'O3.5': 2.45, 'XX9': 2.0})
+    out = capsys.readouterr().out
+    assert 'O3.5: rynek spoza listy liczonej do kuponu (kod poprawny)' in out
+    assert 'model nie zna kodu „XX9”' in out and 'model nie zna kodu „O3.5”' not in out
+
+
+def test_alias_arkusza_derthona():
+    # Raport 07.10 15:00 nr 3: sezon.py kosz „Derthona Basket” -> NIE ZNALEZIONO (arkusz: „Derthona Basket Tortona”)
+    import sezon
+    assert sezon._ALIASY_PILKA.get('derthonabasket') == 'Derthona Basket Tortona'
