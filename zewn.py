@@ -379,7 +379,9 @@ BEZ_PUNKTOW_OK = {'table-tennis', 'badminton', 'darts', 'snooker', 'esports'}   
 #     wtedy to ten sam mecz pod inna nazwa ligi/druzyny;
 #  2) odpada takze cala liga FS, ktorej nazwa (kraj + liga) jest identyczna jak liga w 365 (duble lig top);
 #  3) nazwa druzyny FS zamieniana na zapis 365 TYLKO przy jednoznacznym kandydacie w tym samym kraju.
-_ZNACZNIK_FS = re.compile(r'^(?:b|c|ii|iii|u1\d|u2[0-3]|w|women|res|reserves?|youth|jun|juniors?|am)$')
+# 07.10.2026: + „2”/„3” (fińskie i norweskie rezerwy: „Atlantis 2”, „Inter Turku 2”) — FS-owe „Atlantis” (pierwsza druzyna,
+# Kakkonen 2026) trafialo w „Atlantis 2” z 365 (rezerwy), bo cyfra nie byla znacznikiem.
+_ZNACZNIK_FS = re.compile(r'^(?:b|c|ii|iii|2|3|u1\d|u2[0-3]|w|women|res|reserves?|youth|jun|juniors?|am)$')
 
 
 @functools.lru_cache(maxsize=None)
@@ -404,6 +406,30 @@ def _podobna_druzyna(a, b):
     tb = [w for w in _nrm(b) if len(w) >= 4 and w not in _OGOLNE_FS]
     if any(x == y or (min(len(x), len(y)) >= 5 and (x.startswith(y) or y.startswith(x))) for x in ta for y in tb): return True
     return difflib.SequenceMatcher(None, ' '.join(_nrm(a)), ' '.join(_nrm(b))).ratio() >= 0.75
+
+
+# 07.10.2026 (paczka wieczorna): liga FS -> liga 365 laczyla rozne POZIOMY — „Tercera RFEF - Group 7” -> „Segunda RFEF”
+# (wspolny czlon „rfef”, a kluby spadle z Segundy maja te same nazwy) i lige z pucharem — „Campeonato de Portugal -
+# Group B” -> „Taça de Portugal” (wspolny czlon „portugal”). Zasada ogolna zamiast wyjatkow na napisy:
+#  a) liga nigdy nie trafia do pucharu (nazwa 365 z PUCHAR_WLASCIWY, nazwa FS bez — puchary FS odpadaja wczesniej);
+#  b) gdy obie nazwy maja slowo poziomu (primera/segunda/tercera/..., first/second/third, prima/seconda/terza),
+#     poziomy musza byc te same;
+#  c) nazwa kraju nie liczy sie jako wspolny czlon nazw lig.
+_POZIOM_LIGI = {'primera': 1, 'first': 1, '1st': 1, 'prima': 1, 'primeira': 1, 'segunda': 2, 'second': 2, '2nd': 2,
+                'seconda': 2, 'tercera': 3, 'third': 3, '3rd': 3, 'terza': 3, 'terceira': 3, 'cuarta': 4, 'fourth': 4,
+                '4th': 4, 'quarta': 4, 'quinta': 5, 'fifth': 5, '5th': 5}
+
+
+def _poziomy_ligi(t):
+    return {_POZIOM_LIGI[w] for w in _nrm(t) if w in _POZIOM_LIGI}
+
+
+def _liga_ten_poziom(kraj, t_fs, t_365):
+    """Czy liga FS moze byc ta sama liga co liga 365: liga nie trafia do pucharu, slowa poziomu (jesli sa) zgodne."""
+    if PUCHAR_WLASCIWY.search(str(t_365)) and not _liga_nie_puchar(kraj, t_365) and not PUCHAR_WLASCIWY.search(str(t_fs)):
+        return False
+    pa, pb = _poziomy_ligi(t_fs), _poziomy_ligi(t_365)
+    return not (pa and pb and pa != pb)
 
 
 def _pilka_fs(s):
@@ -456,7 +482,9 @@ def _pilka_fs(s):
         traf = [lg for x in set(g.gosp) | set(g.gosc) for lg in idx_nazw.get((k, klucz(x)), ())]
         if len(traf) < 2: continue
         naj = max(set(traf), key=traf.count)
-        if traf.count(naj) >= 0.6 * len(traf) and (czl(t) & czl(naj)): lmapa[(k, t)] = naj
+        kr = set(_nrm(k))   # nazwa kraju nie jest wspolnym czlonem („Campeonato de Portugal” / „Taça de Portugal”)
+        if traf.count(naj) >= 0.6 * len(traf) and ((czl(t) - kr) & (czl(naj) - kr)) and _liga_ten_poziom(k, t, naj):
+            lmapa[(k, t)] = naj
     fs['turniej'] = [lmapa.get((k.lower(), t), t) for k, t in zip(fs.kraj, fs.turniej)]
 
     # 2) nazwy druzyn: w DOCELOWEJ lidze (ta sama zasada co w pilka(): sofa_div albo "Kraj | Liga").
@@ -479,7 +507,14 @@ def _pilka_fs(s):
             druzyny_celu.setdefault(cel(k, t), set()).update((a_, b_))
     fs_cel = [cel(k, t) for k, t in zip(fs.kraj, fs.turniej)]
     mapa, zle = {}, set()
+    # 07.10.2026: najpierw reczna lista tozsamosci klubow (kluby.SCAL_RECZNIE, ta sama co w uzupelnij_ligi/build_kb):
+    # klub, ktory zmienil zapis miedzy sezonami („Union Clodiense” 2026/27 = „ASD Clodiense” 2025/26 w 365), nie mial
+    # odpowiednika w puli 365, wiec jego mecze ODPADALY, a w bazie zostawal martwy wpis (Raport 07.10 18:00: NIESWIEZA).
+    from kluby import SCAL_RECZNIE, _div_klucz
+    _SR = {(_div_klucz(k[0]), k[1]): v for k, v in SCAL_RECZNIE.items() if len(k) == 2}   # wpisy z data: tylko build_kb
     for c_, x in set(zip(fs_cel, fs.gosp)) | set(zip(fs_cel, fs.gosc)):
+        if (_div_klucz(c_), x) in _SR:
+            mapa[(c_, x)] = _SR[(_div_klucz(c_), x)]; continue
         kand = druzyny_celu.get(c_, set())
         if not kand or x in kand: continue
         for test in (lambda c: klucz(c) == klucz(x), lambda c: _pasuje(x, c), lambda c: _pasuje_luzno(x, c)):

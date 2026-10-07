@@ -7,10 +7,11 @@ oraz dodaje nowe ligi (CZE, CRO, SRB, UKR, KOR, ...). Źródła (wszystkie z Git
      równomiernie między ostatnim meczem z datą a końcem sezonu (przybliżenie tylko dla wag czasowych).
 Wynik: ligi_extra.csv (format tabeli matches) — build_kb.py dokleja go jak delta.
   python3 uzupelnij_ligi.py [--refresh]"""
-import os, re, sys, glob, json, subprocess, sqlite3, numpy as np, pandas as pd
+import os, re, sys, glob, json, functools, subprocess, sqlite3, numpy as np, pandas as pd
 HERE = os.path.dirname(os.path.abspath(__file__)); RAW = os.path.join(HERE, 'raw'); WFR = os.path.join(RAW, 'wfr')
 sys.path.insert(0, HERE)
 from build_kb import norm
+from nazwy import znaczniki as _znaczniki
 
 REL = 'https://github.com/JaseZiv/worldfootballR_data/releases/download/match_results/{}_match_results.rds'
 # kod FBref -> {nazwa rozgrywek: Division w kb}
@@ -214,7 +215,7 @@ for _d, _m in _ALIAS2_2309.items():
         ALIAS2.setdefault(_d, {}).setdefault(_k, _v)   # istniejacy wpis wygrywa
 # 23.09.2026 (audyt po 12:00): reczna lista tozsamosci klubow z kluby.py — ta sama co w build_kb.py.
 # Bez niej archiwum 365scores 2025 i fbref wchodzily jako DWA mecze ("B'ham Legion" / "Birmingham Legion FC").
-from kluby import SCAL_RECZNIE as _SR, zakazane as _zakazane
+from kluby import SCAL_RECZNIE as _SR, zakazane as _zakazane, _div_klucz
 for _kl, _v in _SR.items():
     if len(_kl) == 2:   # wpisy z data (3 elementy) obsluguje tylko build_kb — tu nie ma czym ich zawezic
         ALIAS2.setdefault(_kl[0], {}).setdefault(_kl[1], _v)
@@ -301,16 +302,35 @@ def _sprzeczne(zrodlo, baza):
     return bool(wl_z) and bool(wlasne_b)
 
 
+@functools.lru_cache(maxsize=None)
+def _znaczniki_rez(s):
+    """nazwy.znaczniki bez jednoliterowych inicjalow: pierwszy czlon „K.”/„B.”/„W” to skrot nazwy (K. Beerschot V.A.,
+    B. Dortmund, W Sydney), a samotne „C”/„K” dalej w nazwie — skrot czlonu (Inverness C = Caledonian Thistle).
+    Zmierzone w canon() 07.10: pelne nazwy.znaczniki rozcinalo „K. Beerschot V.A.”/„Beerschot VA” i „Inverness CT”/„Inverness C”."""
+    cz = str(s).split()
+    cz = [c for i, c in enumerate(cz)
+          if not ((i == 0 and len(cz) > 1 and re.fullmatch(r'[A-Za-z]\.?', c)) or re.fullmatch(r'[CcKk]\.?', c))]
+    return _znaczniki(' '.join(cz))
+
+
 def match_one(n, pool, div, zwroc_sile=False):
     """Zwraca nazwe z puli albo None. Z zwroc_sile=True zwraca (nazwa, sila),
     gdzie sila rosnie wraz z pewnoscia dopasowania — canon() uzywa jej do
     rozstrzygania, ktora nazwa ma prawo zajac dany klub."""
     import difflib
     def w(cel, sila): return (cel, sila) if zwroc_sile else cel
-    a = ALIAS2.get(div, {})
+    # 07.10.2026: Division z 365 bywa ze spacja na koncu („Segunda RFEF ”), a wpisy recznie — bez niej
+    a = {**ALIAS2.get(_div_klucz(div), {}), **ALIAS2.get(div, {})}
     if n in a: return w(a[n], 9)
     if n in NIE_MAPUJ: return w(n if n in pool else None, 9)
     if n in ALIAS_ZEWN and ALIAS_ZEWN[n] in pool: return w(ALIAS_ZEWN[n], 9)
+    # 07.10.2026 (paczka wieczorna): rezerwy nigdy nie trafiaja automatem w pierwsza druzyne i odwrotnie — ta sama
+    # zasada co w build_kb (nazwy.znaczniki: B/II/2 = rezerwy, C/III/3, U19, kobiety). Dotad „San Sebastian Reyes B”
+    # -> „San Sebastian Reyes” (przedrostek, sila 5), „Valladolid B” -> „Valladolid”, a „Atlantis FC” -> „Atlantis 2”
+    # (norm() zdejmuje cyfry, wiec klucze byly rowne — sila 8; zmierzone w canon() na danych 07.10 18:00).
+    # Reczne wpisy (ALIAS2/ALIAS_ZEWN, wyzej) dzialaja bez zmian.
+    _zn = _znaczniki_rez(n)
+    pool = [b for b in pool if _znaczniki_rez(b) == _zn]
     k = norm(str(n).translate(ZNAKI))
     base = {norm(str(b).translate(ZNAKI)): b for b in pool}
     if k in base and not _rozne_formy(n, base[k]): return w(base[k], 8)
@@ -337,7 +357,10 @@ def match_one(n, pool, div, zwroc_sile=False):
             if len(dl) == 1: return w(dl[0], 4)
     # sorted(): bez tego kolejnosc zalezy od ziarna hasha procesu
     m = difflib.get_close_matches(k, sorted(base), n=1, cutoff=0.8)
-    if m and not _sprzeczne(n, base[m[0]]): return w(base[m[0]], 2)
+    # 07.10.2026: norm() zdejmuje cyfry, wiec „TP-47” to „tp” i ~ „tpv” (0,8). Podobienstwo liter nie wystarcza, gdy
+    # nazwy maja rozne liczby (poza rokiem zalozenia, ktory norm() tez pomija): „TP-47” != „TPV”.
+    _liczby = lambda x: {d for d in re.findall(r'\d+', str(x)) if len(d) != 4}
+    if m and not _sprzeczne(n, base[m[0]]) and _liczby(n) == _liczby(base[m[0]]): return w(base[m[0]], 2)
     return w(None, 0)
 
 

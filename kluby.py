@@ -212,6 +212,21 @@ SCAL_RECZNIE = {
     ('T1', 'Erzurum BB'): 'Erzurumspor',
     ('Turkiye | 1. Lig', 'Erzurumspor FK'): 'Erzurumspor',
     ('Turkiye | 1. Lig', 'Fatih Karagümrük'): 'Karagumruk',
+    # 07.10.2026 (paczka wieczorna, Raport 18:00): Serie D 2026/27 z Flashscore pod innym zapisem niz 2025/26 z 365scores.
+    # Sprawdzone na zewn/ 07.10: kazda para w tej samej grupie (region), nigdy ze soba nie grala, okresy rozlaczne
+    # (stary zapis do 12.2025, nowy od 09.2026), jedyna nazwa z tym rdzeniem w zrodlach. Siracusa: US Siracusa
+    # 17. w Serie C/C 2025/26 (strefa spadku), w Serie C 2026/27 jej nie ma, w Serie D/I gra „Siracusa”.
+    ('Italy | Serie D', 'Siracusa'): 'US Siracusa',
+    ('Italy | Serie D', 'Sanremese'): 'Sanremo',
+    ('Italy | Serie D', 'USD Casatese'): 'Casatese Merate',
+    ('Italy | Serie D', 'USD Ragusa'): 'Asd Ragusa Calcio',
+    ('Italy | Serie D', 'Union Clodiense'): 'ASD Clodiense',
+    ('Italy | Serie D', 'Ciserano-Bergamo'): 'Virtus Bergamo',   # Virtus Ciserano Bergamo (STS)
+    # Atletico Mineiro: 365scores pisze tak klub w Campeonato Mineiro (osobna liga w bazie, ostatni mecz 03.2026),
+    # w BRA ten sam klub to „Atletico-MG” — oferta trafiala w martwy wpis ze stanowej ligi.
+    ('Brazil | Mineiro', 'Atlético Mineiro'): 'Atletico-MG',
+    # TP-47 (FS, Kakkonen 2026: TP-47 - Vaajakoski 04.10) = „TP-47 Tornio” (365 i oferta STS, ten sam mecz 04.10).
+    ('Finland | Kakkonen', 'TP-47'): 'TP-47 Tornio',
 }
 
 # Nazwy (z danej ligi), ktore NIGDY nie moga zostac sklejone — rozne kluby, ktore automat bral za jeden,
@@ -229,16 +244,35 @@ NIE_SKLEJAJ = {
     'B2': [('Mechelen', 'KRC Mechelen'), ('KV Mechelen', 'KRC Mechelen')],   # KV Mechelen vs Racing Mechelen
     'B1': [('Lommel (1932-2003)', 'Lommel SK')],
     'Spain | Primera Division RFEF': [('UD Ourense', 'Ourense CF')],
-    'Spain | Segunda RFEF': [('UD Ourense', 'Ourense CF'), ('CD Ourense', 'Ourense CF')],   # UD Ourense (2014) i Ourense CF to dwa kluby
+    # 'Spain | Segunda RFEF': UD Ourense (2014) i Ourense CF to dwa kluby — wpis nizej (z parami z 07.10)
     'JAP2': [('Fc Osaka', 'Cerezo Osaka'), ('FC Osaka', 'Cerezo Osaka')],
     'IND': [('SC Delhi', 'Delhi Dynamos')],
+    # 07.10.2026 (paczka wieczorna): TP-47 (Tornio) i TPV (Tampere) to dwa kluby; norm() zdejmuje cyfry („tp”), a „tp”/„tpv”
+    # maja podobienstwo 0,8 — uzupelnij_ligi.match_one dopasowywal „TP-47” do „TPV”.
+    'Finland | Kakkonen': [('TP-47', 'TPV'), ('TP-47 Tornio', 'TPV')],
+    'Finland | Ykkonen': [('TP-47', 'TPV'), ('TP-47 Tornio', 'TPV')],
+    # rezerwy i pierwsza druzyna (ogolnie blokuje to teraz nazwy.znaczniki w match_one; tu jawnie, bo to para z raportu)
+    'Spain | Segunda RFEF': [('UD Ourense', 'Ourense CF'), ('CD Ourense', 'Ourense CF'),
+                             ('San Sebastian Reyes B', 'San Sebastian Reyes'), ('San Sebastian Reyes B', 'San Sebastian De Los Reyes')],
+    'Spain | Tercera RFEF - Group 7': [('San Sebastian Reyes B', 'San Sebastian Reyes'),
+                                       ('San Sebastian Reyes B', 'San Sebastian De Los Reyes')],
 }
-_ZAKAZ = {d: {frozenset(p) for p in l} for d, l in NIE_SKLEJAJ.items()}
+
+
+def _div_klucz(d):
+    # 07.10.2026: 365scores zapisuje „Segunda RFEF ” ze spacja na koncu; uzupelnij_ligi.canon() dostaje Division w takiej
+    # postaci (build_kb dopiero potem ja przycina), wiec wpisy „Spain | Segunda RFEF” w canon() NIE dzialaly.
+    return re.sub(r'\s+', ' ', str(d)).strip()
+
+
+_ZAKAZ = {}
+for _d, _l in NIE_SKLEJAJ.items():
+    _ZAKAZ.setdefault(_div_klucz(_d), set()).update(frozenset(p) for p in _l)
 
 
 def zakazane(div, a, b):
     """True, gdy a i b to na pewno rozne kluby (lista NIE_SKLEJAJ dla tej ligi)."""
-    return a != b and frozenset((a, b)) in _ZAKAZ.get(div, ())
+    return a != b and frozenset((a, b)) in _ZAKAZ.get(_div_klucz(div), ())
 
 
 # Wpisy z SCAL_RECZNIE dzialajace TYLKO w podanej lidze. Pozostale dzialaja w calym KRAJU tej ligi
