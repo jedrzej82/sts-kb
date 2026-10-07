@@ -314,10 +314,10 @@ def _bez_przedrostkow(nazwa):
 # sie w calosci zawierac w dluzszej, a nadmiarowe czlony dluzszej nie moga byc znacznikiem innej druzyny
 # (rezerwy, kobiety, mlodziez: „Real Madrid Castilla”, „Chelsea (K)”, „Barcelona B” to NIE pierwsze druzyny).
 # Wspolne musza byc co najmniej DWA czlony (rdzen + miasto): „Bohemians Praha” (Czechy) to nie „Bohemians”
-# (Dublin), a samo „Santa”/„Real”/„Inter” nie wskazuje klubu. Jedyny wyjatek: nazwa z oferty trafila juz w CALY
-# klub z innej ligi („Everton” = Everton, Premier League) — wtedy w lidze rywala wolno jej wskazac dluzsza nazwe
-# o tym samym rdzeniu („Everton De Vina”), patrz _kotwica_ligowa. Taki kandydat jest uzywany WYLACZNIE z kotwica
-# ligowa (rywal rozpoznany jednoznacznie, jedyny kandydat w jego lidze) — sam znajdz() go nie zwraca.
+# (Dublin), a samo „Santa”/„Real”/„Inter”/„Everton” nie wskazuje klubu. Taki kandydat jest uzywany WYLACZNIE
+# z kotwica ligowa w para_po_lidze (rywal rozpoznany jednoznacznie, jedyna para we wspolnej lidze) — sam znajdz()
+# go nie zwraca. Decyzja 07.10: NIE podmieniamy klubu trafionego pelna nazwa w innej lidze na klub z ligi rywala
+# („Universidad de Chile” – „Everton” zostaje meczem miedzyligowym) — mecze pucharowe i towarzyskie, bez zgadywania.
 _LACZNIKI = frozenset('de del la las los el da do dos das di y'.split())
 _ZNACZNIKI_INNEJ = frozenset('castilla atletic mestalla promesas reserves reserve reserva reservas res women woman '
                              'ladies femenino femenina feminino feminina femminile frauen dames damen kobiety youth '
@@ -330,11 +330,11 @@ def _rdzen(nazwa):
     return [x for x in _tok(str(nazwa).replace("'", '').replace('’', '')) if x not in _LACZNIKI and x not in _OGOLNE]
 
 
-def _rdzen_pasuje(a, b, min_wspolne=2):
-    """a — nazwa z oferty, b — nazwa z arkusza; min_wspolne=1 tylko z _kotwica_ligowa (a = krotsza)."""
+def _rdzen_pasuje(a, b):
+    """a — nazwa z oferty, b — nazwa z arkusza."""
     ta, tb = _rdzen(a), _rdzen(b)
     if not ta or not tb or ta[0] != tb[0] or len(ta[0]) < 4: return False
-    if min(len(ta), len(tb)) < min_wspolne or (len(tb) < 2 and len(ta) > len(tb)): return False
+    if min(len(ta), len(tb)) < 2: return False
     d, k = (ta, tb) if len(ta) >= len(tb) else (tb, ta)
     odp = list(d)
     for x in k:
@@ -358,22 +358,6 @@ def _jednoznaczny(W, wiersz):
     Arkusz bez team_id: jak dotad, nazwa wystarcza."""
     n = norm(wiersz['druzyna'])
     return len({str(w.get('team_id') or '').strip() for w in W if norm(w['druzyna']) == n} - {''}) <= 1
-
-
-def _kotwica_ligowa(W, wiersz_rywala, nazwa, wiersz0):
-    """07.10.2026 (Raport 27.09 21:00 nr 4): rywal rozpoznany jednoznacznie, a „nazwa” trafila (wiersz0) w druzyne
-    z INNEJ ligi. Gdy w lidze rywala jest dokladnie jeden kandydat o tym samym rdzeniu — on (to ten mecz);
-    kilku — 'NIEJEDNOZNACZNE'; zaden — None (zostaje wiersz0, jak dotad: mecz miedzyligowy / pucharowy)."""
-    if not _jednoznaczny(W, wiersz_rywala): return None
-    nr = norm(wiersz_rywala['druzyna'])
-    ligi_r = {w['liga'] for w in W if norm(w['druzyna']) == nr}
-    n0 = norm(wiersz0['druzyna'])
-    if any(w['liga'] in ligi_r for w in W if norm(w['druzyna']) == n0): return None   # jest wspolna liga
-    tr = [w for w in W if w['liga'] in ligi_r and norm(w['druzyna']) not in (nr, n0)
-          and _rdzen_pasuje(nazwa, w['druzyna'], min_wspolne=1)]
-    if not tr: return None
-    if len({norm(w['druzyna']) for w in tr}) > 1: return 'NIEJEDNOZNACZNE'
-    return max(tr, key=lambda w: f(w.get('mecze'), 0) or 0)
 
 
 def para_po_lidze(W, a, b):
@@ -411,22 +395,6 @@ def pilka(a, b):
     else:
         h0 = wymagaj(W, a)
         g0 = wymagaj(W, b)
-    # 07.10.2026 (Raport 27.09 21:00 nr 4): „Universidad de Chile” – „Everton” trafialo w Everton z Premier League.
-    # Gdy obie nazwy trafily w rozne ligi, a w lidze jednej strony jest dokladnie jeden kandydat o tym samym
-    # rdzeniu nazwy drugiej strony — bierzemy go; kilku kandydatow (albo kotwica w obie strony) — NIE ZNALEZIONO.
-    # Bez kandydata w lidze rywala — jak dotad (mecz miedzyligowy, P_sezon informacyjnie).
-    zm = []
-    for i, (rywal, nazwa, w0) in enumerate(((h0, b, g0), (g0, a, h0))):
-        k = _kotwica_ligowa(W, rywal, nazwa, w0)
-        if k is not None: zm.append((i, k))
-    if zm:
-        if len(zm) > 1 or zm[0][1] == 'NIEJEDNOZNACZNE':
-            raise SystemExit(f'NIE ZNALEZIONO: {a!r} – {b!r}: kilku kandydatow w lidze rywala — nie zgaduje')
-        i, k = zm[0]
-        print(f'  dopasowano po lidze rywala ({k["liga"]}): „{(b, a)[i]}” → „{k["druzyna"]}” '
-              f'(zamiast „{(g0, h0)[i]["druzyna"]}” z {(g0, h0)[i]["liga"]})')
-        if i == 0: g0 = k
-        else: h0 = k
     nh, ng = norm(h0['druzyna']), norm(g0['druzyna'])
     if nh == ng:
         raise SystemExit(f'NIE ZNALEZIONO: {a!r} i {b!r} wskazuja te sama druzyne ({h0["druzyna"]}) — pomijam')

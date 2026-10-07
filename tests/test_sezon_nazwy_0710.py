@@ -1,4 +1,4 @@
-"""sezon.py — dopasowanie nazw do arkuszy statystyk (07.10.2026).
+"""sezon.py — dopasowanie nazw do arkuszy statystyk (07.10.2026). Sam „Everton” zostaje meczem miedzyligowym (decyzja 07.10).
 Raport 24.09 21:00 nr 1: „Wang Xinyu” (STS) -> NIE ZNALEZIONO, arkusz tenisa ma „Xin-Yu Wang”.
 Raport 27.09 21:00 nr 4: „Universidad de Chile” – „Everton” trafialo w Everton z Premier League,
 a „Everton Vina del Mar” dawalo NIE ZNALEZIONO (arkusz: „Everton De Vina”, Primera CHI)."""
@@ -81,16 +81,15 @@ def test_everton_vina_del_mar_wspolny_rdzen_i_miasto(monkeypatch, capsys):
         _pilka(monkeypatch, capsys, 'Universidad de Chile', 'Everton Vina del Mar')
 
 
-def test_everton_z_ligi_gospodarza_zamiast_premier_league(monkeypatch, capsys):
-    # przed: „Everton” z Premier League + UWAGA o roznych ligach
-    assert 'Universidad de Chile – Everton De Vina  (Primera CHI' in \
-        _pilka(monkeypatch, capsys, 'Universidad de Chile', 'Everton')
-    assert "Everton De Vina – O'Higgins  (Primera CHI" in _pilka(monkeypatch, capsys, 'Everton', "O'Higgins")
-
-
-def test_kilku_kandydatow_w_lidze_gospodarza_brak_dopasowania(monkeypatch, capsys):
-    arkusz = PILKA + [_r('Everton Talcahuano', 'Primera CHI', '1260')]
-    assert _pilka(monkeypatch, capsys, 'Universidad de Chile', 'Everton', arkusz).startswith('EXIT NIE ZNALEZIONO')
+def test_sam_everton_zostaje_meczem_miedzyligowym(monkeypatch, capsys):
+    # decyzja 07.10: bez podmiany klubu trafionego pelna nazwa na klub z ligi rywala (puchary, towarzyskie)
+    for a, b, oczek in (('Universidad de Chile', 'Everton', 'Universidad de Chile – Everton  (Primera CHI'),
+                        ('Everton', "O'Higgins", "Everton – O'Higgins  (Premier League")):
+        monkeypatch.setattr(sezon, 'wczytaj', lambda sport, plik=None: PILKA)
+        sezon.pilka(a, b)
+        out = capsys.readouterr().out
+        assert 'UWAGA: drużyny w różnych ligach' in out and oczek in out
+    assert sezon.para_po_lidze(PILKA, 'Universidad de Chile', 'Everton') is None
 
 
 def test_bez_falszywych_dopasowan_po_rdzeniu(monkeypatch, capsys):
@@ -113,8 +112,8 @@ def test_rdzen_tylko_z_kotwica_nie_w_znajdz():
     # sam znajdz() bez rywala nie zgaduje — rdzen dziala wylacznie z kotwica ligowa
     assert sezon.znajdz(PILKA, 'Everton Vina del Mar')[0] is None
     assert sezon._rdzen_pasuje('Everton Vina del Mar', 'Everton De Vina')
-    assert not sezon._rdzen_pasuje('Everton', 'Everton De Vina')                 # jeden czlon — tylko z kotwica (b)
-    assert sezon._rdzen_pasuje('Everton', 'Everton De Vina', min_wspolne=1)
-    assert not sezon._rdzen_pasuje('Bohemians Praha', 'Bohemians', min_wspolne=1)
+    assert not sezon._rdzen_pasuje('Everton', 'Everton De Vina')                 # jeden wspolny czlon to za malo
+    assert not sezon._rdzen_pasuje('Bohemians Praha', 'Bohemians')
     assert not sezon._rdzen_pasuje('Real Madrid Castilla', 'Real Madrid')
-    assert not sezon._rdzen_pasuje('Chelsea (K)', 'Chelsea', min_wspolne=1)
+    assert not sezon._rdzen_pasuje('Chelsea (K)', 'Chelsea')
+    assert not sezon._rdzen_pasuje('Racing Club', 'Racing Santander')
