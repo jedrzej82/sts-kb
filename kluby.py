@@ -228,6 +228,9 @@ SCAL_RECZNIE = {
     # 07.10.2026 (Raport 21:00 usterka 2): „RB Bragantino” z Paulisty (ostatni mecz 02.2026) to ten sam klub co
     # „Bragantino” w BRA (Serie A) — oferta „RB Bragantino – Mirassol” trafiala w martwy wpis ze stanowej ligi.
     ('Brazil | Paulista', 'RB Bragantino'): 'Bragantino',
+    # 08.10.2026 (Raport 15:00 nr 3): Al-Okhdood (Nadzran) — 365 do 05.2025 „Al Okhdood SC”, od 08.2025 „Al-Akhdoud”
+    # (KSA, od 08.2026 First Division); nigdy nie grali ze soba. Oferta trafiala w martwy wpis (500 dni).
+    ('KSA', 'Al Okhdood SC'): 'Al-Akhdoud',
     # TP-47 (FS, Kakkonen 2026: TP-47 - Vaajakoski 04.10) = „TP-47 Tornio” (365 i oferta STS, ten sam mecz 04.10).
     ('Finland | Kakkonen', 'TP-47'): 'TP-47 Tornio',
 }

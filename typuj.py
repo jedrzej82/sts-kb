@@ -417,7 +417,8 @@ def _kraj_ligi(div):
 _KRAJ_KANON = {'turk': 'turkey', 'turkiye': 'turkey', 'turkey': 'turkey', 'saudi': 'saudiarabia',
                'saudiarabia': 'saudiarabia', 'czech': 'czechia', 'czechia': 'czechia', 'czechrepublic': 'czechia',
                'korea': 'southkorea', 'southkorea': 'southkorea', 'korearepublic': 'southkorea',
-               'usa': 'usa', 'unitedstates': 'usa', 'unitedstatesofamerica': 'usa'}
+               'usa': 'usa', 'unitedstates': 'usa', 'unitedstatesofamerica': 'usa',
+               'uae': 'uae', 'unitedarabemirates': 'uae'}   # 08.10.2026 (Raport 15:00 nr 2): baza „UAE | …”, 365 „United Arab Emirates”
 
 
 # nazwy "krajow" 365scores, ktore nie sa krajem (rozgrywki miedzynarodowe) — tu terminarz nie rozstrzyga
@@ -795,6 +796,12 @@ def _z_meczami(t, m, clubelo=None):
     if al and ((m.HomeTeam == al) | (m.AwayTeam == al)).any():
         print(f'  "{t}" nie ma meczow w bazie (tylko wpis clubelo) — uzyto "{al}" (kluby.py / aliasy).')
         return al
+    # 08.10.2026 (Raport 15:00 nr 4–5): „HJK Helsinki”, „Universitatea Cluj” — sam wpis clubelo (liga None, ROZNE LIGI BEZ
+    # ELO), a build_kb zapisal ten zapis w warianty_nazw jako nazwe zrodlowa klubu z meczami („HJK”, „U. Cluj”).
+    wr = _WARIANTY.get(norm(t))
+    if wr and wr != t and ((m.HomeTeam == wr) | (m.AwayTeam == wr)).any():
+        print(f'  "{t}" nie ma meczow w bazie (tylko wpis clubelo) — uzyto "{wr}" (warianty_nazw z build_kb).')
+        return wr
     try:
         from kluby import klucz
     except ImportError:

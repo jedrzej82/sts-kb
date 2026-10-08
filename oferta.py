@@ -35,9 +35,16 @@ _KURS = re.compile(r'\d+\.\d{2}')
 _DZIEN = re.compile(r'(\d{4}-\d{2}-\d{2})')
 
 
+# 08.10.2026 (Raport 08.10 12:00 i 15:00 nr 1): PDF pisze lacznik w nazwie jako U+2011 (twardy lacznik) — „Al‑Duhail SC”.
+# typuj.py sobie radzil, ale kursy3.py nie znajdowal meczu u Superbet/LVBET (inny znak = inny czlon). Laczniki
+# U+2010/U+2011/U+2012 i U+2043 -> zwykly „-”, miekki lacznik U+00AD usuwany. Myslniki – i — zostaja (rozdzielaja pary).
+_LACZNIKI = str.maketrans({'\u2010': '-', '\u2011': '-', '\u2012': '-', '\u2043': '-', '\u00ad': None})
+
+
 def _bialy(s):
-    """PDF ma w nazwach waska twarda spacje (U+202F) i podwojne spacje („Leicester City  U21”) — jedna zwykla spacja."""
-    return re.sub(r'\s+', ' ', str(s)).strip()
+    """PDF ma w nazwach waska twarda spacje (U+202F), podwojne spacje („Leicester City  U21”) i twarde laczniki (U+2011)
+    — jedna zwykla spacja i zwykly „-”."""
+    return re.sub(r'\s+', ' ', str(s).translate(_LACZNIKI)).strip()
 
 
 def _znaki(pdf):
