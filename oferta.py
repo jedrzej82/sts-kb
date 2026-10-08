@@ -156,6 +156,38 @@ _UCIETE = re.compile(r'\s*(?:\.\.\.|…)$')
 _JEDNA_DRUZYNA = re.compile(r'^(?:1\. połowa - )?([12])\. (?:drużyna|zawodnik)\b')
 
 
+def _scal_warianty_nazwy(d, ostrz=None):
+    """08.10.2026 (Raport 08.10 12:00 nr 11): STS rozbil mecz na dwa zdarzenia o tej samej godzinie — „Port FC – Persib
+    Bandung” (tylko 1X2) i „Thai Port FC – Persib Bandung” (reszta rynkow). Scalamy, gdy: ten sam dzien, godzina i sport,
+    jedna strona IDENTYCZNA, a czlony drugiej w calosci zawieraja sie w czlonach drugiej nazwy — i to jedyna taka para.
+    Zostaje dluzsza nazwa (wiecej informacji)."""
+    pelne = d[~d.zdarzenie.str.contains(_UCIETE) & d.gosc.astype(str).ne('') & d.gospodarz.astype(str).ne('')]
+    czl = lambda n: set(re.findall(r'\w+', str(n).lower()))
+    zm = {}
+    for k, g in pelne.drop_duplicates(['data_meczu', 'godzina_meczu', 'sport', 'zdarzenie']).groupby(
+            ['data_meczu', 'godzina_meczu', 'sport']):
+        ev = list(zip(g.zdarzenie, g.gospodarz, g.gosc))
+        for i, a in enumerate(ev):
+            for b in ev[i + 1:]:
+                for s_, o in ((1, 2), (2, 1)):
+                    if a[s_] != b[s_] or a[o] == b[o]: continue
+                    ka, kb = czl(a[o]), czl(b[o])
+                    if not ka or not kb or not (ka < kb or kb < ka): continue
+                    krotki, dlugi = (a, b) if len(ka) < len(kb) else (b, a)
+                    if len(czl(krotki[o])) == 1 and len(next(iter(czl(krotki[o])))) < 4: continue   # „FC”, „AS” — za malo
+                    if (k, krotki[0]) in zm and zm[(k, krotki[0])] != dlugi: zm[(k, krotki[0])] = None; continue
+                    zm[(k, krotki[0])] = dlugi
+    zm = {kk: v for kk, v in zm.items() if v is not None}
+    if not zm: return d
+    d = d.copy()
+    for (k, zd), (nzd, ng, na) in zm.items():
+        w = (d.data_meczu == k[0]) & (d.godzina_meczu == k[1]) & (d.sport == k[2]) & (d.zdarzenie == zd)
+        d.loc[w, ['zdarzenie', 'gospodarz', 'gosc']] = [nzd, ng, na]
+    if ostrz is not None:
+        ostrz.append('scalono warianty nazwy jednego meczu: ' + ', '.join(f'{zd} -> {v[0]}' for (_, zd), v in list(zm.items())[:5]))
+    return d
+
+
 def scal_zdarzenia(d, ostrz=None):
     """06.10.2026 (Raport 12:00 usterka 5): ten sam mecz jako kilka „zdarzen”:
       - nazwa ucieta w PDF przy dlugim tytule rynku: „Cedevita Olimpija Lublana - Hapoel Jeroz...”,
@@ -193,6 +225,7 @@ def scal_zdarzenia(d, ostrz=None):
         d.loc[jest, 'zdarzenie'] = [x[0] for x in nowe if x]
         d.loc[jest, 'gospodarz'] = [x[1] for x in nowe if x]
         d.loc[jest, 'gosc'] = [x[2] for x in nowe if x]
+    d = _scal_warianty_nazwy(d, ostrz)
     if ostrz is not None and nie:
         uc = sorted({zd for zd, _, _ in nie if _UCIETE.search(zd)})
         if uc: ostrz.append(f'nazwa ucieta w PDF bez jednoznacznej pelnej nazwy (zostaje osobno): {", ".join(uc[:5])}')

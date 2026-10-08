@@ -43,3 +43,29 @@ def test_wpis_clubelo_bez_meczow_przez_warianty_nazw(monkeypatch):
     assert typuj._z_meczami('Universitatea Cluj', m) == 'U. Cluj'
     assert typuj._z_meczami('CFR Cluj', m) == 'CFR Cluj'           # ma mecze — bez zmian
     assert typuj._z_meczami('Inny Klub', m) == 'Inny Klub'         # cel bez meczow — bez zmian
+
+
+def test_terminarz_krotkie_czlony_al_ain():
+    # Raport 08.10 12:00 nr 2: „Al-Ain FC” -> Al-Ain (KSA); terminarz „Al Ain – Kalba” (UAE) nie byl znajdowany,
+    # bo „al”, „ain” < 4 litery — korekta kraju z terminarza nie startowala (ROZNE KRAJE, noga MNIEJ)
+    import terminarz
+    assert terminarz.pasuje('Al-Ain FC', 'Al Ain')
+    assert not terminarz.pasuje('Al Ain', 'Al Ahly') and not terminarz.pasuje('FC', 'FC')
+    t = pd.DataFrame([dict(data='2026-10-08', sport='football', kraj='UAE', turniej='League Cup', gosp='Al Ain', gosc='Kalba')])
+    assert terminarz.znajdz('Al-Ain FC', 'Al-Ittihad Kalba', t)['kraj'] == 'UAE'
+
+
+def test_oferta_mecz_rozbity_na_warianty_nazwy():
+    # Raport 08.10 12:00 nr 11: PDF 11:30 „Port FC – Persib Bandung” (1X2) i „Thai Port FC – Persib Bandung” (reszta)
+    r = lambda zd, g, a, sek, godz='14:00': dict(data_meczu='2026-10-08', godzina_meczu=godz, sport='PIŁKA NOŻNA',
+                                                 zdarzenie=zd, gospodarz=g, gosc=a, sekcja=sek)
+    d = pd.DataFrame([r('Port FC - Persib Bandung', 'Port FC', 'Persib Bandung', '1X2'),
+                      r('Thai Port FC - Persib Bandung', 'Thai Port FC', 'Persib Bandung', 'Liczba goli'),
+                      r('Lion City - Buriram', 'Lion City', 'Buriram', '1X2'),          # inny rywal — bez zmian
+                      r('Lion City Sailors - Johor', 'Lion City Sailors', 'Johor', '1X2'),
+                      r('Port FC - Persib Bandung', 'Port FC', 'Persib Bandung', 'BTTS', godz='16:00')])   # inna godzina
+    o = []
+    w = oferta.scal_zdarzenia(d, o)
+    assert list(w.zdarzenie[:2]) == ['Thai Port FC - Persib Bandung'] * 2
+    assert list(w.zdarzenie[2:]) == ['Lion City - Buriram', 'Lion City Sailors - Johor', 'Port FC - Persib Bandung']
+    assert any('scalono warianty nazwy' in x for x in o)
