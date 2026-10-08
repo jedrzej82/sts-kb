@@ -137,9 +137,31 @@ def kod_ako(rynek, sport='', gosp='', gosc=''):
     return s
 
 
+# 08.10.2026 (Raport 07.10 21:00 nr 4): STS „CRB Maceió” / Superbet „CRB AL”, a LVBET pelna nazwa „Clube De Regatas Brasil”
+# — zaden wspolny czlon, mecz „nie znaleziono”. Skrot = pierwsze litery czlonow pelnej nazwy (min. 3 czlony znaczace,
+# bez „de/do/da…”); dziala obok dopasowania czlonow, para dalej musi sie zgadzac godzina i druga druzyna.
+_SLOWA_LACZACE = frozenset('de do da dos das del della di la le el los las the of y e i'.split())
+
+
+def _inicjaly(n):
+    t = [x for x in re.split(r'[^a-z0-9]+', _pisownia(str(n).lower())) if x]
+    znacz = [x for x in t if x not in _SLOWA_LACZACE]
+    return {''.join(w[0] for w in v) for v in (znacz, t) if len(v) >= 3}
+
+
+def _skrot(a, b):
+    """Czy nazwa a to skrot z pierwszych liter nazwy b („CRB” = „Clube De Regatas Brasil”): skrot (min. 3 litery) plus
+    najwyzej jeden czlon (miasto/stan: „CRB Maceió”, „CRB AL”). Dluzsza nazwa to klub ze skrotem formy prawnej —
+    „WKS Śląsk Wrocław” nie jest „Wybrzeże Kości Słoniowej”."""
+    ini = _inicjaly(b)
+    t = [x for x in re.split(r'[^a-z0-9]+', _pisownia(str(a).lower())) if x]
+    return bool(ini) and len(t) <= 2 and any(len(x) >= 3 and x in ini for x in t)
+
+
 def _podobne(a, b):
     import dopasuj
-    return dopasuj.podobne(_rdzen(a), _rdzen(b))
+    ra, rb = _rdzen(a), _rdzen(b)
+    return dopasuj.podobne(ra, rb) or _skrot(ra, rb) or _skrot(rb, ra)
 
 
 # 06.10.2026: czlony, ktore nie odrozniaja klubow (dopasuj.OGOLNE ich nie ma — tam sluza do nauki aliasow). Przez nie
@@ -156,7 +178,7 @@ def _wyrazne(a, b):
         for y in dopasuj.tokeny(_rdzen(b)):
             k, d = (x, y) if len(x) <= len(y) else (y, x)
             if len(k) >= 3 and d.startswith(k) and k not in GENERYCZNE and d not in GENERYCZNE: return True
-    return False
+    return _skrot(_rdzen(a), _rdzen(b)) or _skrot(_rdzen(b), _rdzen(a))
 
 
 def wczytaj_bukmacherow(pliki):
