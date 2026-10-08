@@ -32,7 +32,7 @@ def test_al_okhdood_i_vps_vassa():
     assert kluby.SCAL_RECZNIE[('KSA', 'Al Okhdood SC')] == 'Al-Akhdoud'
     a = pd.read_csv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'aliasy.csv'), dtype=str)
     t = a[a.modul == 'typuj']
-    assert set(t[t.nazwa.isin(['Al-Okhdood FC', 'VPS Vassa'])].cel) == {'Al-Akhdoud', 'VPS'}
+    assert set(t[t.nazwa.isin(['Al-Okhdood FC', 'VPS Vassa', 'Renaissance Zemamra'])].cel) == {'Al-Akhdoud', 'VPS', 'CR Khemis Zemamra'}
 
 
 def test_wpis_clubelo_bez_meczow_przez_warianty_nazw(monkeypatch):
