@@ -54,6 +54,9 @@ def pasuje(oferta, zrodlo):
     if znaczniki(oferta) != znaczniki(zrodlo): return False
     a, b = _czlony(oferta), _czlony(zrodlo)
     if not a or not b: return False
+    # 08.10.2026 (Raport 12:00 nr 2): „Al-Ain FC” / „Al Ain” — same krotkie czlony (al, ain); identyczny zestaw czlonow
+    # (min. 5 liter razem) to ta sama nazwa
+    if a == b and len(''.join(a)) >= 5: return True
     if not {x for x in a & b if len(x) >= 4}: return False
     return a <= b or b <= a
 

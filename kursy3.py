@@ -23,6 +23,12 @@ import pandas as pd
 import nazwy
 
 TOLERANCJA_MIN = 5
+# 08.10.2026 (Raport 21:00 nr 2): LVBET podaje NHL/NBA z godzina wznowienia (01:07, 01:15), STS i Superbet pelna godzine —
+# „Carolina Hurricanes – Vancouver Canucks” bez pary przy 5 min. Pliki z telefonu 07.10 20:33 i 08.10 20:38 (Superbet -> LVBET):
+# 15 min w tych sportach = +6 / +10 par (same mecze NHL/NBA), zadna para nie znika ani nie zmienia sie, 0 niejednoznacznych.
+# Pilka zostaje przy 5 min (test_znaczniki_musza_sie_zgadzac_i_godzina_5_min).
+SPORTY_USA = frozenset({'HOKEJ NA LODZIE', 'HOKEJ', 'KOSZYKÓWKA', 'BASEBALL', 'FUTBOL AMERYKAŃSKI'})
+TOLERANCJA_USA_MIN = 15
 # 06.10.2026: w sportach indywidualnych STS podaje godzine orientacyjna (kolejny mecz na korcie): „Kraus – Bartunkova”
 # STS 11:40, LVBET 12:00; „Bhosale/Micic” STS 09:00, Superbet 14:00 — 138 meczow LVBET bez pary. Tu: caly dzien (8 h),
 # ale oba nazwiska wyrazne, ta sama liczba zawodnikow (singiel/debel) i jedna para. Inicjal „B” to nie rezerwy.
@@ -213,7 +219,8 @@ def dopasuj_mecze(sts, buk):
         g = po_dniu.get((r.sport, r.data_meczu))
         if g is None: stat['brak'] += 1; continue
         indyw = str(r.sport).upper() in INDYWIDUALNE
-        c = g[(g.t - r.t).abs() <= (TOLERANCJA_INDYW_MIN if indyw else TOLERANCJA_MIN)]
+        tol = TOLERANCJA_INDYW_MIN if indyw else TOLERANCJA_USA_MIN if str(r.sport).upper() in SPORTY_USA else TOLERANCJA_MIN
+        c = g[(g.t - r.t).abs() <= tol]
         if indyw:
             debel = lambda n: '/' in str(n)
             c = [x for x in c.itertuples(index=False)

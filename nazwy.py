@@ -13,7 +13,10 @@ import re
 
 LITERY = str.maketrans({'ł': 'l', 'Ł': 'L', 'đ': 'd', 'Đ': 'D', 'ø': 'o', 'Ø': 'O', 'ß': 'ss',
                         'æ': 'ae', 'Æ': 'AE', 'œ': 'oe', 'Œ': 'OE', 'þ': 'th', 'Þ': 'TH',
-                        'ð': 'd', 'Ð': 'D', 'ı': 'i', 'ŋ': 'n', 'ħ': 'h', 'ŧ': 't'})
+                        'ð': 'd', 'Ð': 'D', 'ı': 'i', 'ŋ': 'n', 'ħ': 'h', 'ŧ': 't',
+                        # 08.10.2026 (Raport 15:00 nr 1): twarde/typograficzne laczniki z PDF STS („Al‑Duhail”, U+2011)
+                        # to zwykly „-” — inaczej ascii-ignore sklejal „Al‑Duhail” w jeden czlon „alduhail”
+                        '\u2010': '-', '\u2011': '-', '\u2012': '-', '\u2043': '-', '\u00ad': None})
 
 # 29.09.2026 (faza 3): dopisane "talang" (szwedzkie druzyny akademii — raport 25.09 12:00: "Hammarby Talang"
 # dopasowane do pierwszej druzyny Hammarby), "jong" (holenderskie drugie zespoly: Jong Ajax, Jong PSV)

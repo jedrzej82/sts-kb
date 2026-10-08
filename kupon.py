@@ -177,6 +177,7 @@ def main(argv):
     ap.add_argument('--wydane-dzis', type=float, default=0); ap.add_argument('--kupony-dzis', type=int, default=0)
     ap.add_argument('--wydane-lacznie', type=float, default=0)
     ap.add_argument('--k5-dzis', type=float, default=0, help='suma stawek K5 postawionych dzis we wczesniejszych przebiegach (limit 8 zl, 6.7)')
+    ap.add_argument('--stawka-kd', type=float, default=5.0, help='stala stawka KUPONU DNIA (decyzja uzytkownika 08.10)')
     a = ap.parse_args(argv)
     if a.depozyt is None or a.depozyt <= 0:
         sys.exit('BLAD: podaj --depozyt (aktualny stan konta z Bilansu/POPRAWEK) — bez niego stawki Kelly bylyby z nieaktualnej kwoty')
@@ -210,6 +211,51 @@ def main(argv):
     print('\n' + '\n'.join(linie_pilka(wsz, a, wydane, kupony)))
     print('\n' + '\n'.join(linie_bonus(wsz)))
     print('\n' + '\n'.join(linie_niski(wsz)))
+    print('\n' + '\n'.join(linie_dnia(wsz, a.stawka_kd)))
+
+
+# 08.10.2026 (decyzja uzytkownika: „codziennie musze miec jeden kupon AKO, ktory wejdzie”): KUPON DNIA — 2 nogi pilkarskie
+# z roznych meczow o NAJWYZSZEJ lacznej szansie, przy kursie lacznym >= 1,15 (wygrana po podatku 12% wieksza od stawki).
+# Rozliczenia 28.09–06.10 (dwie najpewniejsze nogi dnia): weszlo 8 z 9 dni, srednie P 75%, kurs 1,29. Pojedyncze nogi
+# P 0,85–0,90 trafialy 83% (n=42) — stad korekta 3 pp na noge. EV jest UJEMNE (marza + podatek): to kupon „dla przyjemnosci”,
+# stala mala stawka z budzetu 300 zl (CZESC A bez zmian), nie zalecenie zarobkowe.
+DNIA_NOGI = 2
+DNIA_MIN_P = 0.80          # P nogi po korekcie
+DNIA_KOREKTA = 0.03
+DNIA_MIN_KURS = 1.15       # 1,15 x 0,88 = 1,012 — wygrany kupon zwraca wiecej niz stawke
+
+
+def kupon_dnia(wsz):
+    """Para nog pilkarskich (rozne mecze, bez szacunkow, bez polskich klubow, marza <= 110%) o najwyzszym iloczynie P po
+    korekcie, z kursem lacznym >= DNIA_MIN_KURS. None, gdy takiej pary nie ma."""
+    import itertools
+    x = wsz[(wsz.sport.astype(str).str.lower().isin(['pilka', 'piłka', ''])) & (wsz.szacunek.astype(int) == 0)
+            & (wsz.polski == 0) & (wsz.marza <= 1.10)]
+    x = x.assign(pk=x.p - DNIA_KOREKTA)
+    x = x[x.pk >= DNIA_MIN_P].sort_values('pk', ascending=False).drop_duplicates('mecz').head(15)
+    best = None
+    for c in itertools.combinations(x.index, DNIA_NOGI):
+        k = float(x.loc[list(c), 'kurs'].prod())
+        if k < DNIA_MIN_KURS: continue
+        p = float(x.loc[list(c), 'pk'].prod())
+        if best is None or p > best['p'] or (p == best['p'] and k > best['kurs']):
+            best = dict(nogi=list(c), p=p, kurs=k, ev=p * k * TAX - 1)
+    return best
+
+
+def linie_dnia(wsz, stawka=5.0):
+    o = kupon_dnia(wsz)
+    if o is None:
+        return [f'KUPON DNIA ({DNIA_NOGI} nogi, P nogi >= {DNIA_MIN_P:.0%} po korekcie −{DNIA_KOREKTA * 100:.0f} pp, kurs >= '
+                f'{DNIA_MIN_KURS:.2f}): brak w tym przebiegu — za malo pewnych nog pilkarskich']
+    out = [f'KUPON DNIA: szansa {o["p"]:.0%} (po korekcie −{DNIA_KOREKTA * 100:.0f} pp/noga) | kurs {o["kurs"]:.2f} | '
+           f'stawka {stawka:.0f} zl -> wygrana na reke {stawka * o["kurs"] * TAX:.2f} zl | EV {o["ev"]:+.1%}']
+    for i in o['nogi']:
+        r = wsz.loc[i]
+        out.append(f'   {r.mecz} | {r.rynek} | P {r.p - DNIA_KOREKTA:.1%} | kurs {r.kurs:.2f}')
+    out.append(f'   → decyzja uzytkownika 08.10: codziennie jeden — stala stawka {stawka:.0f} zl z budzetu 300 zl, tag KD; '
+               f'srednio na minusie (EV {o["ev"]:+.0%}), szansa, ze NIE wejdzie: {1 - o["p"]:.0%}')
+    return out
 
 
 # 07.10.2026 (prosba uzytkownika): AKO NISKI KURS — 6–10 nog pilkarskich o wysokim P na jednym kuponie. Backtest 219 dni
