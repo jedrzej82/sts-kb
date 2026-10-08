@@ -231,6 +231,13 @@ SCAL_RECZNIE = {
     # 08.10.2026 (Raport 15:00 nr 3): Al-Okhdood (Nadzran) — 365 do 05.2025 „Al Okhdood SC”, od 08.2025 „Al-Akhdoud”
     # (KSA, od 08.2026 First Division); nigdy nie grali ze soba. Oferta trafiala w martwy wpis (500 dni).
     ('KSA', 'Al Okhdood SC'): 'Al-Akhdoud',
+    # 08.10.2026 (Raport 21:00 nr 1): klub z Serie A pod inna nazwa w lidze stanowej / Serie B (365) — oferta trafiala
+    # w wpis stanowy (235 dni, ROZNE LIGI BEZ ELO). Audyt lig stanowych BRA 08.10: tylko te pary to ten sam klub.
+    ('Brazil | Paranaense', 'Athletico Paranaense'): 'Athletico-PR',
+    ('BRA2', 'Ath Paranaense'): 'Athletico-PR',
+    ('Brazil | Carioca', 'Botafogo'): 'Botafogo RJ',
+    ('Brazil | Carioca', 'Flamengo'): 'Flamengo RJ',
+    ('Brazil | Carioca', 'Vasco da Gama'): 'Vasco',
     # TP-47 (FS, Kakkonen 2026: TP-47 - Vaajakoski 04.10) = „TP-47 Tornio” (365 i oferta STS, ten sam mecz 04.10).
     ('Finland | Kakkonen', 'TP-47'): 'TP-47 Tornio',
 }
@@ -288,7 +295,8 @@ SCAL_TYLKO_LIGA = {('B2', 'Lommel'), ('B1', 'Lommel', '<2004-07-01'), ('B1', 'Lo
                    ('Argentina | Primera Nacional', 'Colon'), ('BOL', 'San Antonio'), ('AUS', 'Adelaide'),
                    ('AUS', 'Brisbane'), ('AUS', 'Newcastle'), ('Portugal | Liga Portugal 2', 'Viseu'),
                    ('PAR', 'San Lorenzo'), ('B1', 'Beveren', '<2010-07-01'), ('T1', 'Erzurumspor', '<2010-07-01'),
-                   ('Ecuador | Serie B', 'Vinotinto', '2026-01-01')}
+                   ('Ecuador | Serie B', 'Vinotinto', '2026-01-01'),
+                   ('Brazil | Carioca', 'Botafogo'), ('Brazil | Carioca', 'Flamengo'), ('Brazil | Carioca', 'Vasco da Gama')}   # 08.10: „Botafogo” to tez PB/SP
 # Wpis z trzecim elementem: 'RRRR-MM-DD' = tylko mecze OD tej daty, '<RRRR-MM-DD' = tylko mecze PRZED ta data.
 
 # Nazwa wspolna dla klubow z roznych krajow: ktory kraj zostaje przy nazwie BEZ przyrostka. Stala lista,

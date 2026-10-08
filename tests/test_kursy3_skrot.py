@@ -7,8 +7,8 @@ import pandas as pd
 import kursy3
 
 
-def _z(*pary, t=90):
-    return pd.DataFrame([dict(sport='PIŁKA NOŻNA', data_meczu='2026-10-08', godzina_meczu='01:30', gospodarz=g, gosc=a, t=t)
+def _z(*pary, t=90, sport='PIŁKA NOŻNA'):
+    return pd.DataFrame([dict(sport=sport, data_meczu='2026-10-08', godzina_meczu='01:30', gospodarz=g, gosc=a, t=t)
                          for g, a in pary])
 
 
@@ -28,3 +28,14 @@ def test_skrot_tylko_z_pierwszych_liter_calej_nazwy():
     # sam skrot nie wystarcza: druga druzyna musi sie zgadzac
     wyn, st = kursy3.dopasuj_mecze(_z(('CRB AL', 'Atletico GO')), _z(('Clube De Regatas Brasil', 'Sport Recife')))
     assert not wyn and st['brak'] == 1
+
+
+def test_nhl_lvbet_godzina_wznowienia():
+    # Raport 08.10 21:00 nr 2: STS/Superbet 01:00, LVBET 01:07 — ta sama para, rozne minuty
+    h = 'HOKEJ NA LODZIE'
+    sts = _z(('Carolina Hurricanes', 'Vancouver Canucks'), t=60, sport=h)
+    wyn, st = kursy3.dopasuj_mecze(sts, _z(('Carolina Hurricanes', 'Vancouver Canucks'), t=67, sport=h))
+    assert len(wyn) == 1 and st['jednoznaczne'] == 1
+    assert not kursy3.dopasuj_mecze(sts, _z(('Carolina Hurricanes', 'Vancouver Canucks'), t=100, sport=h))[0]   # 40 min — nie
+    # pilka dalej 5 min
+    assert not kursy3.dopasuj_mecze(_z(('Legia', 'Lech'), t=60), _z(('Legia', 'Lech'), t=67))[0]
