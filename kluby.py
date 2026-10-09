@@ -238,6 +238,10 @@ SCAL_RECZNIE = {
     ('Brazil | Carioca', 'Botafogo'): 'Botafogo RJ',
     ('Brazil | Carioca', 'Flamengo'): 'Flamengo RJ',
     ('Brazil | Carioca', 'Vasco da Gama'): 'Vasco',
+    # 09.10.2026 (Raport 12:00 nr 2): ten sam klub pod stara nazwa (NIESWIEZA, 146–1966 dni); nigdy nie grali ze soba.
+    ('D3', 'Bayern Munich II'): 'Bayern München II',
+    ('DEN', 'Hvidovre IF'): 'Hvidovre',
+    ('Romania | Liga 2', 'Sepsi'): 'Sepsi Sf. Gheorghe',
     # TP-47 (FS, Kakkonen 2026: TP-47 - Vaajakoski 04.10) = „TP-47 Tornio” (365 i oferta STS, ten sam mecz 04.10).
     ('Finland | Kakkonen', 'TP-47'): 'TP-47 Tornio',
 }
