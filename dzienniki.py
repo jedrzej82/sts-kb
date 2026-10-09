@@ -276,6 +276,17 @@ def _data_meczu(r):
     return pd.Timestamp(m.group(1) if m else r['data'])
 
 
+def _dzien_zrodla(r):
+    """Dzien meczu w kalendarzu zrodel wynikow (UTC: 365 i Flashscore, terminarze maja godzina_utc). Raport 09.10 21:00
+    nr 1: „mecz 2026-10-07 01:30” to czas polski = 06.10 23:30 UTC — Toros del Valle – Sabios de Manizales jest
+    w wynikach pod 06.10; dzien z uwagi (07.10) nie mial meczu, a w oknie +-1 dnia byl tez rewanz z 08.10 -> KILKA_MECZOW.
+    Bez godziny w uwadze — data jak dotad."""
+    m = re.search(r'mecz\s+(\d{4}-\d{2}-\d{2})\s+(\d{1,2}:\d{2})', str(r.get('uwaga', '')))
+    if not m: return _data_meczu(r)
+    t = pd.Timestamp(f'{m.group(1)} {m.group(2)}').tz_localize('Europe/Warsaw', ambiguous=True, nonexistent='shift_forward')
+    return t.tz_convert('UTC').tz_localize(None).normalize()
+
+
 def _szukaj(w, d0, gosp, gosc, rozwiaz, kol_h='h', kol_a='a'):
     """Mecz z okna +-1 dnia, obie nazwy dopasowane jednoznacznie. Zwraca (wiersz, odwrocone) albo (None, powod)."""
     okno = w[(w.d >= d0 - pd.Timedelta(days=1)) & (w.d <= d0 + pd.Timedelta(days=1))]
@@ -482,7 +493,7 @@ def _rozlicz_noge(r, W):
     sport = str(r.get('sport', '')).lower()
     gosp, gosc = _para(r['zdarzenie'])
     if not gosp: return 'BRAK WYNIKU', '', 'zdarzenie bez „A - B”'
-    d0 = _data_meczu(r)
+    d0 = _dzien_zrodla(r)
     rynek = str(r['rynek']).strip()
     if sport in ('pilka', 'piłka', 'piłka nożna', 'football', ''):
         # 01.10.2026: przebieg zapisuje w uwadze „dopasowanie po terminarzu -> X” (typuj._kraj_z_terminarza) — ta sama
