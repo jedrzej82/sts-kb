@@ -1211,6 +1211,16 @@ def rozlicz_typy(L, W=None):
     return L
 
 
+def linia_dopuszczona(fav, draws, p_k, n, klucz=None, kursy=None):
+    """Linia WERDYKT dla nogi dopuszczonej. Raport 09.10 18:00 nr 2: z podanym kursem tego rynku (--kurs Z1/Z2 albo 1/2)
+    EV liczy kod — dotad raport liczyl je recznie tym samym wzorem P × kurs × 0,88 − 1."""
+    k_ = (kursy or {}).get(klucz) if klucz else None
+    return (f'WERDYKT: NOGA DOPUSZCZONA — {fav}' + (' (z dogrywka)' if draws else '')
+            + f', P do kuponu {p_k:.1%}' + (' (SZACUNEK: < 10 meczow)' if n < 10 else '')
+            + (f' | kurs {klucz} {k_:.2f} | EV {p_k * k_ * 0.88 - 1:+.1%} (P × kurs × 0,88 − 1)' if k_ else
+               '; EV licz z TEGO P: P × kurs × 0,88 − 1'))
+
+
 def main(a):
     a = list(a)
     if a and a[0] in ('wynik', 'typ') and len(a) > 2: a[2] = nazwa_sportu(a[2])
@@ -1342,7 +1352,7 @@ def main(a):
         #     03.10 na 11 nogach hokeja i recznej STS mial w ofercie WYLACZNIE 1/X/2, a doslowne
         #     zastosowanie werdyktu dawalo EV +24,9% / +9,1% / +9,0% zamiast +3,2% / -9,8% / -10,0%.
         # (b) rozbieznosc z rynkiem > 15 pp (03.10: Vitoria SC - FC Porto 42,0% vs 5,7% = 36,3 pp).
-        pow_rynek = None
+        pow_rynek = None; klucz = None
         if not powody and kursy_cli:
             strona = '1' if fav == h else '2'
             if draws and not any(k in kursy_cli for k in ('Z1', 'Z2')) and any(k in kursy_cli for k in ('1', 'X', '2')):
@@ -1355,9 +1365,7 @@ def main(a):
         if powody or pow_rynek:
             print(f'\nWERDYKT: NIE NA KUPON — {"; ".join(powody) if powody else pow_rynek}')
         else:
-            print(f'\nWERDYKT: NOGA DOPUSZCZONA — {fav}' + (' (z dogrywka)' if draws else '')
-                  + f', P do kuponu {p_k:.1%}' + (' (SZACUNEK: < 10 meczow)' if n < 10 else '')
-                  + '; EV licz z TEGO P: P × kurs × 0,88 − 1')
+            print('\n' + linia_dopuszczona(fav, draws, p_k, n, klucz, kursy_cli))
     elif a[0] == 'typ':
         from clv import dopisz_typ   # opcjonalnie KURS_TYPU [PIENIADZE] na koncu (P56.3, CLV)
         # 07.10.2026 (Raport 15:00 nr 5): „1”/„2” w sporty_typy znaczy zwyciezca Z DOGRYWKA (_rynek_typu -> Z1/Z2), ale w ako_log
