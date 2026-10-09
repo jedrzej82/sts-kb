@@ -174,6 +174,10 @@ def _scal_warianty_nazwy(d, ostrz=None):
                     ka, kb = czl(a[o]), czl(b[o])
                     if not ka or not kb or not (ka < kb or kb < ka): continue
                     krotki, dlugi = (a, b) if len(ka) < len(kb) else (b, a)
+                    # 09.10.2026 (Raport 12:00 nr 5): „Corona Brasov - Fehervar Hockey Akademia 19” — kurs 19.0 wklejony
+                    # w nazwe przez PDF. Nadmiarowe czlony to same liczby = smiec, nie dluzsza nazwa: zostaje KROTSZA.
+                    if all(x.isdigit() for x in czl(dlugi[o]) - czl(krotki[o])):
+                        krotki, dlugi = dlugi, krotki
                     if len(czl(krotki[o])) == 1 and len(next(iter(czl(krotki[o])))) < 4: continue   # „FC”, „AS” — za malo
                     if (k, krotki[0]) in zm and zm[(k, krotki[0])] != dlugi: zm[(k, krotki[0])] = None; continue
                     zm[(k, krotki[0])] = dlugi
