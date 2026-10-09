@@ -55,6 +55,7 @@ def _zn(n):
     """Znaczniki nazwy; None = nieznane (nazwa ucieta w PDF — znacznik mogl byc w ucietej czesci)."""
     ob, n = _obciete(n)
     if ob: return None
+    n = CALE_NAZWY.get(_pisownia(str(n).strip().lower()), n)
     return nazwy.znaczniki(re.sub(r'\((?:Wom|Women)\)', '(W)', str(n), flags=re.I))
 
 
@@ -68,7 +69,10 @@ def _zn_rowne(a, b):
 PISOWNIA = {'konga': 'kongo', 'pilzno': 'plzen', 'pilsen': 'plzen', 'munchen': 'munich', 'muenchen': 'munich', 'chernigiv': 'chernihiv',
             'kobenhavn': 'copenhagen', 'koebenhavn': 'copenhagen'}
 # cala nazwa (nie czlon — „WKS Slask” to klub): 03.10 Superbet „WKS - Kamerun”, STS „Wybrzeże Kości Słoniowej - Kamerun”
-CALE_NAZWY = {'wks': 'wybrzeze kosci sloniowej', 'zea': 'zjednoczone emiraty arabskie'}   # 06.10: Superbet „ZEA”
+CALE_NAZWY = {'wks': 'wybrzeze kosci sloniowej', 'zea': 'zjednoczone emiraty arabskie',   # 06.10: Superbet „ZEA”
+              # Raport 09.10 18:00 nr 3: LVBET „RSCA Futures - KAS Eupen” = STS „RSC Anderlecht U23 - KAS Eupen” (druzyna U23
+              # Anderlechtu gra w Challenger Pro League pod marka „RSCA Futures”); znacznik U23 tez z tej nazwy (_zn)
+              'rsca futures': 'rsc anderlecht u23'}
 
 
 def _pisownia(slowo):
@@ -334,6 +338,10 @@ def _arg(a, nazwa, dom=None):
     return a[a.index(nazwa) + 1] if nazwa in a else dom
 
 
+def _dopasowane(st):
+    for b, s in st.items(): print(f'{b}: mecze STS dopasowane {s["jednoznaczne"]}, brak {s["brak"]}, niejednoznaczne {s["kilka"]}')
+
+
 def main(a):
     if not a or a[0] not in ('porownaj', 'kupon'): sys.exit(__doc__)
     sts = pd.read_csv(a[1], dtype=str, keep_default_na=False)
@@ -341,7 +349,7 @@ def main(a):
     pliki = [p for x in a[2:] if not x.startswith('--') and x not in wartosci for p in sorted(glob.glob(x))]
     tab, st = tabela(sts, wczytaj_bukmacherow(pliki))
     if a[0] == 'porownaj':
-        for b, s in st.items(): print(f'{b}: mecze STS dopasowane {s["jednoznaczne"]}, brak {s["brak"]}, niejednoznaczne {s["kilka"]}')
+        _dopasowane(st)
         for b in [c for c in ('SUPERBET', 'LVBET') if c in tab]:
             r = (tab[b] / tab.STS).dropna()
             print(f'{b}: kursow {len(r)}, lepszy niz STS {int((r > 1.001).sum())}, mediana {r.median():.3f}, '
@@ -355,6 +363,7 @@ def main(a):
     pob = sorted({f'{m.group(1)} {m.group(2)}:{m.group(3)}'
                   for p in pliki for m in [re.search(r'(\d{4}-\d\d-\d\d)_(\d\d)-(\d\d)', p)] if m})
     print('kursy SUPERBET/LVBET: ' + (f'pobrane {pob[-1]}' if pob else 'BRAK pliku z telefonu — wszystkie kupony u STS'))
+    _dopasowane(st)   # Raport 09.10 18:00 nr 4 (P157.4): raport bierze te liczby z trybu kupon — dotad wypisywal je tylko porownaj
     for (tag, nr), k in ako.groupby(['tag', 'nr_kuponu'], sort=False):
         out, laczne = kupon(tab, list(zip(k.zdarzenie, k.rynek, k.kurs, k.sport if 'sport' in k else [''] * len(k))))
         print(f'{tag}#{nr} {gdzie_grac(out, laczne)}')

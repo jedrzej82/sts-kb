@@ -752,7 +752,10 @@ def _kraj_z_terminarza(home, away, h, a, kh, ka, pool, m, mt=None):
             return None
     if not mt: return None
     kt = norm(mt['kraj'])
-    if not kt or kt in _KRAJE_OGOLNE or _kanon_kraju(kt) not in _kraje_znane(): return None
+    # Raport 09.10 21:00 nr 3: bez warunku „kraj z _kraje_znane()” — lista bierze kraje z SOFA_DIV, a ligi Flashscore
+    # („Honduras | Liga Nacional”) maja kraj tylko w nazwie; „Platense FC” (Honduras) zostawal przy Platense (ARG).
+    # _w_kraju i tak szuka WYLACZNIE wsrod klubow, ktorych ostatnia liga jest z kraju meczu (brak takich -> None).
+    if not kt or kt in _KRAJE_OGOLNE: return None
     nowe = [h, a]
     for i, (n, t_, k, zt) in enumerate(((home, h, kh, mt['gosp']), (away, a, ka, mt['gosc']))):
         if t_ is not None and (not k or _ten_sam_kraj(k, kt)): continue   # kraj nieznany nie przeczy terminarzowi

@@ -25,6 +25,10 @@ TAX = 0.88
 FAZY = {1: {'A': 5, 'B': 3, 'C': 2}, 2: {'A': 8, 'B': 5, 'C': 2}, 3: {'A': 8, 'B': 5, 'C': 2}}
 LIMIT_DZIEN_ZL, LIMIT_DZIEN_KUPONY, BUDZET = 10, 3, 300
 MAKS_NOG_KANDYDATOW = 25
+# Raport 09.10 18:00 nr 1: 25 nog o najwyzszym P to byly same O0.5/U4.5 @1,01–1,10 — 3 takie nogi nie siegaja 1,50, wiec
+# AKO PILKA DNIA / BONUS / MIX dawaly „brak” przy 201 nogach. Dla kuponow z dolnym progiem kursu czesc puli (10 z 25)
+# to nogi o najwyzszym P sposrod tych, ktore moga ten prog osiagnac (kurs >= prog^(1/maks. nog)).
+MAKS_NOG_KURSOWYCH = 10
 PILKA_KURS = (1.50, 2.00)  # 06.10.2026 (uzytkownik): codziennie jeden najpewniejszy AKO z pilki noznej w tym zakresie
 BONUS_KURS = (1.75, 2.20)  # 06.10.2026 (uzytkownik): obrot bonusem LVBET — 3 AKO pod rzad, kazdy kurs >= 1,75; podatek pominiety
 MIX_MIN_KURS = 1.50        # ponizej wyplata po podatku < 1,32 x stawki — „mix” bez sensu   # najlepsze wg P — kombinacje 4 z 25 to 12 650, liczy sie w sekundy
@@ -63,8 +67,13 @@ def wczytaj(plik):
     return d[(d.p > 0) & (d.kurs > 1)].reset_index(drop=True)
 
 
-def _kombinacje(d, nmin, nmax):
-    idx = list(d.sort_values('p', ascending=False).index[:MAKS_NOG_KANDYDATOW])
+def _kombinacje(d, nmin, nmax, kurs_cel=None):
+    wg_p = d.sort_values('p', ascending=False)
+    if kurs_cel is None:
+        idx = list(wg_p.index[:MAKS_NOG_KANDYDATOW])
+    else:
+        idx = list(wg_p.index[:MAKS_NOG_KANDYDATOW - MAKS_NOG_KURSOWYCH])
+        idx += [i for i in wg_p[wg_p.kurs >= kurs_cel ** (1 / nmax)].index if i not in idx][:MAKS_NOG_KURSOWYCH]
     for n in range(nmin, nmax + 1):
         for c in itertools.combinations(idx, n):
             if len({d.at[i, 'mecz'] for i in c}) == n:   # kazda noga z innego meczu (A5)
@@ -114,7 +123,7 @@ def najlepszy(d, rodzaj):
         # 02.10.2026 (decyzja uzytkownika): „najpewniejszy mix” — kupon o NAJWYZSZYM lacznym P (2-4 nogi z roznych
         # meczow, kurs laczny >= MIX_MIN_KURS, maks. 1 szacunek); przy rownym P — wiecej sportow, potem wyzsze EV.
         # TYLKO INFORMACYJNIE: najwyzsze P to zwykle EV < 0 (podatek 12%), stawke ustala CZESC A, nie ten kupon.
-        for c in _kombinacje(d, 2, 4):
+        for c in _kombinacje(d, 2, 4, MIX_MIN_KURS):
             o = _opis(d, c)
             if o['kurs'] >= MIX_MIN_KURS and o['szacunki'] <= 1:
                 o['sporty'] = d.loc[list(c), 'sport'].nunique(); kand.append(o)
@@ -124,7 +133,7 @@ def najlepszy(d, rodzaj):
         # Liczy sie WYLACZNIE szansa wejscia (EV i podatek nieistotne: grane srodki bonusowe). Kurs tuz nad progiem =
         # najwyzsze P, wiec gorna granica 2,20 tylko odcina kupony bez sensu.
         dd = d[d.sport.astype(str).str.lower().isin(['', 'pilka', 'piłka', 'pilka nozna', 'piłka nożna'])]
-        for c in _kombinacje(dd, 2, 3):
+        for c in _kombinacje(dd, 2, 3, BONUS_KURS[0]):
             o = _opis(dd, c)
             if BONUS_KURS[0] <= o['kurs'] <= BONUS_KURS[1] and o['szacunki'] == 0: kand.append(o)
         kand.sort(key=lambda o: (-round(o['p'], 4), o['kurs']))
@@ -134,7 +143,7 @@ def najlepszy(d, rodzaj):
         # z roznych meczow, NAJWYZSZE laczne P. Nogi: wszystkie, ktore przeszly bramki typuj.py (takze EV <= 0).
         # Stawka i tak wg CZESCI A (EV <= 0 -> tylko papierowy/bonus) — kupon wybiera najpewniejszy, nie oplacalny.
         dd = d[d.sport.astype(str).str.lower().isin(['', 'pilka', 'piłka', 'pilka nozna', 'piłka nożna'])]
-        for c in _kombinacje(dd, 2, 3):
+        for c in _kombinacje(dd, 2, 3, PILKA_KURS[0]):
             o = _opis(dd, c)
             if PILKA_KURS[0] <= o['kurs'] <= PILKA_KURS[1] and o['szacunki'] <= 1: kand.append(o)
         klucz = lambda o: (round(o['p'], 4), -o['szacunki'], o['ev'])
