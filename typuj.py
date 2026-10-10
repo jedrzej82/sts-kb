@@ -826,6 +826,25 @@ def _z_meczami(t, m, clubelo=None):
             if len(kand) == 1:
                 print(f'  "{t}" nie ma meczow w bazie (drugi wpis clubelo) — uzyto "{kand[0]}" (ten sam kraj, mecze w bazie).')
                 return kand[0]
+            # 10.10.2026 (Raport 15:00 nr 1): „Ilves Tampere”, „Honka Espoo”, „TPS Turku” — sam wpis clubelo, a mecze sa pod
+            # „Ilves”/„Honka”/„TPS”, ktorych w clubelo nie ma. Ta sama regula (poczatek nazwy, jeden kandydat), ale kandydaci
+            # to kluby z meczami, ktorych OSTATNIA liga jest z kraju wpisu clubelo (kluby.ELO_KRAJ), mecz w ostatnich 2 latach.
+            try:
+                from kluby import ELO_KRAJ
+            except ImportError:
+                ELO_KRAJ = {}
+            kraj = ELO_KRAJ.get(str(kr.iloc[-1]))
+            if kraj and 'Division' in m:
+                ost = pd.concat([m[['MatchDate', 'HomeTeam', 'Division']].rename(columns={'HomeTeam': 'n'}),
+                                 m[['MatchDate', 'AwayTeam', 'Division']].rename(columns={'AwayTeam': 'n'})])
+                ost = ost[ost.n.map(lambda c: c != t and 0 < len(_tokeny(c)) < len(tt) and tt[:len(_tokeny(c))] == _tokeny(c))]
+                ost = ost.sort_values('MatchDate').groupby('n').agg(Division=('Division', 'last'), d=('MatchDate', 'max'))
+                od = pd.to_datetime(m.MatchDate).max() - pd.Timedelta(days=730)
+                kand = sorted(n for n, r in ost.iterrows()
+                              if pd.Timestamp(r.d) >= od and _ten_sam_kraj(_kraj_ligi(r.Division) or '', kraj))
+                if len(kand) == 1:
+                    print(f'  "{t}" nie ma meczow w bazie (tylko wpis clubelo) — uzyto "{kand[0]}" (ten sam kraj ligi, mecze w bazie).')
+                    return kand[0]
     return t
 
 

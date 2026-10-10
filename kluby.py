@@ -245,6 +245,22 @@ SCAL_RECZNIE = {
     # 09.10.2026 (Raport 21:00 nr 2): Omiya Ardija (JAP, xgabora 2012–2018) = RB Omiya Ardija (JAP2, extra — od 2025 nazwa
     # z „RB”, zrodlo pisze ja wstecz od 2015); lata sie nie nakladaja (2016–17 J1, reszta J2) — NIESWIEZA 2875 dni.
     ('JAP', 'Omiya Ardija'): 'RB Omiya Ardija',
+    # 10.10.2026 (Raport 12:00 nr 5): ten sam klub, sezony sie nie nakladaja — KV Kortrijk (B2 2025/26 + baraz 05.2024)
+    # = Kortrijk (B1 do 05.2025 i od 08.2026); Polonia Warsawa (POL2, literowka zrodla extra, od 2025) = Polonia Warszawa (POL 2012/13).
+    ('B2', 'KV Kortrijk'): 'Kortrijk',
+    # 10.10.2026 (Raport 18:00 nr 1): Holandia — zrodlo Eerste Divisie (N2) i football-data (N1) pisza ten sam klub inaczej;
+    # pelne nazwy z oferty („NEC Nijmegen”, „Fortuna Sittard”) trafialy w stary zapis N2 bez wspolnej ligi z rywalem.
+    ('N2', 'NEC Nijmegen'): 'Nijmegen',
+    ('N2', 'Fortuna Sittard'): 'For Sittard',
+    ('N2', 'ADO Den Haag'): 'Den Haag',
+    ('N2', 'De Graafschap'): 'Graafschap',
+    ('N2', 'FC Volendam'): 'Volendam',
+    ('N2', 'RKC Waalwijk'): 'Waalwijk',
+    ('N2', 'Go Ahead Eag'): 'Go Ahead Eagles',
+    ('N2', "Sparta R'dam"): 'Sparta Rotterdam',
+    ('N2', 'Roda JC Kerkrade'): 'Roda',
+    ('N1', 'Roda JC'): 'Roda',   # nazwa wynikowa = zapis clubelo
+    ('POL2', 'Polonia Warsawa'): 'Polonia Warszawa',
     # TP-47 (FS, Kakkonen 2026: TP-47 - Vaajakoski 04.10) = „TP-47 Tornio” (365 i oferta STS, ten sam mecz 04.10).
     ('Finland | Kakkonen', 'TP-47'): 'TP-47 Tornio',
 }
@@ -346,6 +362,14 @@ def klucz(x):
 PRZYROSTEK = re.compile(r'^(.*) \[([a-z]+)\]$')
 
 
+# 10.10.2026 (Raport 15:00 nr 2): kanadyjskie kluby MLS graja w lidze USA (MLS) i w Pucharze Kanady — to jeden klub, nie
+# dwa. rozdziel_kraje dawal „Toronto FC [canada]”, „Vancouver Whitecaps [canada]”, a Puchar pisze „CF Montréal”
+# (MLS: „CF Montreal”) — typuj: „NAZWA WSPOLNA DLA KLUBOW Z ROZNYCH KRAJOW”. Zapis -> nazwa w MLS; tylko w tych krajach.
+KLUBY_DWOCH_KRAJOW = {'CF Montréal': 'CF Montreal', 'CF Montreal': 'CF Montreal', 'Toronto FC': 'Toronto FC',
+                      'Vancouver Whitecaps': 'Vancouver Whitecaps'}
+KRAJE_DWOCH_KRAJOW = frozenset({'usa', 'canada'})
+
+
 def rozdziel_kraje(allm, kraj_ligi, elo_kraj=None):
     """Nazwa uzywana w ligach z ROZNYCH krajow = rozne kluby. Nazwe bez przyrostka zachowuje: kraj z clubelo
     (elo_kraj: nazwa -> kod kraju clubelo), potem kraj z KRAJ_NAZWY, na koncu grupa z najwieksza liczba
@@ -354,6 +378,9 @@ def rozdziel_kraje(allm, kraj_ligi, elo_kraj=None):
     import pandas as pd
     elo_kraj = elo_kraj or {}
     kr = {d: kraj_ligi(d) for d in allm.Division.dropna().unique()}
+    w2 = allm.Division.map(kr).isin(KRAJE_DWOCH_KRAJOW)
+    for c in ('HomeTeam', 'AwayTeam'):
+        allm.loc[w2, c] = allm.loc[w2, c].map(lambda n: KLUBY_DWOCH_KRAJOW.get(n, n))
     t = pd.concat([allm[['Division', 'HomeTeam']].rename(columns={'HomeTeam': 'n'}),
                    allm[['Division', 'AwayTeam']].rename(columns={'AwayTeam': 'n'})])
     t['k'] = t.Division.map(kr)
@@ -364,6 +391,7 @@ def rozdziel_kraje(allm, kraj_ligi, elo_kraj=None):
     mapa, opis = {}, []
     for n in wiele:
         g = ile.loc[n].sort_values(ascending=False, kind='stable')
+        if n in KLUBY_DWOCH_KRAJOW.values() and set(g.index) <= KRAJE_DWOCH_KRAJOW: continue
         glowny = ELO_KRAJ.get(elo_kraj.get(n, ''), None)
         if glowny not in g.index: glowny = KRAJ_NAZWY.get(n)
         if glowny not in g.index: glowny = g.index[0]

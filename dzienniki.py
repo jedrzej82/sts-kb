@@ -536,6 +536,16 @@ def _rozlicz_noge(r, W):
         if not pary: return 'BRAK WYNIKU', '', f'{"/".join(sorted(H))} - {"/".join(sorted(G))}: brak meczu w oknie +-1 dnia (i 8 dni wstecz)'
         if len(pary) > 1: return 'BRAK WYNIKU', '', f'kilka pasujacych meczow ({len(pary)}) — nie zgadujemy'
         if wstecz > 1 and x.w.nunique() > 1: return 'BRAK WYNIKU', '', 'ta para grala w oknie kilka razy z roznym zwyciezca — nie zgadujemy'
+        if wstecz > 1:
+            # Raport 10.10 12:00 nr 1: Medvedev – Struff (Szanghaj, 10.10) rozliczony meczem z Pekinu 03.10 (6-4 6-3) — okno
+            # 8 dni wstecz jest dla dat POCZATKU turnieju (wszystkie mecze turnieju z ta sama data). Gdy ktorys z graczy ma
+            # w danych POZNIEJSZY mecz przed dniem zakladu (Medvedev: cwiercfinal 04.10), znaleziony mecz to stary turniej.
+            dm = x.d.max()
+            gracze = set(x.w) | set(x.l)
+            pozn = t[(t.d > dm) & (t.d < d0) & (t.w.isin(gracze) | t.l.isin(gracze))]
+            if len(pozn):
+                return 'BRAK WYNIKU', '', (f'mecz tej pary z {dm:%Y-%m-%d} to wczesniejszy turniej (pozniej, '
+                                           f'{pozn.d.max():%Y-%m-%d}, grali jeszcze inne mecze) — wyniku z dnia meczu brak')
         h = x.iloc[-1].w if x.iloc[-1].w in H else x.iloc[-1].l
         g = x.iloc[-1].l if h == x.iloc[-1].w else x.iloc[-1].w
         if len(H) > 1 or len(G) > 1: _OSTRZEZENIA.append(f'tenis: {gosp} - {gosc} = {h} - {g} (jedyna pasujaca para, sprawdz)')

@@ -120,7 +120,11 @@ SCAL_SPORTY = {('hokej', 'Zemgale'): 'HK Zemgale/Jlss', ('hokej', 'Troja/Ljungby
                ('piłka ręczna', 'Din. Bucuresti'): 'Dinamo Bucuresti', ('hokej', 'Czech Republic W'): 'Czechia (W)',
                # 07.10.2026 (Raport 06.10 21:00, zdarzenia.py CONFLICT Harem Spor – Fenerbahce Koleji): TBL, do 05.2026
                # „Fenerbahce Koleji”, od 09.2026 zrodlo pisze „Fenerbahce 2” — ta sama liga, okresy rozlaczne
-               ('koszykówka', 'Fenerbahce Koleji'): 'Fenerbahce 2'}
+               ('koszykówka', 'Fenerbahce Koleji'): 'Fenerbahce 2',
+               # 10.10.2026 (Raport 18:00 nr 3): „Cayirova” (TBL do 04.2026) = „Çayırova Belediyespor” (Super Ligi od 09.2026, awans)
+               ('koszykówka', 'Cayirova'): 'Çayırova Belediyespor',
+               # tenze raport: sponsor w nazwie — „Talenet Giants Antwerp” (BNXT do 06.2026) = „Windrose Giants Antwerp” (od 10.2026)
+               ('koszykówka', 'Talenet Giants Antwerp'): 'Windrose Giants Antwerp'}
 
 
 def scal_recznie(d):
