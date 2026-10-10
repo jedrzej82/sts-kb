@@ -248,6 +248,18 @@ SCAL_RECZNIE = {
     # 10.10.2026 (Raport 12:00 nr 5): ten sam klub, sezony sie nie nakladaja — KV Kortrijk (B2 2025/26 + baraz 05.2024)
     # = Kortrijk (B1 do 05.2025 i od 08.2026); Polonia Warsawa (POL2, literowka zrodla extra, od 2025) = Polonia Warszawa (POL 2012/13).
     ('B2', 'KV Kortrijk'): 'Kortrijk',
+    # 10.10.2026 (Raport 18:00 nr 1): Holandia — zrodlo Eerste Divisie (N2) i football-data (N1) pisza ten sam klub inaczej;
+    # pelne nazwy z oferty („NEC Nijmegen”, „Fortuna Sittard”) trafialy w stary zapis N2 bez wspolnej ligi z rywalem.
+    ('N2', 'NEC Nijmegen'): 'Nijmegen',
+    ('N2', 'Fortuna Sittard'): 'For Sittard',
+    ('N2', 'ADO Den Haag'): 'Den Haag',
+    ('N2', 'De Graafschap'): 'Graafschap',
+    ('N2', 'FC Volendam'): 'Volendam',
+    ('N2', 'RKC Waalwijk'): 'Waalwijk',
+    ('N2', 'Go Ahead Eag'): 'Go Ahead Eagles',
+    ('N2', "Sparta R'dam"): 'Sparta Rotterdam',
+    ('N2', 'Roda JC Kerkrade'): 'Roda',
+    ('N1', 'Roda JC'): 'Roda',   # nazwa wynikowa = zapis clubelo
     ('POL2', 'Polonia Warsawa'): 'Polonia Warszawa',
     # TP-47 (FS, Kakkonen 2026: TP-47 - Vaajakoski 04.10) = „TP-47 Tornio” (365 i oferta STS, ten sam mecz 04.10).
     ('Finland | Kakkonen', 'TP-47'): 'TP-47 Tornio',

@@ -540,3 +540,7 @@ typuj,Żalgiris Wilno,FK Zalgiris,"Raport 10.10 12:00 nr 6: ten sam klub w bazie
 typuj,Nomme Kalju,Kalju Nomme,"Raport 10.10 12:00 nr 6: ten sam klub w bazie pod innym zapisem (jedyny kandydat w lidze)",2026-10-10
 typuj,Harju Laagri,Harju Jalgpallikool,"Raport 10.10 12:00 nr 6: ten sam klub w bazie pod innym zapisem (jedyny kandydat w lidze)",2026-10-10
 typuj,FC Krasnodar,Krasnodar,"Raport 10.10 15:00 nr 1 (klasa): sam wpis clubelo bez meczow, mecze pod Krasnodar (RUS)",2026-10-10
+sporty,Kortrijk Spurs,Kortrijk Sport,"Raport 10.10 18:00 nr 3: BNXT; w bazie Kortrijk Sport",2026-10-10
+sporty,Landstede Hammers,Zwolle Landstede,"Raport 10.10 18:00 nr 3: BNXT; w bazie Zwolle Landstede",2026-10-10
+sporty,Cayirova Belediyesi,Çayırova Belediyespor,"Raport 10.10 18:00 nr 3: Super Ligi TUR; kolizja z Cayirova (TBL) — ten sam klub, SCAL_SPORTY",2026-10-10
+sporty,Antwerp Giants,Windrose Giants Antwerp,"Raport 10.10 18:00 nr 3: BNXT; nazwa sponsora zmienia sie co sezon (Talenet -> Windrose)",2026-10-10
