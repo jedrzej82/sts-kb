@@ -101,5 +101,5 @@ def test_kupon_wypisuje_liczby_dopasowan(tmp_path, capsys):
     kursy3.main(['kupon', str(p_sts), str(tmp_path / 'kursy_bukmacherow_*.csv.gz'), '--ako', str(p_ako), '--data', '2026-10-09'])
     out = capsys.readouterr().out.splitlines()
     assert out[0] == 'kursy SUPERBET/LVBET: pobrane 2026-10-09 17:49'
-    assert out[1] == 'LVBET: mecze STS dopasowane 1, brak 0, niejednoznaczne 0'
+    assert out[1] == 'LVBET: mecze STS dopasowane 1, brak 0, niejednoznaczne 0 (100% dopasowanych)'
     assert out[2].startswith('AKON-1800#1 GRAJ U:')

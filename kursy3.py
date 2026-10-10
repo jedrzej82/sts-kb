@@ -339,7 +339,12 @@ def _arg(a, nazwa, dom=None):
 
 
 def _dopasowane(st):
-    for b, s in st.items(): print(f'{b}: mecze STS dopasowane {s["jednoznaczne"]}, brak {s["brak"]}, niejednoznaczne {s["kilka"]}')
+    # Raport 10.10 18:00 nr 4 i 21:00 nr 1: liczba par spada wieczorem razem z oferta STS (236 -> 80 zdarzen), wiec prog
+    # „spadek par > 20%” (P157.4) alarmowal bez awarii. Odsetek dopasowanych nie zalezy od wielkosci oferty — to on do porownan.
+    for b, s in st.items():
+        n = s['jednoznaczne'] + s['brak'] + s['kilka']
+        print(f'{b}: mecze STS dopasowane {s["jednoznaczne"]}, brak {s["brak"]}, niejednoznaczne {s["kilka"]}'
+              + (f' ({s["jednoznaczne"] / n:.0%} dopasowanych)' if n else ''))
 
 
 def main(a):
