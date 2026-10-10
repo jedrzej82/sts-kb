@@ -350,6 +350,14 @@ def klucz(x):
 PRZYROSTEK = re.compile(r'^(.*) \[([a-z]+)\]$')
 
 
+# 10.10.2026 (Raport 15:00 nr 2): kanadyjskie kluby MLS graja w lidze USA (MLS) i w Pucharze Kanady — to jeden klub, nie
+# dwa. rozdziel_kraje dawal „Toronto FC [canada]”, „Vancouver Whitecaps [canada]”, a Puchar pisze „CF Montréal”
+# (MLS: „CF Montreal”) — typuj: „NAZWA WSPOLNA DLA KLUBOW Z ROZNYCH KRAJOW”. Zapis -> nazwa w MLS; tylko w tych krajach.
+KLUBY_DWOCH_KRAJOW = {'CF Montréal': 'CF Montreal', 'CF Montreal': 'CF Montreal', 'Toronto FC': 'Toronto FC',
+                      'Vancouver Whitecaps': 'Vancouver Whitecaps'}
+KRAJE_DWOCH_KRAJOW = frozenset({'usa', 'canada'})
+
+
 def rozdziel_kraje(allm, kraj_ligi, elo_kraj=None):
     """Nazwa uzywana w ligach z ROZNYCH krajow = rozne kluby. Nazwe bez przyrostka zachowuje: kraj z clubelo
     (elo_kraj: nazwa -> kod kraju clubelo), potem kraj z KRAJ_NAZWY, na koncu grupa z najwieksza liczba
@@ -358,6 +366,9 @@ def rozdziel_kraje(allm, kraj_ligi, elo_kraj=None):
     import pandas as pd
     elo_kraj = elo_kraj or {}
     kr = {d: kraj_ligi(d) for d in allm.Division.dropna().unique()}
+    w2 = allm.Division.map(kr).isin(KRAJE_DWOCH_KRAJOW)
+    for c in ('HomeTeam', 'AwayTeam'):
+        allm.loc[w2, c] = allm.loc[w2, c].map(lambda n: KLUBY_DWOCH_KRAJOW.get(n, n))
     t = pd.concat([allm[['Division', 'HomeTeam']].rename(columns={'HomeTeam': 'n'}),
                    allm[['Division', 'AwayTeam']].rename(columns={'AwayTeam': 'n'})])
     t['k'] = t.Division.map(kr)
@@ -368,6 +379,7 @@ def rozdziel_kraje(allm, kraj_ligi, elo_kraj=None):
     mapa, opis = {}, []
     for n in wiele:
         g = ile.loc[n].sort_values(ascending=False, kind='stable')
+        if n in KLUBY_DWOCH_KRAJOW.values() and set(g.index) <= KRAJE_DWOCH_KRAJOW: continue
         glowny = ELO_KRAJ.get(elo_kraj.get(n, ''), None)
         if glowny not in g.index: glowny = KRAJ_NAZWY.get(n)
         if glowny not in g.index: glowny = g.index[0]
