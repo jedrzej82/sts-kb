@@ -245,6 +245,10 @@ SCAL_RECZNIE = {
     # 09.10.2026 (Raport 21:00 nr 2): Omiya Ardija (JAP, xgabora 2012–2018) = RB Omiya Ardija (JAP2, extra — od 2025 nazwa
     # z „RB”, zrodlo pisze ja wstecz od 2015); lata sie nie nakladaja (2016–17 J1, reszta J2) — NIESWIEZA 2875 dni.
     ('JAP', 'Omiya Ardija'): 'RB Omiya Ardija',
+    # 10.10.2026 (Raport 12:00 nr 5): ten sam klub, sezony sie nie nakladaja — KV Kortrijk (B2 2025/26 + baraz 05.2024)
+    # = Kortrijk (B1 do 05.2025 i od 08.2026); Polonia Warsawa (POL2, literowka zrodla extra, od 2025) = Polonia Warszawa (POL 2012/13).
+    ('B2', 'KV Kortrijk'): 'Kortrijk',
+    ('POL2', 'Polonia Warsawa'): 'Polonia Warszawa',
     # TP-47 (FS, Kakkonen 2026: TP-47 - Vaajakoski 04.10) = „TP-47 Tornio” (365 i oferta STS, ten sam mecz 04.10).
     ('Finland | Kakkonen', 'TP-47'): 'TP-47 Tornio',
 }

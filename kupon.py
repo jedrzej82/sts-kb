@@ -241,14 +241,18 @@ def kupon_dnia(wsz):
     x = wsz[(wsz.sport.astype(str).str.lower().isin(['pilka', 'piłka', ''])) & (wsz.szacunek.astype(int) == 0)
             & (wsz.polski == 0) & (wsz.marza <= 1.10)]
     x = x.assign(pk=x.p - DNIA_KOREKTA)
-    x = x[x.pk >= DNIA_MIN_P].sort_values('pk', ascending=False).drop_duplicates('mecz').head(15)
+    # Raport 10.10 12:00 nr 3: dawniej .drop_duplicates('mecz').head(15) — 15 meczow z noga o najwyzszym P (same O0.5
+    # @1,01–1,04), wiec para nie siegala 1,15 przy 58 nogach >= 83%. Wszystkie nogi z progu: 2 z 60 = ok. 1,8 tys. par.
+    x = x[x.pk >= DNIA_MIN_P].sort_values('pk', ascending=False)
     best = None
-    for c in itertools.combinations(x.index, DNIA_NOGI):
-        k = float(x.loc[list(c), 'kurs'].prod())
+    idx, mecz, kurs, pk = list(x.index), list(x.mecz), list(x.kurs.astype(float)), list(x.pk.astype(float))
+    for c in itertools.combinations(range(len(idx)), DNIA_NOGI):
+        if len({mecz[i] for i in c}) < DNIA_NOGI: continue   # kazda noga z innego meczu
+        k = math.prod(kurs[i] for i in c)
         if k < DNIA_MIN_KURS: continue
-        p = float(x.loc[list(c), 'pk'].prod())
+        p = math.prod(pk[i] for i in c)
         if best is None or p > best['p'] or (p == best['p'] and k > best['kurs']):
-            best = dict(nogi=list(c), p=p, kurs=k, ev=p * k * TAX - 1)
+            best = dict(nogi=[idx[i] for i in c], p=p, kurs=k, ev=p * k * TAX - 1)
     return best
 
 
