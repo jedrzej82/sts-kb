@@ -28,3 +28,10 @@ def test_literowka_nie_scala_innych_par():
     assert set(oferta._scal_warianty_nazwy(_d(w), []).zdarzenie) == {'Olympiacos Pireus - Panathinaikos Ateny',
                                                                      'Olympiakos Pireus - Panathinaikos Ateny',
                                                                      'Olympiakos Pireus - Aris Saloniki'}
+
+
+def test_alias_saint_louis_city():
+    # Raport 11.10 21:00 nr 2: „Saint Louis City SC” -> Saint Louis (USL 2017–20, inny klub); w bazie MLS: St. Louis City
+    import os
+    a = pd.read_csv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'aliasy.csv'), dtype=str)
+    assert {(r.modul, r.nazwa): r.cel for r in a.itertuples()}[('typuj', 'Saint Louis City SC')] == 'St. Louis City'
