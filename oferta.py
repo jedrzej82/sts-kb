@@ -156,6 +156,18 @@ _UCIETE = re.compile(r'\s*(?:\.\.\.|…)$')
 _JEDNA_DRUZYNA = re.compile(r'^(?:1\. połowa - )?([12])\. (?:drużyna|zawodnik)\b')
 
 
+def _literowka(ka, kb):
+    """Zbiory czlonow rowne poza JEDNA para czlonow (min. 5 liter, ta sama dlugosc +-1), ktore roznia sie jedna litera
+    (zamiana, wstawienie albo usuniecie): „olympiacos”/„olympiakos”."""
+    ra, rb = ka - kb, kb - ka
+    if len(ra) != 1 or len(rb) != 1: return False
+    x, y = next(iter(ra)), next(iter(rb))
+    if min(len(x), len(y)) < 5 or abs(len(x) - len(y)) > 1: return False
+    if len(x) == len(y): return sum(p != q for p, q in zip(x, y)) == 1
+    k, d = (x, y) if len(x) < len(y) else (y, x)
+    return any(d[:i] + d[i + 1:] == k for i in range(len(d)))
+
+
 def _scal_warianty_nazwy(d, ostrz=None):
     """08.10.2026 (Raport 08.10 12:00 nr 11): STS rozbil mecz na dwa zdarzenia o tej samej godzinie — „Port FC – Persib
     Bandung” (tylko 1X2) i „Thai Port FC – Persib Bandung” (reszta rynkow). Scalamy, gdy: ten sam dzien, godzina i sport,
@@ -163,6 +175,7 @@ def _scal_warianty_nazwy(d, ostrz=None):
     Zostaje dluzsza nazwa (wiecej informacji)."""
     pelne = d[~d.zdarzenie.str.contains(_UCIETE) & d.gosc.astype(str).ne('') & d.gospodarz.astype(str).ne('')]
     czl = lambda n: set(re.findall(r'\w+', str(n).lower()))
+    ile = pelne.groupby('zdarzenie').size()
     zm = {}
     for k, g in pelne.drop_duplicates(['data_meczu', 'godzina_meczu', 'sport', 'zdarzenie']).groupby(
             ['data_meczu', 'godzina_meczu', 'sport']):
@@ -172,8 +185,13 @@ def _scal_warianty_nazwy(d, ostrz=None):
                 for s_, o in ((1, 2), (2, 1)):
                     if a[s_] != b[s_] or a[o] == b[o]: continue
                     ka, kb = czl(a[o]), czl(b[o])
-                    if not ka or not kb or not (ka < kb or kb < ka): continue
-                    krotki, dlugi = (a, b) if len(ka) < len(kb) else (b, a)
+                    if ka and kb and _literowka(ka, kb):
+                        # 11.10.2026 (Raport 18:00 nr 2): „Olympiacos Pireus” (tylko 1X2) i „Olympiakos Pireus” (tylko gole) —
+                        # pisownia rozni sie jedna litera w jednym czlonie. Zostaje wariant z WIEKSZA liczba kursow.
+                        krotki, dlugi = (a, b) if ile.get(a[0], 0) < ile.get(b[0], 0) else (b, a)
+                    elif not ka or not kb or not (ka < kb or kb < ka): continue
+                    else:
+                        krotki, dlugi = (a, b) if len(ka) < len(kb) else (b, a)
                     # 09.10.2026 (Raport 12:00 nr 5): „Corona Brasov - Fehervar Hockey Akademia 19” — kurs 19.0 wklejony
                     # w nazwe przez PDF. Nadmiarowe czlony to same liczby = smiec, nie dluzsza nazwa: zostaje KROTSZA.
                     if all(x.isdigit() for x in czl(dlugi[o]) - czl(krotki[o])):
