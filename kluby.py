@@ -250,6 +250,27 @@ SCAL_RECZNIE = {
     ('B2', 'KV Kortrijk'): 'Kortrijk',
     # 10.10.2026 (Raport 18:00 nr 1): Holandia — zrodlo Eerste Divisie (N2) i football-data (N1) pisza ten sam klub inaczej;
     # pelne nazwy z oferty („NEC Nijmegen”, „Fortuna Sittard”) trafialy w stary zapis N2 bez wspolnej ligi z rywalem.
+    # 11.10.2026 (Raport 12:00 nr 2): stary zapis z nizszej ligi tego samego klubu — „Karlsruher SC” -> Karlsruher (3. Liga
+    # 2017–19) zamiast Karlsruhe (2. Bundesliga), „VV Sint-Truiden” -> Sint-Truiden (II liga 2014/15) zamiast St Truiden.
+    # KRC Mechelen (B2 2014/15) to INNY klub niz KV Mechelen — nie sklejamy.
+    ('D3', 'Karlsruher'): 'Karlsruhe',
+    ('B2', 'Sint-Truiden'): 'St Truiden',
+    # tenze raport (klasa): II liga Belgii (B2) i 3. Liga (D3) z innego zrodla niz B1/D2 — ten sam klub pod dwiema nazwami
+    # („Union SG”/„St. Gilloise”, „OH Leuven”/„Oud-Heverlee Leuven”). NIE: R.Oc. De Charleroi (Olympic, nie Sporting),
+    # Excel Mouscron (klub rozwiazany 2009, nie Royal Excel Mouscron).
+    ('B2', 'OH Leuven'): 'Oud-Heverlee Leuven',
+    ('B2', 'Union SG'): 'St. Gilloise',
+    ('B2', 'K. Beerschot V.A.'): 'Beerschot VA',
+    ('B2', 'KAS Eupen'): 'Eupen',
+    ('B2', 'La Louvière'): 'RAAL La Louviere',
+    ('B2', 'RFC Seraing'): 'Seraing',
+    ('B2', 'Zulte Waregem'): 'Waregem',
+    ('D3', 'Arminia'): 'Bielefeld',
+    ('D3', 'FC Ingolstadt 04'): 'Ingolstadt',
+    ('D3', '1860 Munich'): 'Munich 1860',
+    ('D3', 'MSV Duisburg'): 'Duisburg',
+    ('D3', 'Paderborn 07'): 'Paderborn',
+    ('D3', 'FSV Frankfurt'): 'Frankfurt FSV',
     ('N2', 'NEC Nijmegen'): 'Nijmegen',
     ('N2', 'Fortuna Sittard'): 'For Sittard',
     ('N2', 'ADO Den Haag'): 'Den Haag',

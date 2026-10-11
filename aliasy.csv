@@ -544,3 +544,12 @@ sporty,Kortrijk Spurs,Kortrijk Sport,"Raport 10.10 18:00 nr 3: BNXT; w bazie Kor
 sporty,Landstede Hammers,Zwolle Landstede,"Raport 10.10 18:00 nr 3: BNXT; w bazie Zwolle Landstede",2026-10-10
 sporty,Cayirova Belediyesi,Çayırova Belediyespor,"Raport 10.10 18:00 nr 3: Super Ligi TUR; kolizja z Cayirova (TBL) — ten sam klub, SCAL_SPORTY",2026-10-10
 sporty,Antwerp Giants,Windrose Giants Antwerp,"Raport 10.10 18:00 nr 3: BNXT; nazwa sponsora zmienia sie co sezon (Talenet -> Windrose)",2026-10-10
+typuj,FC Koeln,FC Koln,"Raport 11.10 12:00 nr 1–3: oe nie jest zamieniane na o; w bazie FC Koln",2026-10-11
+typuj,1. FC Koeln,FC Koln,"Raport 11.10 12:00 nr 1–3: jw.",2026-10-11
+typuj,Union Saint-Gilloise,St. Gilloise,"Raport 11.10 12:00 nr 1–3: w bazie St. Gilloise (B1)",2026-10-11
+typuj,Karlsruher SC,Karlsruhe,"Raport 11.10 12:00 nr 1–3: 2. Bundesliga; stary zapis Karlsruher (3. Liga) sklejony",2026-10-11
+typuj,VV Sint-Truiden,St Truiden,"Raport 11.10 12:00 nr 1–3: B1; stary zapis Sint-Truiden (B2 2014/15) sklejony",2026-10-11
+typuj,Al-Faisaly FC,Al Faysaly,"Raport 11.10 12:00 nr 1–3: Saudi Pro League 2026 = Al Faysaly; Al Faisaly (Jordania) to inny klub — bez SCAL_RECZNIE",2026-10-11
+typuj,Olympiacos Pireus,Olympiakos,"Raport 11.10 12:00 nr 1–3: drugi wariant zapisu w PDF STS (nr 3680)",2026-10-11
+typuj,TSV 1860 Munchen,Munich 1860,"Raport 11.10 12:00 (klasa D2/D3): pelna nazwa klubu, w bazie zapis football-data",2026-10-11
+typuj,1860 Monachium,Munich 1860,"Raport 11.10 12:00 (klasa D2/D3): pelna nazwa klubu, w bazie zapis football-data",2026-10-11
