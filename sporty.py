@@ -124,7 +124,9 @@ SCAL_SPORTY = {('hokej', 'Zemgale'): 'HK Zemgale/Jlss', ('hokej', 'Troja/Ljungby
                # 10.10.2026 (Raport 18:00 nr 3): „Cayirova” (TBL do 04.2026) = „Çayırova Belediyespor” (Super Ligi od 09.2026, awans)
                ('koszykówka', 'Cayirova'): 'Çayırova Belediyespor',
                # tenze raport: sponsor w nazwie — „Talenet Giants Antwerp” (BNXT do 06.2026) = „Windrose Giants Antwerp” (od 10.2026)
-               ('koszykówka', 'Talenet Giants Antwerp'): 'Windrose Giants Antwerp'}
+               ('koszykówka', 'Talenet Giants Antwerp'): 'Windrose Giants Antwerp',
+               # 11.10.2026 (Raport 15:00 nr 4): 365 pisze „GKS Jastrzêbie” („ê” zamiast „ę” u zrodla) — tylko zapis nazwy
+               ('hokej', 'GKS Jastrzêbie'): 'GKS Jastrzębie'}
 
 
 def scal_recznie(d):
@@ -589,7 +591,7 @@ _ALIASY_RECZNE = {
     # Poprawka 43 (24.09.2026) — hokej: STS dokleja miasto (kazda para sprawdzona w lidze)
     'lukkorauma': 'Lukko', 'tapparatampere': 'Tappara', 'bilitygriliberec': 'Liberec',
     'stjernenfredrikstad': 'Stjernen', 'stavangeroilers': 'Stavanger', 'hv71jonkoping': 'HV 71',
-    'ehckloten': 'Kloten Flyers', 'hkzemgalellu': 'HK Zemgale/Jlss', 'jkhgksjastrzebie': 'GKS Jastrzêbie',
+    'ehckloten': 'Kloten Flyers', 'hkzemgalellu': 'HK Zemgale/Jlss', 'jkhgksjastrzebie': 'GKS Jastrzębie',
     # koszykowka
     'riesenludwigsburg': 'N.R. Ludwigsburg', 'mhpriesenludwigsburg': 'N.R. Ludwigsburg',
     'semelbournephoenix': 'South East Melbourne', 'southeastmelbournephoenix': 'South East Melbourne',
