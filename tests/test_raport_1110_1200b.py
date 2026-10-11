@@ -28,3 +28,11 @@ def test_aliasy_1110():
     assert m[('typuj', 'Al-Faisaly FC')] == 'Al Faysaly' and m[('typuj', 'Olympiacos Pireus')] == 'Olympiakos'
     assert m[('typuj', 'TSV 1860 Munchen')] == 'Munich 1860'
     assert typuj.ALIASES[typuj.norm('Jahn Regensburg')] == 'SSV Jahn Regensburg'   # alias w kodzie — zapis D3 zostaje
+
+
+def test_jastrzebie_zapis_nazwy():
+    # Raport 11.10 15:00 nr 4: 365 pisze „GKS Jastrzêbie” — w bazie i WERDYKT „GKS Jastrzębie” (ta sama historia, 50 meczow)
+    import sporty
+    d = pd.DataFrame([dict(sport='hokej', gosp='GKS Jastrzêbie', gosc='Podhale Nowy Targ')])
+    assert sporty.scal_recznie(d).gosp.iloc[0] == 'GKS Jastrzębie'
+    assert sporty._ALIASY_RECZNE['jkhgksjastrzebie'] == 'GKS Jastrzębie'
