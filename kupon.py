@@ -58,8 +58,12 @@ MARGINES_SZACUNKU = 0.10
 
 def wczytaj(plik):
     d = pd.read_csv(plik)
-    for c, v in (('sport', ''), ('szacunek', 0), ('polski', 0), ('marza', 1.0), ('kryteria', 0), ('ev_dodatni', 1)):
+    for c, v in (('sport', ''), ('szacunek', 0), ('polski', 0), ('kryteria', 0), ('ev_dodatni', 1)):
         d[c] = d[c].fillna(v) if c in d else v   # pusta komorka = wartosc domyslna (NaN psul filtr polski == 0)
+    # Raport 11.10 12:00 nr 9: pusta marza byla brana jako 1,0 — przechodzila filtr „marza <= 110%” (6.3), a prawdziwa
+    # wynosila 110,3–110,4% (Palmeiras – Corinthians, Ruzomberok – Zilina). Brak marzy = marza NIEZNANA: noga nie przechodzi
+    # filtra (KUPON DNIA, AKO PILKA/BONUS, MIX) i nie idzie za pieniadze (za_pieniadze). typuj.py wpisuje marze z 1X2.
+    d['marza'] = pd.to_numeric(d['marza'], errors='coerce') if 'marza' in d else float('nan')
     d['p'] = d.p.astype(float); d['kurs'] = d.kurs.astype(float)
     # p_min: dolny kraniec przedzialu P. Jawna kolumna wygrywa; inaczej p - margines dla nog "szacunek".
     jawne = d['p_min'].astype(float) if 'p_min' in d else pd.Series([float('nan')] * len(d), index=d.index)
@@ -88,7 +92,8 @@ def _opis(d, c):   # indeksy c pochodza z d (ramki bez resetu indeksu — .loc d
                   (x.p - x.szacunek.astype(float) * MARGINES_SZACUNKU).clip(lower=0.0).prod())
     return dict(nogi=list(c), p=p, kurs=k, ev=ev(p, k), szacunki=int(x.szacunek.sum()),
                 p_dol=p_dol, ev_dol=ev(p_dol, k),
-                polski=bool(x.polski.any()), marza_max=float(x.marza.max()), poziom=poziom(list(x.kryteria)))
+                polski=bool(x.polski.any()), poziom=poziom(list(x.kryteria)),
+                marza_max=float(x.marza.max()) if x.marza.notna().all() else float('inf'))   # inf = ktoras marza nieznana
 
 
 def najlepszy(d, rodzaj):
@@ -160,6 +165,7 @@ def za_pieniadze(o, rodzaj, a, wydane_dzis, kupony_dzis):
     if o['szacunki'] and o.get('ev_dol', o['ev']) <= 0:
         return 0, (f'EV od DOLNEGO krania przedzialu {o["ev_dol"]:+.1%} <= 0 '
                    f'(P {o["p"]:.1%} -> {o["p_dol"]:.1%}; A1 b)')
+    if o['marza_max'] == float('inf'): return 0, 'marza nieznana (pusta kolumna marza w nogi.csv; 6.3)'
     if o['marza_max'] > 1.10: return 0, f'marza {o["marza_max"]:.1%} > 110% (6.3)'
     if o['poziom'] == 'D': return 0, 'poziom D (A4.3)'
     lacznie = getattr(a, 'lacznie', a.wydane_lacznie)   # 29.09.2026: z kuponami tego przebiegu (main)

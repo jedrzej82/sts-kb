@@ -111,10 +111,11 @@ def test_ako_pilka_dnia_brak(tmp_path, capsys):
 
 def test_ako_bonus_lvbet_min_175(tmp_path, capsys):
     import kupon
-    f = _nogi(tmp_path, [('A - B', '1X', 0.88, 1.25, 0, 0, '', '', 'pilka', 0),
-                         ('C - D', 'U4.5', 0.86, 1.20, 0, 0, '', '', 'pilka', 0),
-                         ('E - F', '12', 0.80, 1.20, 0, 0, '', '', 'pilka', 0),
-                         ('G - H', 'O1.5', 0.60, 1.80, 1, 0, '', '', 'pilka', 1)])     # szacunek — nie do bonusu
+    # 11.10.2026 (Raport 12:00 nr 9): marza wpisana — pusta marza = nieznana, noga nie przechodzi filtra 110% (6.3)
+    f = _nogi(tmp_path, [('A - B', '1X', 0.88, 1.25, 0, 0, '1.06', '', 'pilka', 0),
+                         ('C - D', 'U4.5', 0.86, 1.20, 0, 0, '1.06', '', 'pilka', 0),
+                         ('E - F', '12', 0.80, 1.20, 0, 0, '1.06', '', 'pilka', 0),
+                         ('G - H', 'O1.5', 0.60, 1.80, 1, 0, '1.06', '', 'pilka', 1)])     # szacunek — nie do bonusu
     kupon.main([f, '--depozyt', '45.35'])
     out = capsys.readouterr().out.split('AKO BONUS LVBET')[1]
     assert '1. P 60.5% | kurs STS 1.80' in out                       # 1.25 x 1.20 x 1.20 = 1.80 >= 1.75; P 0.88 x 0.86 x 0.80
