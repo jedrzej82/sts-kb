@@ -554,3 +554,19 @@ typuj,Olympiacos Pireus,Olympiakos,"Raport 11.10 12:00 nr 1–3: drugi wariant z
 typuj,TSV 1860 Munchen,Munich 1860,"Raport 11.10 12:00 (klasa D2/D3): pelna nazwa klubu, w bazie zapis football-data",2026-10-11
 typuj,1860 Monachium,Munich 1860,"Raport 11.10 12:00 (klasa D2/D3): pelna nazwa klubu, w bazie zapis football-data",2026-10-11
 typuj,Saint Louis City SC,St. Louis City,"Raport 11.10 21:00 nr 2: MLS; Saint Louis (USL 2017–20) to inny klub (Saint Louis FC)",2026-10-11
+typuj,Al-Wasl FC,Al Wasl,Raport 12.10 12:00: AFC CL Elite (ZEA); terminarz 365/FS 12.10: Al Wasl – Al Ahli Jeddah,2026-10-12
+typuj,Al-Qadisiyah FC,Qadisiya,"Raport 12.10 12:00: AFC CL Elite, klub saudyjski (FS „Al Qadsiah (Sau)”); bez aliasu trafial w libijskie Al Qadisiyah",2026-10-12
+typuj,Pakhtakor Tashkent,Pakhtakor,Raport 12.10 12:00: AFC CL Elite (UZB); terminarz 365/FS 12.10: Pakhtakor – Qadisiya,2026-10-12
+typuj,Tractor Sazi Tebriz,Tractor FC,Raport 12.10 12:00: AFC CL Elite (IRN); terminarz 365 12.10: Tractor FC – Al Shamal,2026-10-12
+typuj,Al-Shamal SC,Al Shamal,Raport 12.10 12:00: AFC CL Elite (QAT); Al Shamal Future to rezerwy,2026-10-12
+typuj,Al-Gharafa SC,Al Gharafa,Raport 12.10 12:00: AFC CL Elite (QAT); terminarz 365 12.10: Al Gharafa – Esteghlal FC Tehran,2026-10-12
+typuj,Al-Quwa Al-Jawiya,Quwa Al Jawiya,Raport 12.10 12:00: AFC CL Elite (IRQ); terminarz 365 12.10: Quwa Al Jawiya – Al Ain,2026-10-12
+typuj,Al-Ain FC,Al Ain,"Raport 12.10 12:00: AFC CL Elite (ZEA, FS „Al Ain (Uae)”); bez aliasu trafial w saudyjskie Al-Ain (KSA, 2021)",2026-10-12
+typuj,Fortaleza CE,Fortaleza,Raport 12.10 12:00: Serie B (BRA2); terminarz 12.10: Fortaleza – CRB; Fortaleza FC to klub kolumbijski,2026-10-12
+typuj,Future FC,Modern Sport FC,Raport 12.10 12:00: Egipt PL: Future FC przemianowany na Modern Sport; terminarz 365/FS 12.10: Modern Sport FC – ENPPI,2026-10-12
+typuj,Aris Saloniki,Aris,"Raport 12.10 12:00: rozliczenie 11.10 (P114.3): G1, wyniki 11.10 Aris/Aris Salonica – Volos 3:2; Aris Limasol to klub cypryjski",2026-10-12
+typuj,Volos NPS,Volos NFC,"Raport 12.10 12:00: rozliczenie 11.10: Nea Paralia Sportiki Volos = Volos NFC (G1), wyniki 11.10 Aris – Volos 3:2",2026-10-12
+typuj,RFS Riga,Rigas FS,"Raport 12.10 12:00: rozliczenie 11.10 (P114.3): Rigas Futbola Skola, wyniki 11.10 Rigas FS – FK Jelgava 4:2; Riga FC to inny klub",2026-10-12
+sporty,Kolubara Lazarevac,Kolubara La 2003,Raport 12.10 12:00: kosz Serbia KLS; w statystykach i wynikach 365 „Kolubara La 2003”,2026-10-12
+sporty,Dynamic Belgrad,KK Dynamic BG,Raport 12.10 12:00: kosz Serbia KLS; w statystykach i wynikach 365 „KK Dynamic BG”,2026-10-12
+typuj,CA Los Andes,Los Andes,"Raport 12.10 18:00 nr 3 (P129.2/P136.2): Primera Nacional (Lomas de Zamora); terminarz 365/FS 05.10 Godoy Cruz – Los Andes i 12.10 Racing Cordoba – Los Andes; CA Los Andes (Los Sarmientos) to amator z Torneo Regional (ostatni mecz 2025-11)",2026-10-12
