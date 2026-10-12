@@ -995,6 +995,14 @@ def club(home, away, kursy, live=None):
     elif skroty and not wspolna_liga(m, h, a) and terminarz_potwierdza_pare(h, a, mt, pool, (kh, ka)):
         print(f'  PUCHAR KRAJOWY ({mt["kraj"]}, {mt["turniej"]}): {h} i {a} bez wspolnej ligi — w pucharze to normalne; '
               f'terminarz ({mt["gosp"]} – {mt["gosc"]}) wskazuje te same kluby — dopasowanie przyjete.')
+    elif skroty and not wspolna_liga(m, h, a) and '--kontynentalny' in sys.argv:
+        # 12.10.2026 (Raport 12:00 nr 3, Liga Mistrzow AFC): w pucharze kontynentalnym kluby z definicji nie graja w jednej
+        # lidze, wiec kontrola LACZNA nic nie mowi. Krotsza nazwa NIE jest przyjmowana: „Al-Qadisiyah FC” trafialo w libijskie
+        # Al Qadisiyah, „Al-Ain FC” w saudyjskie Al-Ain (a w AFC graja kluby z KSA i ZEA). Tylko alias rozstrzyga.
+        sys.exit('NIEPEWNE DOPASOWANIE (puchar kontynentalny): ' + '; '.join(f'"{n}" -> {t} (zgubiony czlon rozrozniajacy)'
+                                                                         for n, t in skroty)
+                 + ' — w pucharze kontynentalnym wspolna liga nie rozstrzyga, a krotsza nazwa moze byc klubem z innego kraju. '
+                 'Analiza przerwana, noga MNIEJ. Dopisz pare do aliasy.csv (modul typuj) po sprawdzeniu kraju klubu w terminarzu.')
     elif skroty and not wspolna_liga(m, h, a):
         sys.exit('NIEPEWNE DOPASOWANIE: ' + '; '.join(f'"{n}" -> {t} (zgubiony czlon rozrozniajacy)' for n, t in skroty)
                  + f', a {h} i {a} nie graly w jednej lidze w ostatnich 2 latach — to prawdopodobnie INNY klub. '
