@@ -656,7 +656,8 @@ def kupon_pieniezny(r0):
     m = re.search(r'stawka\W*(\d+(?:[.,]\d+)?)', str(r0.get('uwaga', '')), re.I)
     stawka = _liczba(m.group(1)) if m else 0.0
     status = str(r0.get('status', '')).upper()
-    return stawka, bool(stawka > 0 and not any(x in status for x in ('PAPIER', 'ODWOL', 'NIE GRAC')))
+    # 12.10.2026: „NIE DO GRY” (KD z ako_log 09–11.10, stawka „5 zl tylko jesli uzytkownik postawi”) liczylo sie jak zagrany
+    return stawka, bool(stawka > 0 and not any(x in status for x in ('PAPIER', 'ODWOL', 'NIE GRAC', 'NIE DO GRY', 'NIEZAGRAN', 'NIE ZAGRAN')))
 
 
 # 02.10.2026: FAKTYCZNE zaklady (STS, LVBET, Superbet) — plik zaklady_faktyczne.csv w baza-wiedzy (dane, NIE repo).
@@ -728,6 +729,9 @@ def czytaj_zaklady(plik):
     return z
 
 
+KD_PAPIER_OD = '2026-10-11'   # KUPON DNIA tylko papierowy (P182.7; decyzja uzytkownika 12.10)
+
+
 def rozlicz_dzien(data, ako, W, zaklady=None):
     """Wiersze pliku Rozliczenie dla kuponow uruchomionych w dniu `data` + podsumowanie Bilansu.
     zaklady: faktyczne zaklady (czytaj_zaklady) — gdy sa wpisy z tego dnia, pieniadze Bilansu licza sie z nich."""
@@ -756,6 +760,10 @@ def rozlicz_dzien(data, ako, W, zaklady=None):
             kn = [_liczba(v) for v in nogi.get('kurs', pd.Series(dtype=str))]
             kurs = float(math.prod(kn)) if kn and all(kn) else None
         stawka, pien = kupon_pieniezny(r0)
+        # 12.10.2026 (decyzja uzytkownika „B”, P182.7): KUPON DNIA (tag KD) tylko PAPIEROWY od 11.10 — ujemne EV. Stawka
+        # „5 zl” w RAZEM z przebiegu nie wchodzi juz do Bilansu; faktycznie zagrany KD wpisuje sie do zaklady_faktyczne.csv.
+        kd_pap = re.match(r'KD\b', str(tag).strip().upper()) is not None and str(data) >= KD_PAPIER_OD
+        if kd_pap: pien = False
         zalecony = fakt and pien
         if zalecony: pien = False   # 02.10: sa faktyczne zaklady dnia — kupon systemu to tylko zalecenie
         status = str(r0.get('status', '')).upper()
@@ -789,6 +797,7 @@ def rozlicz_dzien(data, ako, W, zaklady=None):
             p = _liczba(r0.get('P', ''))
             if p: bil['pap_P'].append(p / 100 if p > 1 else p)
             uw = f'papierowy; wirtualnie z 5 zl: {(5 * kurs * TAX - 5) if wygral else -5:+.2f} zl' if not wynik.startswith('NIEROZL') else 'papierowy'
+            if kd_pap: uw = 'KUPON DNIA — tylko papierowy (decyzja uzytkownika 12.10); ' + uw
         if wynik.startswith('NIEROZL'): bil['nierozliczone'].append(f'{tag}#{nr}')
         wiersze.append(dict(tag=f'RAZEM_{tag}_{nr}', zdarzenie=f'{n} nogi ({godz})', rynek='', P=r0.get('P', ''), kurs_typu=f'{kurs:.3f}',
                             kurs_zamkniecia='', CLV='', wynik='', TRAFIONY_PRZEGRANY=wynik, kategoria='', uwaga=uw))
