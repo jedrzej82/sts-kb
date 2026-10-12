@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 przebieg.py:*)",
+      "Bash(nohup python3 przebieg.py:*)",
+      "Bash(python3 typuj.py:*)",
+      "Bash(python3 typuj_wsad.py:*)",
+      "Bash(python3 sporty.py:*)",
+      "Bash(python3 sporty_wsad.py:*)",
+      "Bash(python3 tenis.py:*)",
+      "Bash(python3 tenis_wsad.py:*)",
+      "Bash(python3 sezon.py:*)",
+      "Bash(python3 kupon.py:*)",
+      "Bash(python3 dzienniki.py:*)",
+      "Bash(python3 clv.py:*)",
+      "Bash(python3 kursy3.py:*)",
+      "Bash(python3 oferta.py:*)",
+      "Bash(python3 dopasuj.py:*)",
+      "Bash(python3 zdarzenia.py:*)",
+      "Bash(python3 rynek_model.py:*)",
+      "Bash(python3 linie.py:*)",
+      "Bash(python3 rejestr.py:*)",
+      "Bash(python3 test_ostatnie.py:*)",
+      "Bash(python3 backtest.py:*)",
+      "Bash(python3 ensemble.py:*)",
+      "Bash(python3 tenis_bt.py:*)",
+      "Bash(python3 sporty_bt.py:*)",
+      "Bash(python3 ramki.py:*)",
+      "Bash(python3 korekta_rynkow.py:*)",
+      "Bash(python3 swiezosc.py:*)",
+      "Bash(python3 -m pytest:*)"
+    ]
+  }
+}
