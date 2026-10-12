@@ -76,7 +76,7 @@ def test_k5_omija_polski_klub_gdy_jest_inna_kombinacja(capsys):
             dict(mecz='Bayern - Mainz', rynek='1', p=0.86, kurs=1.28)])
     f = os.path.join(tempfile.mkdtemp(), 'n.csv'); d.to_csv(f, index=False)
     kupon.main([f, '--depozyt', '100'])
-    k5 = capsys.readouterr().out.split('K5:')[1]
+    k5 = capsys.readouterr().out.split('K5:')[1].split('\n\n')[0]   # sam blok K5 (KUPON DNIA nizej mowi „PAPIEROWY”)
     assert 'Legia' not in k5 and 'PAPIEROWY' not in k5
 
 

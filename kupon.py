@@ -272,7 +272,8 @@ def linie_dnia(wsz, stawka=5.0):
     for i in o['nogi']:
         r = wsz.loc[i]
         out.append(f'   {r.mecz} | {r.rynek} | P {r.p - DNIA_KOREKTA:.1%} | kurs {r.kurs:.2f}')
-    out.append(f'   → decyzja uzytkownika 08.10: codziennie jeden — stala stawka {stawka:.0f} zl z budzetu 300 zl, tag KD; '
+    # 12.10.2026: decyzja uzytkownika „B” — KD tylko papierowy (ujemne EV); stawka powyzej to wirtualne 5 zl do oceny
+    out.append(f'   → TYLKO PAPIEROWY (decyzja uzytkownika 12.10), tag KD, stawka wirtualna {stawka:.0f} zl; '
                f'srednio na minusie (EV {o["ev"]:+.0%}), szansa, ze NIE wejdzie: {1 - o["p"]:.0%}')
     return out
 
