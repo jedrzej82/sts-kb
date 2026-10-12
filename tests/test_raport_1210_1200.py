@@ -52,3 +52,10 @@ def test_rozliczenie_1110_aris_i_rfs():
     assert r('Aris Saloniki - Volos NPS', 'O0.5')[:2] == ('TRAFIONY', '3:2')
     assert r('RFS Riga - FK Jelgava', '12')[:2] == ('TRAFIONY', '4:2')
     assert r('Aris Saloniki - Volos NPS', '2')[:2] == ('PRZEGRANY', '3:2')
+
+
+def test_ca_los_andes_raport_1800():
+    # Raport 12.10 18:00 nr 3: zdarzenia.py CONFLICT [MOZLIWY_DUBEL:CA Los Andes (Los Sarmientos)=Los Andes] — resolve dawal
+    # amatorski klub z Tucuman; STS „CA Los Andes” to Los Andes z Primera Nacional (terminarz 05.10 i 12.10)
+    pula = {'Los Andes', 'CA Los Andes (Los Sarmientos)', 'Paso de Los Andes (Villa General San Martín)', 'Racing Cordoba'}
+    assert typuj.resolve('CA Los Andes', pula) == 'Los Andes'
