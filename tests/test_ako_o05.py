@@ -12,21 +12,25 @@ def _plik(tmp_path, w):
     return str(nogi)
 
 
-def test_wybor_po_p_o25_rozne_mecze_bez_szacunkow(tmp_path):
-    f = _plik(tmp_path, [('A - B', .55, .94, 1.02, 1.40, 0, 0, .70, .625), ('C - D', .60, .95, 1.01, 1.30, 0, 0, .74, .67),
-                         ('E - F', .58, .95, 1.03, 1.45, 1, 0, .69, .635),      # szacunek — pomijany
-                         ('G - H', .62, .96, 1.02, 1.42, 0, 0, .66, .64), ('I - J', .50, .92, 1.04, 1.70, 0, 0, .58, .54),
-                         ('C - D', .60, .95, 1.01, 1.30, 0, 0, .74, .67)])     # dubel z drugiego przebiegu
-    o = kupon.kupon_o05(f, 3)
-    assert list(o['nogi'].mecz) == ['C - D', 'G - H', 'A - B'] and abs(o['kurs'] - 1.01 * 1.02 * 1.02) < 1e-9
-    assert kupon.kupon_o05(f, 4) is None                     # I - J ponizej 60%, E - F szacunek
+def test_wszystkie_mecze_dnia_na_kuponach_3_4(tmp_path):
+    w = [(f'M{i} - N{i}', .55, .95, 1.02, 1.40, 0, 0, .70, .80 - i * .02) for i in range(9)]   # 9 meczow >= 60%
+    w += [('E - F', .58, .95, 1.03, 1.45, 1, 0, .69, .79),          # szacunek — na liscie, poza kuponem
+          ('X - Y', .58, .95, '', 1.45, 0, 0, .69, .78),            # brak kursu O0.5 — na liscie, poza kuponem
+          ('I - J', .50, .92, 1.04, 1.70, 0, 0, .58, .54),          # ponizej 60%
+          ('M0 - N0', .55, .95, 1.02, 1.40, 0, 0, .70, .80)]        # dubel z drugiego przebiegu
+    f = _plik(tmp_path, w)
+    x, kup = kupon.kupony_o05(f)
+    assert len(x) == 11 and 'I - J' not in set(x.mecz)
+    assert [len(o['nogi']) for o in kup] == [3, 3, 3]
+    assert {m for o in kup for m in o['nogi'].mecz} == {f'M{i} - N{i}' for i in range(9)}   # kazdy mecz z kursem na kuponie
     t = '\n'.join(kupon.linie_o05(f))
-    assert 'PAPIEROWY' in t and 'nawet WYGRANY zwraca mniej niz stawke' in t and 'AKOO05-3' in t
+    assert 'MECZE DNIA Z P(O2.5) >= 60%' in t and 'SZACUNEK — poza kuponem' in t and 'brak kursu O0.5' in t
+    assert 'AKOO05-3' in t and 'WYGRANY ZWRACA MNIEJ NIZ STAWKE' in t
 
 
-def test_brak_pliku_o25(tmp_path):
-    assert kupon.kupon_o05(str(tmp_path / 'nogi.csv'), 3) is None
-    assert 'brak' in kupon.linie_o05(str(tmp_path / 'nogi.csv'))[0]
+def test_podzial_na_3_i_4():
+    assert kupon.podzial(2) == [] and kupon.podzial(5) == [4] and kupon.podzial(7) == [4, 3] and kupon.podzial(10) == [4, 3, 3]
+    assert all(sum(kupon.podzial(n)) == n for n in range(6, 40))
 
 
 def test_typuj_zapisuje_p_o25_i_p_rynku(tmp_path, monkeypatch):
