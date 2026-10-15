@@ -671,7 +671,59 @@ def _jawny_kraj(name, pool, m):
     return base if k and _KRAJ_KANON.get(k, k) == kr else None
 
 
-def _wariant_kraju(h, a, m, pool, jawne=(False, False)):
+# 15.10.2026: kraje federacji UEFA (nazwy jak z _kraj_ligi / _KRAJ_KANON) — do rozstrzygania nazw w pucharach UEFA
+KRAJE_UEFA = frozenset(
+    'albania andorra armenia austria azerbaijan belarus belgium bosniaandherzegovina bosnia bulgaria croatia cyprus czechia '
+    'denmark england estonia faroeislands finland france georgia germany gibraltar greece hungary iceland israel italy '
+    'kazakhstan kosovo latvia liechtenstein lithuania luxembourg malta moldova montenegro netherlands northmacedonia '
+    'northernireland norway poland portugal ireland romania russia sanmarino scotland serbia slovakia slovenia spain sweden '
+    'switzerland turkey ukraine wales'.split())
+_PUCHAR_UEFA = re.compile(r'(?i)\b(uefa|champions league|europa league|conference league)\b')
+
+
+def _kraj_klubu(t, m):
+    """Kraj klubu: z przyrostka „[kraj]” albo z ligi jego ostatniego meczu w bazie."""
+    mm = _PRZYR.match(t)
+    if mm: return norm(mm.group(2))
+    w = m[(m.HomeTeam == t) | (m.AwayTeam == t)]
+    if w.empty: return None
+    k = _kraj_ligi(w.sort_values('MatchDate').Division.iloc[-1])
+    return _KRAJ_KANON.get(k, k) if k else None
+
+
+def para_z_terminarza_pucharu(home, away, pool, h=None, a=None):
+    """15.10.2026 (Raport 15:00 nr 2): w pucharze kontynentalnym nazwy z oferty („Celtic Glasgow”, „Ajax Amsterdam”,
+    „AS Monaco”) gubily sie albo byly skrotami bez dowodu. Terminarz (365/Flashscore) zapisuje TEN mecz krotko („Celtic”,
+    „Ajax”, „Monaco”) — drugi, niezalezny zapis pary. Zwraca (mecz z terminarza, klub gosp., klub gosc.) albo (None, None, None)."""
+    import contextlib
+    import io
+    try:
+        import terminarz as _tm
+        t = _tm.wczytaj()
+    except Exception as e:
+        print(f'  UWAGA: terminarz pucharu pominiety ({type(e).__name__}: {e})')
+        return None, None, None
+    if t is None or not len(t): return None, None, None
+    zrodla = [t[t.zrodlo == z].drop(columns='zrodlo') for z in ('365', 'fs')] if 'zrodlo' in t else [t]
+    # nazwy z oferty z polskim egzonimem („Viktoria Pilzno”) nie pasuja do zapisu terminarza — druga proba nazwami z bazy;
+    # kazde zrodlo osobno (Flashscore „Plzen” jest niejednoznaczne, 365 „Viktoria Plzen” nie) — pierwszy zapis, w ktorym
+    # OBIE nazwy daja sie dopasowac do bazy
+    pary = [(home, away)] + ([(h or home, a or away)] if (h or a) and (h, a) != (home, away) else [])
+    pierwszy = (None, None, None)
+    for tz in zrodla:
+        for g, d in pary:
+            mt = _tm.znajdz(g, d, tz)
+            if not mt or not (_PUCHAR.search(str(mt.get('turniej', ''))) or _PUCHAR_UEFA.search(str(mt.get('turniej', ''))) or
+                              re.search(r'(?i)libertadores|sudamericana|afc|caf|concacaf|friendl|sparing', str(mt.get('turniej', '')))):
+                continue
+            with contextlib.redirect_stdout(io.StringIO()):
+                th, ta = resolve(mt.get('gosp', ''), pool), resolve(mt.get('gosc', ''), pool)
+            if th and ta: return mt, th, ta
+            if pierwszy[0] is None: pierwszy = (mt, th, ta)
+    return pierwszy
+
+
+def _wariant_kraju(h, a, m, pool, jawne=(False, False), uefa=False, potw=None):
     """23.09.2026: jedna nazwa bywa uzywana przez kluby z ROZNYCH krajow ("Santos": Brazylia i Meksyk,
     "Nacional": Portugalia i Urugwaj). build_kb zostawia nazwe jednemu klubowi (kluby.KRAJ_NAZWY / clubelo),
     reszcie dodaje przyrostek kraju ("Nacional [uruguay]").
@@ -690,9 +742,26 @@ def _wariant_kraju(h, a, m, pool, jawne=(False, False)):
                   f'Wybrano "{t}". Jesli chodzi o inny klub, podaj jego nazwe z przyrostkiem, np. "{inne[0]}".')
     if h is None or a is None:
         return h, a
+    potw = potw or {}
     if '--kontynentalny' in sys.argv:
         # Recenzja 23.09: w pucharze nie ma kraju rywala do porownania, wiec "Nacional" - "Bolivar" liczylo
         # po cichu portugalski Nacional. Nazwa wspolna bez jawnego kraju = stop.
+        # 15.10.2026 (Raport 15:00 nr 3: Celta Vigo – Juventus, „Juventus [haiti]”): w meczu pucharu UEFA (turniej z terminarza)
+        # klub spoza UEFA nie gra — zostaje kandydat z kraju UEFA, ale TYLKO gdy jest jeden (Red Star FRA / Red Star [serbia]
+        # — oba UEFA — dalej stop).
+        # 15.10.2026 (Lugano – Crvena Zvezda): terminarz zapisal klub INNA nazwa niz niejednoznaczny rdzen („Crvena zvezda”, nie
+        # „Red Star”) i ta nazwa wskazuje TEN SAM wybrany klub — drugi, niezalezny zapis rozstrzyga
+        for t, inne in list(niejedn):
+            if t in potw:
+                print(f'  TERMINARZ PUCHARU potwierdza "{t}" (zapis „{potw[t]}” nie jest nazwa wspolna) — przyjeto.')
+                niejedn.remove((t, inne))
+        if niejedn and uefa:
+            for t, inne in list(niejedn):
+                uef = [k for k in [t] + inne if _kraj_klubu(k, m) in KRAJE_UEFA]
+                if len(uef) == 1:
+                    print(f'  PUCHAR UEFA: "{t}" — z klubow {", ".join([t] + inne)} tylko {uef[0]} jest z kraju UEFA — przyjeto.')
+                    h, a = (uef[0], a) if t == h else (h, uef[0])
+                    niejedn.remove((t, inne))
         if niejedn:
             t, inne = niejedn[0]
             sys.exit(f'NAZWA WSPOLNA DLA KLUBOW Z ROZNYCH KRAJOW w meczu miedzynarodowym: "{t}" (inne: {", ".join(inne)}). '
@@ -927,7 +996,18 @@ def club(home, away, kursy, live=None):
     a = ja or resolve(away, pool) or _przez_egzonim(away, pool)
     h, a = _z_meczami(h, m, _elo), _z_meczami(a, m, _elo)
     jawne = (bool(jh) or bool(_PRZYR.match(str(home).strip())), bool(ja) or bool(_PRZYR.match(str(away).strip())))
-    h, a = _wariant_kraju(h, a, m, pool, jawne)
+    mtp, tph, tpa = (para_z_terminarza_pucharu(home, away, pool, h, a) if '--kontynentalny' in sys.argv else (None, None, None))
+    if mtp:
+        print(f'  TERMINARZ (puchar): {mtp["gosp"]} – {mtp["gosc"]} | {mtp["turniej"]} -> {tph} – {tpa}')
+        # strona bez dopasowania z oferty: nazwa z terminarza (ten sam mecz, krotszy zapis); sprzecznosc — bez zmian
+        if h is None and tph and tph != a: h = tph; print(f'  "{home}" -> {h} (nazwa z terminarza pucharu)')
+        if a is None and tpa and tpa != h: a = tpa; print(f'  "{away}" -> {a} (nazwa z terminarza pucharu)')
+    potw = {}
+    if mtp:
+        for k_, raw in ((tph, mtp['gosp']), (tpa, mtp['gosc'])):
+            mm_ = _PRZYR.match(str(k_)) if k_ else None
+            if k_ and norm(raw) != norm(mm_.group(1) if mm_ else k_): potw[k_] = raw
+    h, a = _wariant_kraju(h, a, m, pool, jawne, uefa=bool(mtp and _PUCHAR_UEFA.search(str(mtp.get('turniej', '')))), potw=potw)
     if h is not None and h == a:
         # patrz komentarz w sporty.py: dwie rozne nazwy z oferty wskazujace jeden wpis
         # w bazie daja mecz druzyny z sama soba i P okolo 50% dla obu stron — liczby
@@ -1002,6 +1082,9 @@ def club(home, away, kursy, live=None):
     elif skroty and not wspolna_liga(m, h, a) and terminarz_potwierdza_pare(h, a, mt, pool, (kh, ka)):
         print(f'  PUCHAR KRAJOWY ({mt["kraj"]}, {mt["turniej"]}): {h} i {a} bez wspolnej ligi — w pucharze to normalne; '
               f'terminarz ({mt["gosp"]} – {mt["gosc"]}) wskazuje te same kluby — dopasowanie przyjete.')
+    elif skroty and not wspolna_liga(m, h, a) and '--kontynentalny' in sys.argv and mtp and (tph, tpa) == (h, a):
+        print(f'  PUCHAR KONTYNENTALNY ({mtp["turniej"]}): terminarz ({mtp["gosp"]} – {mtp["gosc"]}) wskazuje te same kluby '
+              f'({h} – {a}) — skrocone nazwy potwierdzone, dopasowanie przyjete.')
     elif skroty and not wspolna_liga(m, h, a) and '--kontynentalny' in sys.argv:
         # 12.10.2026 (Raport 12:00 nr 3, Liga Mistrzow AFC): w pucharze kontynentalnym kluby z definicji nie graja w jednej
         # lidze, wiec kontrola LACZNA nic nie mowi. Krotsza nazwa NIE jest przyjmowana: „Al-Qadisiyah FC” trafialo w libijskie
