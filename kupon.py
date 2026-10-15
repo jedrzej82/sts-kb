@@ -230,45 +230,73 @@ def main(argv):
     print('\n' + '\n'.join(linie_o05(a.plik)))
 
 
-# 15.10.2026 (decyzja uzytkownika „2”): AKO O0.5 — 3 i 4 nogi „powyzej 0.5 gola” z meczow o NAJWYZSZYM P(O2.5) modelu
+# 15.10.2026 (decyzja uzytkownika „2”, doprecyzowane: KAZDY mecz dnia z P(O2.5) >= 60%): AKO O0.5 — wszystkie takie mecze na
+# kolejnych kuponach 3–4 nog „powyzej 0.5 gola” (backtest: 2,6 kuponu/dzien, kupon wchodzi 88–89%, wszystkie kupony dnia 73% dni)
 # (P(O2.5) = srednia modelu i rynku bez marzy >= 60%, kazda noga z innego meczu, bez szacunkow). TYLKO PAPIEROWY, obserwacja 2–3 tygodnie. Backtest 2023–2026
 # (17,8 tys. meczow z kursami, walk-forward): przy P(O2.5) >= 60% O0.5 wchodzi w 96,6%; 3 nogi weszly w 90,7% dni,
 # 4 nogi w 86,3%. Kurs STS na O0.5 w takich meczach to 1,01–1,03, wiec kurs laczny ok. 1,06–1,09 — po podatku 12%
 # NAWET WYGRANY kupon zwraca mniej niz stawke (prog: kurs laczny > 1,14). Stad zapis wirtualny z prawdziwych kursow.
 O05_MIN_P25 = 0.60
-O05_NOGI = (3, 4)
 
 
-def kupon_o05(plik_nogi, n):
-    """Najlepsze n meczow wg P(O2.5) z pliku typuj.plik_o25 (z kursem O0.5). None, gdy za malo meczow."""
+def mecze_o25(plik_nogi):
+    """WSZYSTKIE mecze dnia z P(O2.5) >= progu (plik typuj.plik_o25), malejaco wg P; pusta tabela, gdy brak pliku."""
     import os
     f = os.path.splitext(plik_nogi)[0] + '_o25.csv'
-    if not os.path.exists(f): return None
+    if not os.path.exists(f): return pd.DataFrame(columns=['mecz', 'p_o25', 'p_o05', 'kurs_o05', 'p_wybor', 'szacunek', 'na_kupon'])
     x = pd.read_csv(f, dtype=str).drop_duplicates('mecz', keep='last')
     if 'p_wybor' not in x: x['p_wybor'] = x.p_o25
     for c in ('p_o25', 'p_o05', 'kurs_o05', 'p_wybor'): x[c] = pd.to_numeric(x[c], errors='coerce')
-    x = x[(x.p_wybor >= O05_MIN_P25) & (x.kurs_o05 > 1) & (pd.to_numeric(x.szacunek, errors='coerce').fillna(1) == 0)]
-    x = x.sort_values('p_wybor', ascending=False).head(n)
-    if len(x) < n: return None
-    p = float(math.prod(x.p_o05.fillna(0))) or None
-    return dict(nogi=x, kurs=float(math.prod(x.kurs_o05)), p=p)
+    x['szacunek'] = pd.to_numeric(x.szacunek, errors='coerce').fillna(1).astype(int)
+    x = x[x.p_wybor >= O05_MIN_P25].sort_values('p_wybor', ascending=False).reset_index(drop=True)
+    x['na_kupon'] = (x.kurs_o05 > 1) & (x.szacunek == 0)
+    return x
+
+
+def podzial(n):
+    """Rozmiary kuponow po 4 i 3 nogi obejmujace jak najwiecej z n meczow (n=5: jeden kupon 4, 1 mecz zostaje)."""
+    for a in range(n // 4, -1, -1):
+        if (n - 4 * a) % 3 == 0: return [4] * a + [3] * ((n - 4 * a) // 3)
+    return podzial(n - 1) if n > 3 else []
+
+
+def kupony_o05(plik_nogi):
+    """15.10.2026 (uzytkownik: „kazdy mecz dnia, ktory moze osiagnac O2.5”): WSZYSTKIE takie mecze (z kursem O0.5, bez
+    szacunkow) rozlozone kolejno na kupony 3–4 nog O0.5. Zwraca (lista_meczow, lista kuponow [dict(nogi, kurs, p)])."""
+    x = mecze_o25(plik_nogi)
+    k = x[x.na_kupon]
+    out, i = [], 0
+    for n in podzial(len(k)):
+        g = k.iloc[i:i + n]; i += n
+        p = float(math.prod(g.p_o05)) if g.p_o05.notna().all() else None
+        out.append(dict(nogi=g, kurs=float(math.prod(g.kurs_o05)), p=p))
+    return x, out
 
 
 def linie_o05(plik_nogi, stawka=5.0):
-    out = []
-    for n in O05_NOGI:
-        o = kupon_o05(plik_nogi, n)
-        if o is None:
-            out.append(f'AKO O0.5 ({n} nogi, P(O2.5) >= {O05_MIN_P25:.0%}): brak — za malo meczow z P(O2.5) i kursem O0.5'); continue
+    x, kup = kupony_o05(plik_nogi)
+    if x.empty:
+        return [f'AKO O0.5 — mecze dnia z P(O2.5) >= {O05_MIN_P25:.0%}: brak']
+    out = [f'MECZE DNIA Z P(O2.5) >= {O05_MIN_P25:.0%} (srednia modelu i rynku): {len(x)}']
+    for r in x.itertuples():
+        out.append(f'   {r.mecz} | P(O2.5) {r.p_wybor:.1%} (model {r.p_o25:.0%})'
+                   + (f' | O0.5 @{r.kurs_o05:.2f}' if r.kurs_o05 == r.kurs_o05 else ' | brak kursu O0.5')
+                   + (' | SZACUNEK — poza kuponem' if r.szacunek else ''))
+    if not kup:
+        out.append('AKO O0.5: brak kuponu — za malo meczow z kursem O0.5 (potrzeba >= 3)'); return out
+    w_kup = sum(len(o['nogi']) for o in kup)
+    out.append(f'AKO O0.5: {len(kup)} kupon(y) po 3–4 nogi, {w_kup} z {int(x.na_kupon.sum())} meczow z kursem O0.5 | PAPIEROWE')
+    for nr, o in enumerate(kup, 1):
         wyp = stawka * o['kurs'] * TAX
-        out.append(f'AKO O0.5 ({n} nogi z najwyzszym P(O2.5)): kurs laczny {o["kurs"]:.3f} | '
-                   + (f'P modelu {o["p"]:.1%} | ' if o['p'] else '') + f'z {stawka:.0f} zl po podatku {wyp:.2f} zl | PAPIEROWY')
+        out.append(f' {nr}. {len(o["nogi"])} nogi | kurs laczny {o["kurs"]:.3f}' + (f' | P modelu {o["p"]:.1%}' if o['p'] else '')
+                   + f' | z {stawka:.0f} zl po podatku {wyp:.2f} zl' + (' — WYGRANY ZWRACA MNIEJ NIZ STAWKE' if o['kurs'] * TAX <= 1 else '')
+                   + f' | tag AKOO05-{nr}')
         for r in o['nogi'].itertuples():
-            out.append(f'   {r.mecz} | O0.5 | P(O2.5) {r.p_wybor:.1%} (model {r.p_o25:.0%})' + (f' | P(O0.5) {r.p_o05:.1%}' if r.p_o05 == r.p_o05 else '')
-                       + f' | kurs {r.kurs_o05:.2f}')
-        if o['kurs'] * TAX <= 1:
-            out.append(f'   → nawet WYGRANY zwraca mniej niz stawke ({wyp:.2f} zl z {stawka:.0f} zl; potrzeba kursu > {1 / TAX:.2f})')
-        out.append(f'   → zapisz w ako_log jako papierowy (tag AKOO05-{n}); rozliczenie wirtualne z {stawka:.0f} zl')
+            out.append(f'      {r.mecz} | O0.5 | P(O2.5) {r.p_wybor:.1%} | kurs {r.kurs_o05:.2f}')
+    zost = int(x.na_kupon.sum()) - w_kup
+    if zost: out.append(f'   ({zost} mecz(e) z konca listy poza kuponami — nie da sie ich ulozyc w 3–4 nogi)')
+    out.append(f'   → zapisz kazdy w ako_log jako papierowy (tag AKOO05-nr); rozliczenie wirtualne z {stawka:.0f} zl; '
+               f'za pieniadze NIE (kurs laczny > {1 / TAX:.2f} potrzebny, by wygrany dal zysk)')
     return out
 
 
