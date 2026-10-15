@@ -227,6 +227,49 @@ def main(argv):
     print('\n' + '\n'.join(linie_bonus(wsz)))
     print('\n' + '\n'.join(linie_niski(wsz)))
     print('\n' + '\n'.join(linie_dnia(wsz, a.stawka_kd)))
+    print('\n' + '\n'.join(linie_o05(a.plik)))
+
+
+# 15.10.2026 (decyzja uzytkownika „2”): AKO O0.5 — 3 i 4 nogi „powyzej 0.5 gola” z meczow o NAJWYZSZYM P(O2.5) modelu
+# (P(O2.5) = srednia modelu i rynku bez marzy >= 60%, kazda noga z innego meczu, bez szacunkow). TYLKO PAPIEROWY, obserwacja 2–3 tygodnie. Backtest 2023–2026
+# (17,8 tys. meczow z kursami, walk-forward): przy P(O2.5) >= 60% O0.5 wchodzi w 96,6%; 3 nogi weszly w 90,7% dni,
+# 4 nogi w 86,3%. Kurs STS na O0.5 w takich meczach to 1,01–1,03, wiec kurs laczny ok. 1,06–1,09 — po podatku 12%
+# NAWET WYGRANY kupon zwraca mniej niz stawke (prog: kurs laczny > 1,14). Stad zapis wirtualny z prawdziwych kursow.
+O05_MIN_P25 = 0.60
+O05_NOGI = (3, 4)
+
+
+def kupon_o05(plik_nogi, n):
+    """Najlepsze n meczow wg P(O2.5) z pliku typuj.plik_o25 (z kursem O0.5). None, gdy za malo meczow."""
+    import os
+    f = os.path.splitext(plik_nogi)[0] + '_o25.csv'
+    if not os.path.exists(f): return None
+    x = pd.read_csv(f, dtype=str).drop_duplicates('mecz', keep='last')
+    if 'p_wybor' not in x: x['p_wybor'] = x.p_o25
+    for c in ('p_o25', 'p_o05', 'kurs_o05', 'p_wybor'): x[c] = pd.to_numeric(x[c], errors='coerce')
+    x = x[(x.p_wybor >= O05_MIN_P25) & (x.kurs_o05 > 1) & (pd.to_numeric(x.szacunek, errors='coerce').fillna(1) == 0)]
+    x = x.sort_values('p_wybor', ascending=False).head(n)
+    if len(x) < n: return None
+    p = float(math.prod(x.p_o05.fillna(0))) or None
+    return dict(nogi=x, kurs=float(math.prod(x.kurs_o05)), p=p)
+
+
+def linie_o05(plik_nogi, stawka=5.0):
+    out = []
+    for n in O05_NOGI:
+        o = kupon_o05(plik_nogi, n)
+        if o is None:
+            out.append(f'AKO O0.5 ({n} nogi, P(O2.5) >= {O05_MIN_P25:.0%}): brak — za malo meczow z P(O2.5) i kursem O0.5'); continue
+        wyp = stawka * o['kurs'] * TAX
+        out.append(f'AKO O0.5 ({n} nogi z najwyzszym P(O2.5)): kurs laczny {o["kurs"]:.3f} | '
+                   + (f'P modelu {o["p"]:.1%} | ' if o['p'] else '') + f'z {stawka:.0f} zl po podatku {wyp:.2f} zl | PAPIEROWY')
+        for r in o['nogi'].itertuples():
+            out.append(f'   {r.mecz} | O0.5 | P(O2.5) {r.p_wybor:.1%} (model {r.p_o25:.0%})' + (f' | P(O0.5) {r.p_o05:.1%}' if r.p_o05 == r.p_o05 else '')
+                       + f' | kurs {r.kurs_o05:.2f}')
+        if o['kurs'] * TAX <= 1:
+            out.append(f'   → nawet WYGRANY zwraca mniej niz stawke ({wyp:.2f} zl z {stawka:.0f} zl; potrzeba kursu > {1 / TAX:.2f})')
+        out.append(f'   → zapisz w ako_log jako papierowy (tag AKOO05-{n}); rozliczenie wirtualne z {stawka:.0f} zl')
+    return out
 
 
 # 08.10.2026 (decyzja uzytkownika: „codziennie musze miec jeden kupon AKO, ktory wejdzie”): KUPON DNIA — 2 nogi pilkarskie
