@@ -1372,12 +1372,44 @@ def _dopisz_noge(mecz, rynek, p, kurs, szacunek, polski, ev_dodatni=True, marza=
         wr.writerow([w.get(c, '') for c in kol])
 
 
+def plik_o25(nogi):
+    """Plik obok nogi.csv: P(O2.5) z modelu i kurs O0.5 kazdego meczu — dla papierowego AKO O0.5 w kupon.py."""
+    return os.path.splitext(nogi)[0] + '_o25.csv'
+
+
+def _dopisz_o25(mecz, d, kursy, szacunek, polski):
+    """15.10.2026 (decyzja uzytkownika): papierowy kupon 3–4 nog O0.5 z meczow o najwyzszym P(O2.5). KAZDY mecz z P modelu
+    (bez bramek nog) — wybiera kupon.py. Brak kursu O0.5 w ofercie = pusty kurs (kupon.py taki mecz pomija)."""
+    import csv
+    f = plik_o25(NOGI_PLIK)
+    nowy = not os.path.exists(f)
+    with open(f, 'a', encoding='utf-8', newline='') as fh:
+        wr = csv.writer(fh)
+        if nowy: wr.writerow(['mecz', 'p_o25', 'p_o05', 'kurs_o05', 'kurs_o25', 'szacunek', 'polski', 'p_rynek_o25', 'p_wybor'])
+        # P rynku z pary O2.5/U2.5 bez marzy; P do wyboru = srednia modelu i rynku (backtest: sam model zanizal P wzgledem
+        # rynku, laczenie z rynkiem dawalo najlepsza kalibracje); bez pary kursow = sam model
+        po, pu = _liczba_kursu(kursy.get('O2.5')), _liczba_kursu(kursy.get('U2.5'))
+        pr = (1 / po) / (1 / po + 1 / pu) if po and pu else None
+        pw = (d['O2.5'] + pr) / 2 if pr else d['O2.5']
+        wr.writerow([mecz, f'{d["O2.5"]:.4f}', f'{d["O0.5"]:.4f}' if 'O0.5' in d else '', kursy.get('O0.5', ''),
+                     kursy.get('O2.5', ''), int(bool(szacunek)), int(bool(polski)), f'{pr:.4f}' if pr else '', f'{pw:.4f}'])
+
+
+def _liczba_kursu(v):
+    try:
+        v = float(str(v).replace(',', '.'))
+    except (TypeError, ValueError):
+        return None
+    return v if v > 1 else None
+
+
 def value(rows, kursy, dz=None, mecz=None, szacunek=False, polski=False):
     """29.09.2026: wczesniej wynik drugie_zrodlo() byl wyrzucany — bramka z Poprawki 48 istniala tylko jako tekst
     do przeczytania. Teraz: noga bez zgodnego drugiego zrodla ma wprost werdykt NIE NA KUPON, a EV i Kelly do
     kuponu licza sie z P po bramce (od Poprawki 58: P modelu, gdy zrodla zgodne)."""
     if not kursy: return
     d = {k: pc for k, p, pc in rows}
+    if NOGI_PLIK and mecz and 'O2.5' in d: _dopisz_o25(mecz, d, kursy, szacunek, polski)
     print('\nWARTOŚĆ (kurs użyty dopiero po wyliczeniu P; podatek 12%):')
     for k, o in kursy.items():
         if k not in d:   # 05.10.2026: literowka w kodzie rynku nie moze przejsc po cichu
