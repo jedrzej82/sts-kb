@@ -312,6 +312,13 @@ _SKROTY_OGOLNE = set()   # z tego: nazwy, w ktorych odpadly WYLACZNIE czlony ogo
 _PUCHAR = re.compile(r'(?i)\b(cup|puchar|copa|coupe|coppa|pokal|beker|ta[cç]a|kupa|kupasi|trophy|super ?cup)\b')
 
 
+def zakaz_pucharu(argv, mt):
+    """P77.1: puchar kontynentalny (--kontynentalny) albo krajowy (turniej pucharowy w terminarzu) -> powod zakazu nogi."""
+    if '--kontynentalny' in argv or (mt and _PUCHAR.search(str(mt.get('turniej', '')))):
+        return 'PUCHAR — tylko papier (P77.1), z tego meczu nie budujemy nogi kuponu'
+    return None
+
+
 def skrot_w_pucharze_ok(skroty, mt, kraje):
     """01.10.2026 (Raport 12:00, USTERKA 4): Katar, QSL Cup — „Al-Gharafa SC” -> Al Gharafa, „Al-Mesaimeer SC” ->
     Mesaimeer SC; kluby z dwoch poziomow ligi nie maja wspolnej ligi, wiec kontrola LACZNA zawsze przerywala mecze
@@ -1158,6 +1165,11 @@ def club(home, away, kursy, live=None):
     # wydrukiem — gosp_O0.5 dostala „NOGA DOPUSZCZONA” i trafila do nogi.csv (ev_dodatni=1). Teraz to blokada w werdykcie.
     if any(o.startswith('ROZNE LIGI BEZ ELO') for o in ostrz):
         KONTEKST_MECZU['zakaz_nogi'] = 'ROZNE LIGI BEZ ELO — P nieporownywalne, z tego meczu nie budujemy nogi kuponu'
+    # 15.10.2026 (Raport 15:00 nr 8, P77.1 „puchary tylko na papierze”): Union SG – Real Sociedad (--kontynentalny, oba kluby
+    # z Elo) dostal „NOGA DOPUSZCZONA” 1X, a kupon.py wzial noge do K5/MIX — przebieg odrzucal ja recznie. Puchar
+    # kontynentalny (--kontynentalny) albo krajowy (terminarz: turniej pucharowy) = zadna noga nie idzie do nogi.csv.
+    elif (_zp := zakaz_pucharu(sys.argv, mt)):
+        KONTEKST_MECZU['zakaz_nogi'] = _zp
     if (_sr := KONTEKST_MECZU['sr_goli_ligi']) is not None and _sr >= PROG_LIGA_BRAMKOSTRZELNA:
         print(f'\nLIGA BRAMKOSTRZELNA: srednia {_sr:.2f} gola na mecz (12 mies.) — U3.5 z P >= 70% NIE NA KUPON (Poprawka 146).')
     dz = drugie_zrodlo([(r.MatchDate, r.HomeTeam, r.AwayTeam, int(r.FTHome), int(r.FTAway)) for r in _mm.itertuples()], h, a, rows)
