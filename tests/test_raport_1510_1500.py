@@ -85,4 +85,5 @@ def test_alias_ncaaf_texas_state():
     import sporty
     pula = {'Texas', 'Texas State', 'Texas Tech', 'Colorado State', 'Oklahoma', 'Oklahoma State'}
     assert sporty.resolve('Texas State Bobcats', pula, 'futbol_amerykanski') == 'Texas State'
+    assert sporty.resolve('Colorado State Rams', pula | {'Colorado'}, 'futbol_amerykanski') == 'Colorado State'
     assert sporty.resolve('Oklahoma Baptist Bison', pula, 'futbol_amerykanski') is None   # brak w zrodle — MNIEJ
