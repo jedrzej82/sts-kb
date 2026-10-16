@@ -78,3 +78,11 @@ def test_aliasy_egzonimy_pucharow():
     al = {(r.modul, r.nazwa): r.cel for r in a.itertuples()}
     assert al[('typuj', 'Viktoria Pilzno')] == 'Viktoria Plzen' and al[('typuj', 'OFI Kreta')] == 'OFI Crete'
     assert al[('typuj', 'Olympique Marsylia')] == 'Marseille'
+
+
+def test_alias_ncaaf_texas_state():
+    # Raport 15.10 21:00 nr 1: „Texas State Bobcats” pasowalo do 2 wpisow (Texas, Texas State)
+    import sporty
+    pula = {'Texas', 'Texas State', 'Texas Tech', 'Colorado State', 'Oklahoma', 'Oklahoma State'}
+    assert sporty.resolve('Texas State Bobcats', pula, 'futbol_amerykanski') == 'Texas State'
+    assert sporty.resolve('Oklahoma Baptist Bison', pula, 'futbol_amerykanski') is None   # brak w zrodle — MNIEJ
