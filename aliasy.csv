@@ -575,3 +575,9 @@ typuj,OFI Kreta,OFI Crete,Raport 15.10 15:00 nr 2: Liga Europy (G1); terminarz 3
 typuj,Olympique Marsylia,Marseille,Raport 15.10 15:00 nr 2: Liga Europy (F1); terminarz 365/FS 15.10: Marseille – Olympiacos Piraeus,2026-10-15
 sporty,Texas State Bobcats,Texas State,"Raport 15.10 21:00 nr 1: NCAAF (FBS) — w statystykach i wynikach 365 „Texas State” (Texas to inny klub, Longhorns)",2026-10-15
 sporty,Colorado State Rams,Colorado State,"Raport 15.10 21:00 nr 1: NCAAF (FBS) — w statystykach i wynikach 365 „Colorado State” (Colorado to inny klub, Buffaloes)",2026-10-15
+typuj,Steaua Bukareszt,CSA Steaua Bucuresti,"Raport 16.10 21:00 nr 1: Liga 2 ROU; „Steaua” w puli to stary wpis Elo (FCSB), w Liga 2 gra CSA Steaua Bucuresti (2025–26, terminarz 365/FS 17.10: Steaua Bucuresti – Metaloglobus)",2026-10-16
+typuj,Stade Lavallois,Laval,"Raport 16.10 18:00 nr 3: Ligue 2; bez aliasy_auto.csv „Stade Lavallois” -> None (w bazie Laval, F2; build_kb ma te pare tylko dla nazw ze zrodel)",2026-10-16
+typuj,Wexford FC,Wexford Youths,"Raport 16.10 18:00 nr 2: Irlandia Division 1; ten sam klub (Wexford Youths -> Wexford FC 2017), w wynikach 365 „Wexford Youths”, FS „Wexford”",2026-10-16
+typuj,West Bromwich,West Brom,"Rozliczenie 13.10 (Raporty 16.10 nr 8): Wrexham AFC – West Bromwich, NAZWA_NIEDOPASOWANA; w wynikach 365/FS „West Brom”",2026-10-16
+typuj,Mardin Spor,Mardin 1969,"Rozliczenie 15.10 (Raporty 16.10 nr 8): Mardin Spor – Fatih Karagumruk, NAZWA_NIEDOPASOWANA; w bazie i wynikach 365 „Mardin 1969” (1. Lig)",2026-10-16
+sezon,Oviedo CB,Oviedo Club Baloncesto,"Raport 16.10 18:00 nr 4: arkusz statystyki_koszykowka pisze pelna nazwe „Oviedo Club Baloncesto”",2026-10-16

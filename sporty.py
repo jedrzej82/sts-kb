@@ -84,7 +84,11 @@ K = 24
 from nazwy import LITERY as _LITERY   # 29.09.2026: jedna tabela dla wszystkich modulow (nazwy.py)
 
 # 29.09.2026: html.unescape — w bazie dart byl „William O&#039;Connor” obok „William O’Connor” (dwa klucze, dwa Elo)
-def norm(s): return re.sub(r'[^a-z0-9]', '', unicodedata.normalize('NFKD', html.unescape(str(s)).translate(_LITERY)).encode('ascii', 'ignore').decode().lower())
+def norm(s): return _norm(str(s))
+
+
+@functools.lru_cache(maxsize=1 << 20)   # 16.10.2026: jak typuj.norm — funkcja czysta, wolana miliony razy w dopasuj.py auto
+def _norm(s): return re.sub(r'[^a-z0-9]', '', unicodedata.normalize('NFKD', html.unescape(s).translate(_LITERY)).encode('ascii', 'ignore').decode().lower())
 
 
 def scal_warianty(d, cicho=False):

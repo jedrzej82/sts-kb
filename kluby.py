@@ -284,6 +284,27 @@ SCAL_RECZNIE = {
     ('POL2', 'Polonia Warsawa'): 'Polonia Warszawa',
     # TP-47 (FS, Kakkonen 2026: TP-47 - Vaajakoski 04.10) = „TP-47 Tornio” (365 i oferta STS, ten sam mecz 04.10).
     ('Finland | Kakkonen', 'TP-47'): 'TP-47 Tornio',
+    # 16.10.2026 (Raport 21:00 nr 3): Kyoto Sanga (JAP2 2014–2021 i baraz 13.11.2022, zrodlo J2) = Kyoto (J1 od 02.2022,
+    # uzupelnij_ligi skleja „Kyoto Sanga” tylko w JAP). Daty sie nie nakladaja; oferta pisze „Kyoto Sanga” i trafiala w stary
+    # wpis — NIESWIEZA 1433 dni przy klubie grajacym co tydzien w J1.
+    ('JAP2', 'Kyoto Sanga'): 'Kyoto',
+    # 16.10.2026 (Raport 18:00 nr 2): Wexford (football-data, IRL 2016) = Wexford Youths (365, Division 1 od 2025; od 2017
+    # nazwa Wexford FC). FS tez pisze „Wexford”. Oferta „Wexford FC” trafiala w zapis z 2016 bez wspolnej ligi z UC Dublin.
+    ('IRL', 'Wexford'): 'Wexford Youths',
+    # 16.10.2026 (Raporty 12:00–18:00, P110.1): Regionalliga Ost — 365 (do 11.2025, „Austria | Regional League - East”) pisze
+    # pelne nazwy, FS (od 09.2026, „Austria | Regionalliga East”) skroty; oferta pisze pelne. Kluby z ofert 16.10
+    # (Favoritner AC, SG Traiskirchen, FC Marchfeld Donauauen) byly NIESWIEZE (329 dni). Pary z porownania obu list
+    # druzyn ligi; nie sklejamy: Mattersburg SV 2020, SV Donau, Warth, Wienerberger (beniaminki — brak pary w 2025).
+    ('Austria | Regionalliga East', 'Favoritner'): 'Favoritner AC',
+    ('Austria | Regionalliga East', 'Traiskirchen'): 'SG Traiskirchen',
+    ('Austria | Regionalliga East', 'Marchfeld'): 'FC Marchfeld Donauauen',
+    ('Austria | Regionalliga East', 'Donaufeld Wien'): 'SR Donaufeld',
+    ('Austria | Regionalliga East', 'Kremser'): 'Krems',
+    ('Austria | Regionalliga East', 'Horn'): 'SV Horn',
+    ('Austria | Regionalliga East', 'SV Oberwart'): 'Oberwart',
+    ('Austria | Regionalliga East', 'Parndorf'): 'SC/ESV Parndorf',
+    ('Austria | Regionalliga East', 'Wiener Sport-Club'): 'Wiener Sportklub',
+    ('Austria | Regionalliga East', 'Wiener Viktoria'): 'SC Wiener Viktoria',
 }
 
 # Nazwy (z danej ligi), ktore NIGDY nie moga zostac sklejone — rozne kluby, ktore automat bral za jeden,

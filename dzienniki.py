@@ -162,6 +162,17 @@ def _data(s):
 
 def wyniki_pilka(kb=HERE):
     """(data, gosp, gosc, g, a, ht_g, ht_a) z kb.sqlite (matches + intl) i zewn/wyniki_*_pilka_*."""
+    w = _wyniki_pilka_wszystkie(kb)
+    return w.dropna(subset=['d', 'g', 'ga']).drop_duplicates(['d', 'h', 'a'], keep='last')
+
+
+def wyniki_pilka_bez_wyniku(kb=HERE):
+    """16.10.2026: TYLKO wiersze zrodel BEZ wyniku (mecz przelozony/przerwany/odwolany) — do kodu anomalii nogi."""
+    w = _wyniki_pilka_wszystkie(kb)
+    return w[w.d.notna() & (w.g.isna() | w.ga.isna())].drop_duplicates(['d', 'h', 'a'], keep='last')
+
+
+def _wyniki_pilka_wszystkie(kb):
     czesci = []
     db = os.path.join(kb, 'kb.sqlite')
     if os.path.exists(db):
@@ -186,7 +197,7 @@ def wyniki_pilka(kb=HERE):
     w = pd.concat(czesci, ignore_index=True)
     w['d'] = _data(w.d).dt.normalize()
     for c in ('g', 'ga', 'hg', 'ha'): w[c] = pd.to_numeric(w[c], errors='coerce')
-    return w.dropna(subset=['d', 'g', 'ga']).drop_duplicates(['d', 'h', 'a'], keep='last')
+    return w
 
 
 def wyniki_inne(kb=HERE):
@@ -461,6 +472,7 @@ ANOMALIE = (
     ('DOGRYWKA_NIEZNANA', 'zrodlo wynikow', r'brak informacji o dogrywce'),
     ('REMIS_PRZY_ZWYCIEZCY', 'decyzja', r'remis przy rynku zwyciezcy'),
     ('KILKA_MECZOW', 'dopasowanie zdarzenia', r'kilka (meczow|pasujacych)'),
+    ('MECZ_BEZ_WYNIKU', 'zrodlo wynikow', r'mecz w zrodle bez wyniku'),
     ('NAZWA_NIEDOPASOWANA', 'dopasowanie zdarzenia', r'nie dopasowano'),
     ('BRAK_MECZU', 'dopasowanie zdarzenia', r'brak meczu w oknie'),
 )
@@ -489,6 +501,20 @@ def rozlicz_noge(r, W):
     return stan, wyn, uw
 
 
+def _bez_wyniku_w_zrodle(W, d0, gosp, gosc, roz):
+    """16.10.2026 (Raporty 16.10 nr 8: Millonarios FC – CD Once Caldas 14.10, NAZWA_NIEDOPASOWANA): Flashscore ma ten mecz
+    BEZ wyniku (przelozony/przerwany), 365 nie ma go wcale. Pula okna brala tylko mecze z wynikiem, wiec nazwa
+    „nie dopasowala sie” — warstwa bledu to zrodlo wynikow, nie nazwy. Gdy para jest w wierszach bez wyniku: osobny komunikat
+    (kod MECZ_BEZ_WYNIKU). Noga dalej BRAK WYNIKU — nic nie zgadujemy."""
+    b = W.get('pilka_bez')
+    if b is None or b.empty: return None
+    n = len(_OSTRZEZENIA)
+    y, _ = _szukaj(b, d0, gosp, gosc, roz)
+    del _OSTRZEZENIA[n:]
+    if y is None: return None
+    return f'mecz w zrodle bez wyniku (przelozony/przerwany?): {y["h"]} - {y["a"]} {y["d"]:%Y-%m-%d} ({y.get("zr", "")})'
+
+
 def _rozlicz_noge(r, W):
     sport = str(r.get('sport', '')).lower()
     gosp, gosc = _para(r['zdarzenie'])
@@ -502,7 +528,7 @@ def _rozlicz_noge(r, W):
         wsk = m.group(1).strip() if m else None
         roz = (lambda n, p: _rozwiaz_pilka(n, p) or (wsk if wsk in p else None)) if wsk else _rozwiaz_pilka
         x, odw = _szukaj(W['pilka'], d0, gosp, gosc, roz)
-        if x is None: return 'BRAK WYNIKU', '', odw
+        if x is None: return 'BRAK WYNIKU', '', _bez_wyniku_w_zrodle(W, d0, gosp, gosc, roz) or odw
         g, a = (x.ga, x.g) if odw else (x.g, x.ga)
         hg, ha = (x.ha, x.hg) if odw else (x.hg, x.ha)
         wyn = f'{int(g)}:{int(a)}'
@@ -831,7 +857,7 @@ def main(a):
         ako_p = os.path.join(HERE, 'ako_log.csv')
     if not os.path.exists(ako_p): sys.exit(f'brak {ako_p} — najpierw: python3 dzienniki.py scal KATALOG_Z_DELTAMI')
     ako = _czytaj(ako_p)
-    W = dict(pilka=wyniki_pilka(), inne=wyniki_inne(), tenis=wyniki_tenis())
+    W = dict(pilka=wyniki_pilka(), pilka_bez=wyniki_pilka_bez_wyniku(), inne=wyniki_inne(), tenis=wyniki_tenis())
     zp = a[a.index('--zaklady') + 1] if '--zaklady' in a else os.path.join(HERE, 'zaklady_faktyczne.csv')
     zaklady = czytaj_zaklady(zp)
     if zaklady is not None and (zaklady.data == data).any():
