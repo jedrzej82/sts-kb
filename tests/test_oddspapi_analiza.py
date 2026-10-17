@@ -71,3 +71,33 @@ def test_nazwy_rynkow_i_wyniki_rozliczen(tmp_path, capsys):
     assert f'WYNIKI nóg z przewagą >= 3% (rozliczenia OddsPapi): 2 nóg, trafione 1, zysk {2.30 * 0.88 - 2:+.2f} zł' in out
     assert '— nie wszedł' in out                                                          # AKO z A i B: B przegrało
     assert oa.zysk('HALFWIN', 2.0, 0.12) == pytest.approx(0.38) and oa.zysk('UNDECIDED', 2.0, 0.12) is None
+
+
+def _nogi(n_meczow, przewagi, dzien0=1792252800, meczow_dziennie=40):
+    out, info = [], {}
+    for i in range(n_meczow):
+        fid = f'm{i}'
+        info[fid] = {'t': dzien0 + (i // meczow_dziennie) * 86400}
+        for j, e in enumerate(przewagi(i)):
+            out.append(dict(id=fid, rynek=101, wynik=101 + j, przewaga6=0.05, przewagaz=e, pz=0.5, kurs_sb=2.1))
+    return out, info
+
+
+def test_werdykt_za_malo_dalej_stop():
+    nogi_, info = _nogi(50, lambda i: [0.05, 0.04])
+    assert oa.werdykt(nogi_, info, 0.03)[0] == 'ZA MAŁO DANYCH' and '100/200' in oa.werdykt(nogi_, info, 0.03)[1]
+    nogi_, info = _nogi(150, lambda i: [0.06 + 0.02 * (i % 3 - 1), 0.05])
+    w, uz = oa.werdykt(nogi_, info, 0.03)
+    assert w == 'DALEJ' and '300 nóg w 150 meczach' in uz
+    nogi_, info = _nogi(150, lambda i: [-0.02 + 0.04 * (i % 2), -0.03])
+    assert oa.werdykt(nogi_, info, 0.03)[0] == 'STOP'
+    # mało okazji: 8 dni, 2 okazje dziennie
+    nogi_, info = _nogi(16, lambda i: [0.05], meczow_dziennie=2)
+    w, uz = oa.werdykt(nogi_, info, 0.03)
+    assert w == 'STOP' and '2.0/dzień' in uz
+
+
+def test_bootstrap_po_meczach_przedzial():
+    nogi_, _ = _nogi(100, lambda i: [0.1 if i % 2 else -0.1] * 3)
+    sr, lo, hi = oa.bootstrap_po_meczach(nogi_)
+    assert sr == pytest.approx(0) and lo < 0 < hi and hi - lo > 0.02                   # mecze, nie nogi: szeroki przedział

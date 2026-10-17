@@ -74,7 +74,9 @@ Nigdy stałe „+2 h”: w Pythonie `ZoneInfo('Europe/Warsaw')`/`tz_localize('Eu
   Pomiar: `oddspapi_analiza.py oddspapi_hist_*.json.gz --listy oddspapi_*_RANO.json.gz` (przewaga Superbet vs Pinnacle bez marzy
   6 h przed i na zamknieciu, EV po podatku 12%, AKO dzienne z nog >= --prog; tylko rynki z tym samym zestawem wynikow u obu;
   `--rynki oddspapi_rynki.json` = nazwy rynkow (1 platne raz), `--rozliczenia oddspapi_rozl_*.json.gz` = WIN/LOSE z settlements
-  — platne, skrypt rozlicza max 4 mecze/dobe, tylko z noga Superbet powyzej kursu uczciwego).
+  — platne, skrypt rozlicza max 4 mecze/dobe, tylko z noga Superbet powyzej kursu uczciwego). Pierwsza linia raportu = WERDYKT
+  (plan z 17.10): STOP gdy po 7 dniach < 3 okazje/dzien albo srednia przewaga vs zamkniecie <= 0; DALEJ (AKO papierowe, ~50 kuponow,
+  potem decyzja uzytkownika) gdy >= 200 nog, srednia >= +3% i dolna granica 95% (bootstrap po meczach) > 0; inaczej ZA MALO DANYCH.
   `apps_script/wyniki_live.gs` (wyniki na zywo dla aplikacji „Prognozy meczowe”: API-Sports — klucz TYLKO we wlasciwosciach
   skryptu APISPORTS_KEY — + OpenLigaDB -> `wyniki_live.json` na Dysku co minute; darmowy plan: kazdy sport najwyzej co 15 min,
   limit 95/dzien; NIE jest czescia przebiegu ani rozliczen).

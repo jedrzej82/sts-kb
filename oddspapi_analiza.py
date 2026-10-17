@@ -29,11 +29,18 @@ import datetime as dt
 import gzip
 import json
 import math
+import random
 import sys
 from zoneinfo import ZoneInfo
 
 PL = ZoneInfo('Europe/Warsaw')
 PODEJRZANE = 0.35
+# WERDYKT (17.10.2026, plan sprawdzenia przyjęty z użytkownikiem): czy przewaga Superbet nad Pinnacle jest prawdziwa
+MIN_NOG = 200                   # nóg z przewagą >= progu (6 h przed), żeby ocenić przewagę względem zamknięcia
+MIN_DNI_CZESTOSC = 7            # po tylu dniach obserwacji oceniamy, czy okazji jest dość na codzienne AKO
+MIN_NOG_DZIENNIE = 3
+PROG_DALEJ = 0.03               # średnia przewaga vs zamknięcie, przy której (i dolnej granicy 95% > 0) idziemy dalej
+BOOTSTRAP = 2000
 RYNKI = {101: '1X2'}            # znane identyfikatory OddsPapi; reszta jako „rynek NNN”
 WYNIKI = {101: '1', 102: 'X', 103: '2'}
 
@@ -130,6 +137,46 @@ def _proc(x):
     return '—' if x is None else f'{100 * x:+.1f}%'
 
 
+def bootstrap_po_meczach(nogi_, klucz='przewagaz', b=BOOTSTRAP, ziarno=17):
+    """Średnia i 95% przedział (percentylowy) średniej `klucz` przy losowaniu MECZÓW ze zwracaniem — nogi jednego meczu
+    nie są niezależne (ten sam wynik meczu, te same błędy linii)."""
+    po_meczu = collections.defaultdict(list)
+    for n in nogi_:
+        po_meczu[n['id']].append(n[klucz])
+    grupy = list(po_meczu.values())
+    if not grupy:
+        return None, None, None
+    los = random.Random(ziarno)
+    srednie = []
+    for _ in range(b):
+        wyb = [g for _ in grupy for g in [grupy[los.randrange(len(grupy))]]]
+        w = [x for g in wyb for x in g]
+        srednie.append(sum(w) / len(w))
+    srednie.sort()
+    wszystkie = [x for g in grupy for x in g]
+    return sum(wszystkie) / len(wszystkie), srednie[int(0.025 * b)], srednie[int(0.975 * b) - 1]
+
+
+def werdykt(dobre, mecze_info, prog):
+    """(werdykt, uzasadnienie): DALEJ | STOP | ZA MAŁO DANYCH — według planu z 17.10.2026."""
+    okazje = [n for n in dobre if n['przewaga6'] >= prog and n['przewagaz'] is not None]
+    dni = {dt.datetime.fromtimestamp(mecze_info[n['id']]['t'], PL).date() for n in dobre
+           if n['id'] in mecze_info and mecze_info[n['id']].get('t')}
+    if len(dni) >= MIN_DNI_CZESTOSC and len(okazje) / len(dni) < MIN_NOG_DZIENNIE:
+        return 'STOP', (f'za mało okazji: {len(okazje)} nóg z przewagą >= {prog:.0%} w {len(dni)} dniach '
+                        f'({len(okazje) / len(dni):.1f}/dzień < {MIN_NOG_DZIENNIE}) — codziennego AKO nie da się złożyć')
+    if len(okazje) < MIN_NOG:
+        return 'ZA MAŁO DANYCH', f'{len(okazje)}/{MIN_NOG} nóg z przewagą >= {prog:.0%}' + (f' w {len(dni)} dniach' if dni else '')
+    sr, lo, hi = bootstrap_po_meczach(okazje)
+    opis = (f'{len(okazje)} nóg w {len({n["id"] for n in okazje})} meczach: przewaga vs zamknięcie Pinnacle średnio {_proc(sr)}, '
+            f'95% przedział {_proc(lo)} … {_proc(hi)}')
+    if sr <= 0 or hi < PROG_DALEJ:
+        return 'STOP', opis + ' — rano widać szum albo stare kursy, przewaga nie trzyma się do zamknięcia'
+    if lo > 0 and sr >= PROG_DALEJ:
+        return 'DALEJ', opis + ' — przewaga prawdziwa: AKO papierowe (bez stawki), ~50 kuponów, potem decyzja użytkownika'
+    return 'ZA MAŁO DANYCH', opis + ' — niejednoznaczne, zbieramy dalej'
+
+
 def raport(lista, mecze_info, prog, podatek, ile_nog, ryn=None, rozl=None):
     ryn, rozl = ryn or {}, rozl or {}
     linie = []
@@ -142,6 +189,8 @@ def raport(lista, mecze_info, prog, podatek, ile_nog, ryn=None, rozl=None):
     if not dobre:
         linie.append('Brak nóg do oceny.')
         return linie
+    w, uzas = werdykt(dobre, mecze_info, prog)
+    linie.insert(0, f'WERDYKT: {w} — {uzas}')
     for nazwa, klucz in (('vs Pinnacle 6 h przed', 'przewaga6'), ('vs Pinnacle zamknięcie', 'przewagaz')):
         w = sorted(n[klucz] for n in dobre if n[klucz] is not None)
         if not w:
