@@ -26,6 +26,7 @@ KOMUNIKATY = [
     ('kilka meczow tej pary w oknie +-1 dnia — nie zgadujemy', 'KILKA_MECZOW'),
     ('kilka pasujacych meczow (2) — nie zgadujemy', 'KILKA_MECZOW'),
     ('A - B: kilka meczow tej pary tego dnia (rozne wyniki) — nie zgadujemy', 'KILKA_MECZOW'),
+    ('mecz w zrodle bez wyniku (przelozony/przerwany?): Millonarios - Once Caldas 2026-10-14 (fs)', 'MECZ_BEZ_WYNIKU'),
     ('nie dopasowano: Maccabi Ironi Kiryat Gat', 'NAZWA_NIEDOPASOWANA'),
     ('Lukko - Ilves: brak meczu w oknie +-1 dnia', 'BRAK_MECZU'),
 ]

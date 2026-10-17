@@ -323,10 +323,19 @@ def _produkcja():
         x = d[d.sport == sporty.nazwa_sportu(s)]
         if len(x): pule[s] = {p for p in set(x.gosp) | set(x.gosc) if isinstance(p, str)}
 
+    # 16.10.2026 (P126.1, dopasuj.py auto 12–13 min): kotwica_ligowa wolala resolver dla KAZDEGO zdarzenia dwa razy w kazdym
+    # przejsciu (6888 wywolan, 1249 s z 1350 s). Pamiec (S, nazwa) -> wynik; auto() czysci ja po dopisaniu aliasow
+    # (zastosuj zmienia ALIASES, wiec wynik resolvera moze sie zmienic).
+    pam = {}
+
     def rozwiaz(S, n):
+        if (S, n) in pam: return pam[(S, n)]
         with contextlib.redirect_stdout(io.StringIO()):
-            if S == 'pilka': return typuj.resolve(n, pule['pilka']) or typuj._przez_egzonim(n, pule['pilka'])
-            return sporty.resolve(n, pule[S], sporty.nazwa_sportu(S))
+            if S == 'pilka': w = typuj.resolve(n, pule['pilka']) or typuj._przez_egzonim(n, pule['pilka'])
+            else: w = sporty.resolve(n, pule[S], sporty.nazwa_sportu(S))
+        pam[(S, n)] = w
+        return w
+    rozwiaz.wyczysc = pam.clear
     return rozwiaz, pule
 
 
@@ -366,6 +375,7 @@ def auto(kursy, zewn, wyjscie):
             d, kl = slownik[r.modul]
             d.setdefault(kl(r.nazwa), r.cel)
             if r.modul == 'sporty': sporty._ALIASY_WIELE.setdefault(kl(r.nazwa), []).append(r.cel)
+        getattr(rozwiaz, 'wyczysc', lambda: None)()
     dzis = pd.Timestamp.today().strftime('%Y-%m-%d')
     al, kon, stat = ucz(ev, zrodla(zewn), rozwiaz, pule)
     wynik = [jako_aliasy(al, dzis)]

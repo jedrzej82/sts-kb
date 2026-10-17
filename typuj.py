@@ -34,7 +34,15 @@ def db():
 from nazwy import LITERY as _LITERY   # 29.09.2026: jedna tabela dla wszystkich modulow (nazwy.py)
 
 def norm(s):
-    s = unicodedata.normalize('NFKD', str(s).translate(_LITERY)).encode('ascii', 'ignore').decode().lower()
+    return _norm(str(s))
+
+
+# 16.10.2026 (Raporty 16.10, P126.1: dopasuj.py auto 12–13 min > limit 10 min/polecenie): resolve() normalizuje CALA pule
+# przy kazdym wywolaniu — w dopasuj.py auto 127 mln wywolan norm (755 s z 1350 s). Funkcja czysta (napis -> napis), wiec
+# pamiec podreczna nie zmienia wyniku.
+@functools.lru_cache(maxsize=1 << 20)
+def _norm(s):
+    s = unicodedata.normalize('NFKD', s.translate(_LITERY)).encode('ascii', 'ignore').decode().lower()
     return re.sub(r'[^a-z0-9]', '', s)
 
 
