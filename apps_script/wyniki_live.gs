@@ -49,6 +49,11 @@ var LIMIT_DZIEN = 95;          // darmowy plan: 100/dzień na sport — zostawia
 var API_PILKA = 'https://v3.football.api-sports.io/';
 var FOLDER_API = 'api-football';
 var OBS_NA_MINUTE = 4;
+// 17.10.2026: konto API-Sports zawieszone („Your account is suspended”) po dniu z kilkoma ręcznymi „ustaw”. Twarde
+// zabezpieczenia: jeden przebieg naraz (blokada skryptu), najwyżej MAKS_NA_MINUTE zapytań API-Sports na minutę łącznie
+// (limit API: 10/min), a po odpowiedzi o zawieszeniu/zablokowaniu konta — żadnych zapytań przez BLOKADA_H godzin.
+var MAKS_NA_MINUTE = 7;
+var BLOKADA_H = 6;
 var MAKS_LIG = 150;            // właściwość skryptu ma limit 9 KB — stan historii (2 sezony na ligę) musi się zmieścić
 var OPENLIGA = ['bl1', 'bl2', 'bl3'];
 
@@ -61,6 +66,27 @@ function ustaw() {
 }
 
 function wynikiLive() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(1000)) return;                 // poprzedni przebieg (albo ręczne „ustaw”) jeszcze trwa
+  try { wynikiLive_(); } finally { lock.releaseLock(); }
+}
+
+// czy wolno teraz wysłać zapytanie do API-Sports (limit na minutę + blokada po zawieszeniu konta); liczy zapytanie
+function mozeApi_(stan) {
+  var teraz = Date.now();
+  if (stan.blokada && teraz - stan.blokada.ts < BLOKADA_H * 3600000) return false;
+  var minuta = Math.floor(teraz / 60000);
+  if (stan.minuta !== minuta) { stan.minuta = minuta; stan.naMinute = 0; }
+  if (stan.naMinute >= MAKS_NA_MINUTE) return false;
+  stan.naMinute++;
+  return true;
+}
+
+function sprawdzBlokade_(stan, blad) {
+  if (/suspend|banned|blocked|account/i.test(blad || '')) stan.blokada = {ts: Date.now(), powod: String(blad).slice(0, 200)};
+}
+
+function wynikiLive_() {
   var P = PropertiesService.getScriptProperties();
   var klucz = P.getProperty('APISPORTS_KEY') || '';
   var co = Math.max(1, +(P.getProperty('ODSWIEZ_MIN') || 15));
@@ -69,7 +95,8 @@ function wynikiLive() {
   var coPilka = Math.max(1, +(P.getProperty('ODSWIEZ_PILKA_MIN') || 30));
   var dzienUtc = teraz.toISOString().slice(0, 10);
   var stan = JSON.parse(P.getProperty('wl_stan') || '{}');
-  if (stan.data !== dzienUtc) stan = {data: dzienUtc, sport: {}};   // limit API liczy się od 00:00 UTC
+  if (stan.data !== dzienUtc) stan = {data: dzienUtc, sport: {}, blokada: stan.blokada, minuta: stan.minuta, naMinute: stan.naMinute};   // limit API liczy się od 00:00 UTC
+  if (stan.blokada && teraz.getTime() - stan.blokada.ts >= BLOKADA_H * 3600000) delete stan.blokada;   // po BLOKADA_H jedna próba
   var stary = czytajPlik_();
   var mecze = (stary && stary.data === dzis ? stary.mecze : []) || [], zrodla = (stary && stary.data === dzis ? stary.zrodla : {}) || {};
 
@@ -78,6 +105,7 @@ function wynikiLive() {
     if (!klucz) { zrodla[s] = {blad: 'brak APISPORTS_KEY we właściwościach skryptu'}; return; }
     if (teraz.getTime() - st.ts < (s === 'football' ? coPilka : co) * 60000 - 5000) return;   // jeszcze nie pora
     if (st.n >= LIMIT_DZIEN) { zrodla[s] = zrodla[s] || {}; zrodla[s].blad = 'dzienny limit zapytań wyczerpany'; return; }
+    if (!mozeApi_(stan)) { if (stan.blokada) { zrodla[s] = zrodla[s] || {}; zrodla[s].blad = 'wstrzymane: ' + stan.blokada.powod; } return; }
     st.n++; st.ts = teraz.getTime(); stan.sport[s] = st;
     try {
       var r = UrlFetchApp.fetch(HOSTY[s] + '?date=' + dzis + '&timezone=Europe/Warsaw',
@@ -85,7 +113,7 @@ function wynikiLive() {
       var j = JSON.parse(r.getContentText() || '{}'), h = r.getHeaders();
       var bl = bladApi_(r.getResponseCode(), j);
       var zost = +(h['x-ratelimit-requests-remaining'] || h['X-RateLimit-Requests-Remaining'] || NaN);
-      if (bl) { zrodla[s] = {ts: teraz.toISOString(), blad: bl, zostalo: isNaN(zost) ? null : zost}; return; }
+      if (bl) { sprawdzBlokade_(stan, bl); zrodla[s] = {ts: teraz.toISOString(), blad: bl, zostalo: isNaN(zost) ? null : zost}; return; }
       var nowe = (j.response || []).map(function (x) { return s === 'football' ? meczPilka(x) : meczGra(s, x); }).filter(Boolean);
       mecze = mecze.filter(function (m) { return m.s !== s; }).concat(nowe);
       zrodla[s] = {ts: teraz.toISOString(), n: nowe.length, blad: null, zostalo: isNaN(zost) ? null : zost};
@@ -103,7 +131,9 @@ function wynikiLive() {
     } catch (e) { zrodla['openliga_' + kod] = {ts: teraz.toISOString(), blad: String(e).slice(0, 200)}; }
   });
 
-  if (klucz) {
+  if (stan.blokada) zrodla.blokada = {od: new Date(stan.blokada.ts).toISOString(), powod: stan.blokada.powod, godzin: BLOKADA_H};
+  else delete zrodla.blokada;
+  if (klucz && !stan.blokada) {
     try { zrodla.obserwacja = obserwacja_(P, stan, klucz, mecze, teraz, coPilka); }
     catch (e) { zrodla.obserwacja = {blad: String(e).slice(0, 300)}; }
   }
@@ -217,11 +247,13 @@ function rezerwaLive_(teraz, coPilka) {
 function zapytajPilka_(stan, klucz, sciezka, limitObs) {
   var st = stan.sport.football || {n: 0, ts: 0};
   if (st.n >= limitObs) return {blad: 'budżet'};
+  if (!mozeApi_(stan)) return {blad: 'budżet'};
   st.n++; stan.sport.football = st; stan.obsMin = (stan.obsMin || 0) + 1;
   var r = UrlFetchApp.fetch(API_PILKA + sciezka, {headers: {'x-apisports-key': klucz}, muteHttpExceptions: true});
   var j = {};
   try { j = JSON.parse(r.getContentText() || '{}'); } catch (e) { return {blad: 'odpowiedź nie jest JSON'}; }
   var bl = bladApi_(r.getResponseCode(), j);
+  if (bl) sprawdzBlokade_(stan, bl);
   return bl ? {blad: bl} : {j: j};
 }
 
