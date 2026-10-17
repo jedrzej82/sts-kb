@@ -110,7 +110,7 @@ def test_wyniki_live_normalizacja_zrodel():
 def test_wyniki_live_klucz_tylko_we_wlasciwosciach():
     t = _txt('wyniki_live.gs')
     assert "P.getProperty('APISPORTS_KEY')" in t and not re.search(r"x-apisports-key'\s*:\s*'[0-9a-f]{20,}", t)
-    c = _cialo(t, 'wynikiLive')
+    c = _cialo(t, 'wynikiLive_')
     # budzet darmowego planu: limit sprawdzany przed zapytaniem, licznik zapisany po petli
     assert c.index('st.n >= LIMIT_DZIEN') < c.index('UrlFetchApp.fetch(HOSTY[s]') < c.index("P.setProperty('wl_stan'")
 
@@ -151,6 +151,7 @@ var DriveApp = {searchFolders: function () { return {hasNext: function () { retu
     return {hasNext: function () { return !!f && !d; }, next: function () { d = true; return f; }}; },
   createFile: function (n, t) { return pliki['DRIVE_' + n] = plikAtrapa(n, t); }};
 var Logger = {log: function (x) { log.push(String(x)); }};
+var LockService = {getScriptLock: function () { return {tryLock: function () { return true; }, releaseLock: function () {}}; }};
 var Utilities = {formatDate: function (d, tz, f) {
   var p = {}; new Intl.DateTimeFormat('en-GB', {timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hourCycle: 'h23'})
     .formatToParts(d).forEach(function (x) { p[x.type] = x.value; });
@@ -163,7 +164,8 @@ var fx = function (id, lid, st, h, a) { return {fixture: {id: id, timestamp: 179
   lineups: [{team: {id: 1, name: h}, formation: '4-3-3', coach: {name: 'Trener'}, startXI: [{player: {name: 'A, B'}}, {player: {name: 'C'}}], substitutes: [{player: {name: 'D'}}]}]}; };
 var UrlFetchApp = {fetch: function (u) { wyw.push(u.replace(/^https:\/\/v\d\.[a-z]+\.api-sports\.io\//, ''));
   var b = {response: []};
-  if (u.indexOf('fixtures?ids=') >= 0 && PLAN_DARMOWY) b = {errors: {plan: 'Free plans do not have access to the Ids parameter.'}, response: []};
+  if (ZAWIESZONE) b = {errors: {access: 'Your account is suspended, check on https://dashboard.api-football.com.'}, response: []};
+  else if (u.indexOf('fixtures?ids=') >= 0 && PLAN_DARMOWY) b = {errors: {plan: 'Free plans do not have access to the Ids parameter.'}, response: []};
   else if (u.indexOf('fixtures?id=') >= 0) b.response = [fx(+u.split('id=')[1], 39, 'FT', 'H', 'A')];
   else if (u.indexOf('league=') >= 0 && PLAN_DARMOWY) b = {errors: {plan: 'Free plans do not have access to this season, try from 2022 to 2024.'}, response: []};
   else if (u.indexOf('fixtures?ids=') >= 0) b.response = u.split('ids=')[1].split('-').map(function (i) { return fx(+i, 39, 'FT', 'H' + i, 'A' + i); });
@@ -174,11 +176,12 @@ var UrlFetchApp = {fetch: function (u) { wyw.push(u.replace(/^https:\/\/v\d\.[a-
 '''
 
 
-def _symulacja(teraz_iso, props, ligi, dzis_mecze, przebiegi=1, plan_darmowy=False):
+def _symulacja(teraz_iso, props, ligi, dzis_mecze, przebiegi=1, plan_darmowy=False, zawieszone=False):
     if not shutil.which('node'):
         pytest.skip('brak node')
     src = _txt('wyniki_live.gs')
     js = (_ATRAPY_GS.replace('PROPS', json.dumps(props)).replace('LIGI_JSON', json.dumps(ligi)).replace('DZIS', dzis_mecze).replace('PLAN_DARMOWY', 'true' if plan_darmowy else 'false')
+          .replace('ZAWIESZONE', 'true' if zawieszone else 'false')
           + src + r'''
     var RD = Date, T0 = RD.parse('%s'), krok = 0;
     Date = function (x) { return arguments.length ? new RD(x) : new RD(T0 + krok * 60000); };
@@ -253,3 +256,22 @@ def test_wyniki_live_plan_darmowy_bez_ids_i_bez_sezonow():
     assert sorted(x for x in sc if x.startswith('fixtures?id=')) == ['fixtures?id=%d' % (100 + i) for i in range(5)]
     assert sum(1 for x in sc if 'league=' in x) == 1                          # jedna odmowa sezonu i stop (nie 40)
     assert len(w['pliki']['api_statystyki_2026-10.csv'].splitlines()) == 1 + 5 * 2
+
+
+def test_wyniki_live_konto_zawieszone_stop_zapytan():
+    # 17.10.2026: „Your account is suspended” — skrypt dalej pytał co minutę; teraz po pierwszej takiej odpowiedzi cisza na 6 h
+    w = _symulacja('2026-10-17T10:00:00Z', {'APISPORTS_KEY': 'K', 'SPORTY': 'football,hockey,basketball'},
+                   {'ligi': [{'lid': 39, 'sezon': 2026}]}, '[]', przebiegi=40, zawieszone=True)
+    api = [x for x in w['wyw'] if not x.startswith('http')]
+    assert len(api) == 1, api                       # pierwsze zapytanie zwróciło „suspended” — dalej żadnych przez 40 minut
+    st = json.loads(w['props']['wl_stan'])
+    assert 'suspended' in st['blokada']['powod']
+
+
+def test_wyniki_live_najwyzej_7_zapytan_na_minute():
+    # limit API 10/min: 5 sportów + archiwum + kontuzje + szczegóły w jednej minucie przekraczały go
+    dzis = 'Array.apply(null, {length: 30}).map(function (_, i) { return fx(100 + i, 39, "FT", "H" + i, "A" + i); })'
+    w = _symulacja('2026-10-17T10:00:00Z', {'APISPORTS_KEY': 'K', 'SPORTY': 'football,hockey,basketball,handball,volleyball'},
+                   {'ligi': [{'lid': 39, 'sezon': 2026}]}, dzis, przebiegi=1, plan_darmowy=True)
+    api = [x for x in w['wyw'] if not x.startswith('http')]
+    assert len(api) == 7
