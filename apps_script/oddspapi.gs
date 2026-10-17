@@ -18,6 +18,7 @@
  *  3. Wybierz funkcję „ustaw” -> „Uruchom” -> zezwól. Tworzy wyzwalacz co godzinę i wysyła JEDNO zapytanie
  *     (lista bukmacherów: znajduje nazwę Superbet PL). Wynik w „Dzienniku wykonania” i w pliku oddspapi_stan.json.
  *     Ponowne „ustaw” tego samego dnia nie wysyła już nic.
+ *  4. (opcjonalnie) „sprawdzTeraz” -> „Uruchom”: próba od razu, 2 zapytania, najwyżej raz na dobę (plik ..._TEST.json.gz).
  *
  * WYNIK: folder „oddspapi” na Dysku, plik oddspapi_RRRR-MM-DD_OKNO.json.gz na okno:
  *  {v, ts, okno, bukmacherzy:[pinnacle, superbet], mecze:[{id, t, kraj, liga, lid, a, b}],
@@ -48,6 +49,21 @@ function ustaw() {
                + (st.blad ? ' | ' + st.blad : ''));
     zapiszStan_(P, st);
     plikStanu_(P, st, 'ustaw', 0, 0, st.blad ? [st.blad] : []);
+  } finally { lock.releaseLock(); }
+}
+
+// Ręczna próba poza oknami (np. zaraz po instalacji): lista meczów + jedna paczka kursów = 2 zapytania, raz na dobę.
+function sprawdzTeraz() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(1000)) return;
+  try {
+    var P = PropertiesService.getScriptProperties(), st = stan_(P);
+    if (st.okna.TEST === st.dzien.d) { Logger.log('Próba już była dziś — wynik w pliku oddspapi_stan.json'); return; }
+    st.okna.TEST = st.dzien.d;
+    zapiszStan_(P, st);
+    okno_(P, st, 'TEST', {kursy: 1, lista: true}, new Date());
+    zapiszStan_(P, st);
+    Logger.log('Mecze/kursy zapisane; zapytania dziś ' + st.dzien.n + ', w miesiącu ' + st.mies.n + (st.blad ? ' | ' + st.blad : ''));
   } finally { lock.releaseLock(); }
 }
 
