@@ -353,3 +353,13 @@ def test_setka_dni_od_stanu_i_limit(tmp_path, monkeypatch):
     z.z_setka(s, {}, dt.datetime(2026, 10, 4, 1, 0), stan, str(kat))
     assert stan['setka_do'] == '2026-10-03'
 
+
+
+def test_na_pl_czas_letni_i_zimowy():
+    # 17.10.2026: wczesniej stale +2 h; zmiana czasu 25.10.2026 i 29.03.2026 o 01:00 UTC
+    T = z.dt.datetime
+    assert z.na_pl(T(2026, 10, 17, 22, 30)) == T(2026, 10, 18, 0, 30)
+    assert z.na_pl(T(2026, 10, 25, 0, 59)) == T(2026, 10, 25, 2, 59)
+    assert z.na_pl(T(2026, 10, 25, 1, 0)) == T(2026, 10, 25, 2, 0)
+    assert z.na_pl(T(2026, 12, 31, 23, 30)) == T(2027, 1, 1, 0, 30)
+    assert z.na_pl(T(2026, 3, 29, 1, 0)) == T(2026, 3, 29, 3, 0)

@@ -58,6 +58,19 @@ FM_MAKS_PRZED, FM_MAKS_PO = 80, 140
 FM_LIMIT_S = 360        # najwyzej tyle sekund na szczegoly FotMob w jednym uruchomieniu
 REZERWA_S = 60          # przerwij pobieranie szczegolow, gdy do konca budzetu zostaje mniej
 FM_DNI_PO = 3           # mecze zakonczone: dzis, wczoraj, przedwczoraj
+
+
+def _ost_niedziela(rok, mies):
+    d = dt.datetime(rok, mies, 31)
+    return d - dt.timedelta(days=(d.weekday() + 1) % 7)
+
+
+def na_pl(t):
+    """UTC (naiwny) -> czas polski regula UE: CEST od ostatniej niedzieli marca 01:00 UTC do ostatniej niedzieli
+    pazdziernika 01:00 UTC, poza tym CET. Bez zoneinfo — Termux bywa bez bazy stref (jak kursy_bukmacherow.na_pl).
+    17.10.2026: wczesniej stale +2 h — od 25.10 „dzis” i nazwa zipa o godzine do przodu."""
+    lato = _ost_niedziela(t.year, 3).replace(hour=1) <= t < _ost_niedziela(t.year, 10).replace(hour=1)
+    return t + dt.timedelta(hours=2 if lato else 1)
 # Kolejnosc szczegolow (zrodla.py na telefonie nie ma oferty STS — prosta lista priorytetu wg kraju FotMob 'ccode'):
 # INT = reprezentacje i puchary europejskie; potem kraje lig top/czesto w ofercie STS; w kraju kolejnosc FotMob
 # (najwyzsza liga pierwsza). Mlodziezowe, kobiece i rezerwy na koncu grupy.
@@ -836,7 +849,7 @@ def z_90minut(s, w, teraz=None):
             if x['data'] > str((teraz + dt.timedelta(days=2)).date()): x['data'] = str(int(x['data'][:4]) - 1) + x['data'][4:]
         # 03.10.2026 (cron 14:40): mecze z dzisiejsza data maja wynik, ktory moze byc z TRAKCIE meczu (Unia Swarzedz -
         # Kotwica Kornik 7:0 o 14:40) — bierzemy tylko do wczoraj; dzisiejsze dociagnie jutrzejsze uruchomienie
-        dzis_pl = str((teraz + dt.timedelta(hours=2)).date())
+        dzis_pl = str(na_pl(teraz).date())
         r = [x for x in r if x['data'] < dzis_pl]
         mecze += r
         stat.append({'turniej': turniej, 'link': href, 'kod': kod, 'mecze': len(r)})
@@ -938,7 +951,7 @@ def main(a):
     budzet = float(a[a.index('--budzet-min') + 1]) if '--budzet-min' in a else 12.0
     tylko = set(a[a.index('--tylko') + 1].split(',')) if '--tylko' in a else set(WSZYSTKIE)
     teraz = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
-    dzis = (teraz + dt.timedelta(hours=2)).date()
+    dzis = na_pl(teraz).date()
     try: stan = json.load(open(STAN))
     except (OSError, ValueError): stan = {}
     gotowe = set(stan.get('gotowe', []))
@@ -964,7 +977,7 @@ def main(a):
             bledy[nazwa] = f'{type(e).__name__}: {e}'
     w['sedziowie'] = sedziowie(w)
     pliki_wynikow = w.pop('_pliki_wynikow', [])
-    zn = (teraz + dt.timedelta(hours=2)).strftime('%Y-%m-%d_%H-%M')
+    zn = na_pl(teraz).strftime('%Y-%m-%d_%H-%M')
     tmp = os.path.join(kat, f'.zrodla_{zn}')
     os.makedirs(tmp, exist_ok=True)
     pliki = [p for p in (zapisz(tmp, n, r, zn) for n, r in w.items()) if p]

@@ -32,7 +32,9 @@
 - Usuwać zadania cyklicznego `trig_01LXhx9anABLZ7aaWYpxUcUA`.
 
 ## Czas
-Użytkownik liczy w czasie polskim (UTC+2 latem): 10:00 UTC = 12:00 PL. Przebiegi: 12:00, 15:00, 18:00, 21:00 PL.
+Użytkownik liczy w czasie polskim: latem UTC+2 (10:00 UTC = 12:00 PL), zimą UTC+1 (11:00 UTC = 12:00 PL); zmiana w ostatnią
+niedzielę marca i października. Przebiegi: 12:00, 15:00, 18:00, 21:00 PL (zadanie cykliczne z CRON_TZ=Europe/Warsaw).
+Nigdy stałe „+2 h”: w Pythonie `ZoneInfo('Europe/Warsaw')`/`tz_localize('Europe/Warsaw')`, na Termuxie reguła UE (`na_pl`).
 
 ## Mapa
 - Reguły: Dysk, folder baza-wiedzy — „INSTRUKCJA STS v7” + „POPRAWKI DO INSTRUKCJI v7 — wyd. N” (każde nowsze niż v7).
