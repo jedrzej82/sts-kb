@@ -9,7 +9,8 @@
  *  - po 401/403/429 albo błędzie limitu — ŻADNYCH zapytań przez BLOKADA_H godzin,
  *  - dwa okna dziennie (czas polski, także po zmianie czasu): RANO (11:xx, przed przebiegiem 12:00) = lista meczów
  *    na 24 h + kursy, WIECZOR (20:xx, przed przebiegiem 21:00) = kursy tylko lig z meczami po 20:00 (prawie zamknięcie).
- *  Razem najwyżej 6 zapytań/dobę (lista bukmacherów tylko raz) = najwyżej ok. 186/miesiąc.
+ *  Każdy bukmacher osobnym zapytaniem (plan darmowy nie przyjmuje dwóch naraz): RANO 1 + 2, WIECZOR 2 = 5/dobę,
+ *  ok. 155/miesiąc; jedna paczka = LIG_NA_ZAPYTANIE lig z największą liczbą meczów (próba, nie cała oferta).
  *
  * INSTALACJA (OSOBNY projekt — nie wklejaj do projektu „wyniki live”, żeby blokady i liczniki się nie mieszały):
  *  1. https://script.google.com -> „Nowy projekt” -> wklej CAŁY ten plik -> zapisz, nazwij „oddspapi”.
@@ -18,7 +19,7 @@
  *  3. Wybierz funkcję „ustaw” -> „Uruchom” -> zezwól. Tworzy wyzwalacz co godzinę i wysyła JEDNO zapytanie
  *     (lista bukmacherów: znajduje nazwę Superbet PL). Wynik w „Dzienniku wykonania” i w pliku oddspapi_stan.json.
  *     Ponowne „ustaw” tego samego dnia nie wysyła już nic.
- *  4. (opcjonalnie) „sprawdzTeraz” -> „Uruchom”: próba od razu, 2 zapytania, najwyżej raz na dobę (plik ..._TEST.json.gz).
+ *  4. (opcjonalnie) „sprawdzTeraz” -> „Uruchom”: próba od razu, 3 zapytania, najwyżej raz na dobę (plik ..._TEST.json.gz).
  *
  * WYNIK: folder „oddspapi” na Dysku, plik oddspapi_RRRR-MM-DD_OKNO.json.gz na okno:
  *  {v, ts, okno, bukmacherzy:[pinnacle, superbet], mecze:[{id, t, kraj, liga, lid, a, b}],
@@ -33,7 +34,7 @@ var MAKS_MIESIAC = 200;
 var BLOKADA_H = 24;
 var PRZERWA_MS = 6000;
 var LIG_NA_ZAPYTANIE = 25;
-var OKNA = {RANO: {godz: 11, kursy: 2, lista: true}, WIECZOR: {godz: 20, kursy: 2, lista: false}};
+var OKNA = {RANO: {godz: 11, kursy: 1, lista: true}, WIECZOR: {godz: 20, kursy: 1, lista: false}};   // kursy = paczki lig (x2 bukmacherów)
 
 function ustaw() {
   ScriptApp.getProjectTriggers().forEach(function (t) {
@@ -52,14 +53,15 @@ function ustaw() {
   } finally { lock.releaseLock(); }
 }
 
-// Ręczna próba poza oknami (np. zaraz po instalacji): lista meczów + jedna paczka kursów = 2 zapytania, raz na dobę.
+// Ręczna próba poza oknami (np. zaraz po instalacji): lista meczów + jedna paczka lig u 2 bukmacherów = 3 zapytania,
+// raz na dobę (klucz TEST2 — po poprawce z 17.10 próbę można powtórzyć raz).
 function sprawdzTeraz() {
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(1000)) return;
   try {
     var P = PropertiesService.getScriptProperties(), st = stan_(P);
-    if (st.okna.TEST === st.dzien.d) { Logger.log('Próba już była dziś — wynik w pliku oddspapi_stan.json'); return; }
-    st.okna.TEST = st.dzien.d;
+    if (st.okna.TEST2 === st.dzien.d) { Logger.log('Próba już była dziś — wynik w pliku oddspapi_stan.json'); return; }
+    st.okna.TEST2 = st.dzien.d;
     zapiszStan_(P, st);
     okno_(P, st, 'TEST', {kursy: 1, lista: true}, new Date());
     zapiszStan_(P, st);
@@ -115,9 +117,16 @@ function okno_(P, st, nazwa, o, teraz) {
   var kursy = [];
   for (var i = 0; i < o.kursy && i * LIG_NA_ZAPYTANIE < ligi.length; i++) {
     var paczka = ligi.slice(i * LIG_NA_ZAPYTANIE, (i + 1) * LIG_NA_ZAPYTANIE);
-    var r = pytaj_(P, st, 'odds-by-tournaments', {tournamentIds: paczka.join(','), bookmakers: 'pinnacle,' + st.bukmacher});
-    if (r.blad) { bledy.push('odds: ' + r.blad); break; }
-    (r.dane || []).forEach(function (f) { kursy = kursy.concat(wiersze_(f)); });
+    // 17.10.2026: darmowy plan odrzuca 2 bukmacherów naraz („400 INVALID_PARAMETER Invalid number of bookmakers
+    // specified”, choć dokumentacja mówi o 3) — każdy bukmacher osobnym zapytaniem, te same ligi
+    var stop = false;
+    ['pinnacle', st.bukmacher].forEach(function (bk) {
+      if (stop) return;
+      var r = pytaj_(P, st, 'odds-by-tournaments', {tournamentIds: paczka.join(','), bookmakers: bk});
+      if (r.blad) { bledy.push('odds ' + bk + ': ' + r.blad); stop = true; return; }
+      (r.dane || []).forEach(function (f) { kursy = kursy.concat(wiersze_(f)); });
+    });
+    if (stop) break;
   }
   if (ligi.length > o.kursy * LIG_NA_ZAPYTANIE) bledy.push('pominięte ligi (budżet): ' + (ligi.length - o.kursy * LIG_NA_ZAPYTANIE));
   zapiszOkno_(P, st, nazwa, mecze, kursy, bledy);

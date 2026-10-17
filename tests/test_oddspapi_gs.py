@@ -28,12 +28,15 @@ var KOD = KOD_HTTP;
 var UrlFetchApp = {fetch: function (u) { wyw.push(u.replace('https://api.oddspapi.io/v4/', ''));
   var b;
   if (KOD !== 200) b = {error: {code: 'RATE_LIMIT', message: 'Too many requests'}};
+  else if (u.indexOf('odds-by-tournaments') >= 0 && u.indexOf('bookmakers=') >= 0 && u.split('bookmakers=')[1].split('&')[0].indexOf('%2C') >= 0)
+    return {getResponseCode: function () { return 400; }, getContentText: function () { return JSON.stringify({error: {code: 'INVALID_PARAMETER', message: 'Invalid number of bookmakers specified.'}}); }};
   else if (u.indexOf('bookmakers?') >= 0) b = [{slug: 'pinnacle', bookmakerName: 'Pinnacle'}, {slug: 'superbet.ro', bookmakerName: 'Superbet RO'},
       {slug: 'superbet.pl', bookmakerName: 'Superbet PL'}];
   else if (u.indexOf('fixtures?') >= 0) { b = []; for (var i = 0; i < 60; i++) b.push({fixtureId: 'id' + i, startTime: new Date(Date.now() + (i % 2 ? 2 : 10) * 3600000).toISOString(),
       tournamentId: i, tournamentName: 'L' + i, categoryName: 'K', participant1Name: 'A' + i, participant2Name: 'B' + i}); }
-  else b = [{fixtureId: 'id1', bookmakerOdds: {pinnacle: {markets: {'101': {outcomes: {'101': {players: {'0': {active: true, price: 2.1, bookmakerOutcomeId: 'home', mainLine: true}}},
-      '102': {players: {'0': {active: false, price: 3.3}}}}}}}, 'superbet.pl': {markets: {'101': {outcomes: {'101': {players: {'0': {active: true, price: 2.2}}}}}}}}}];
+  else if (u.indexOf('bookmakers=pinnacle') >= 0) b = [{fixtureId: 'id1', bookmakerOdds: {pinnacle: {markets: {'101': {outcomes: {'101': {players: {'0': {active: true, price: 2.1, bookmakerOutcomeId: 'home', mainLine: true}}},
+      '102': {players: {'0': {active: false, price: 3.3}}}}}}}}}];
+  else b = [{fixtureId: 'id1', bookmakerOdds: {'superbet.pl': {markets: {'101': {outcomes: {'101': {players: {'0': {active: true, price: 2.2}}}}}}}}}];
   return {getResponseCode: function () { return KOD; }, getContentText: function () { return JSON.stringify(b); }}; }};
 '''
 
@@ -62,15 +65,15 @@ def test_doba_dwa_okna_najwyzej_szesc_zapytan():
     eps = [u.split('?')[0] for u in w['wyw']]
     assert eps == ['bookmakers', 'fixtures'] + ['odds-by-tournaments'] * 4
     assert len(w['wyw']) <= 6 and w['wyzw'] == ['oddspapi', 'oddspapi']
-    assert 'bookmakers=pinnacle%2Csuperbet.pl' in w['wyw'][2] and 'sportId=10' in w['wyw'][1]
+    assert 'bookmakers=pinnacle&' in w['wyw'][2] and 'bookmakers=superbet.pl&' in w['wyw'][3] and 'sportId=10' in w['wyw'][1]
     rano = json.loads(w['pliki']['oddspapi_2026-10-18_RANO.json.gz']['t'])
-    assert len(rano['mecze']) == 60 and rano['bledy'] == ['pominięte ligi (budżet): 10']
+    assert len(rano['mecze']) == 60 and rano['bledy'] == ['pominięte ligi (budżet): 35']
     assert ['id1', 'pinnacle', 101, 101, 2.1, 'home', 1] in rano['kursy'] and ['id1', 'superbet.pl', 101, 101, 2.2, '', 0] in rano['kursy']
     assert not any(k[1] == 'pinnacle' and k[3] == 102 for k in rano['kursy'])        # nieaktywny kurs pominięty
-    # wieczorem tylko ligi z meczami po ok. 19:30 PL (30 lig parzystych) -> paczki 25 + 5
+    # wieczorem tylko ligi z meczami po ok. 19:30 PL (30 lig parzystych) -> jedna paczka 25 lig u obu bukmacherów
     wiecz = [u.split('tournamentIds=')[1].split('&')[0].split('%2C') for u in w['wyw'][4:]]
-    assert [len(x) for x in wiecz] == [25, 5] and all(int(x) % 2 == 0 for x in sum(wiecz, []))
-    assert w['spanie'] >= 6000 * 2                                                      # przerwa między zapytaniami
+    assert [len(x) for x in wiecz] == [25, 25] and all(int(x) % 2 == 0 for x in sum(wiecz, []))
+    assert w['spanie'] >= 6000 * 3                                                      # przerwa między zapytaniami
     stan = json.loads(w['pliki']['oddspapi_stan.json']['t'])
     assert stan['zapytania'] == {'dzis': 5, 'miesiac': 6}   # doba liczona w UTC: lista bukmacherow 17.10 22:30 UTC and stan['bukmacher'] == 'superbet.pl'
     assert 'TAJNY123' not in json.dumps(w['pliki'])                                    # klucz nigdy w plikach
@@ -101,6 +104,7 @@ def test_brak_klucza_zero_zapytan():
 
 def test_sprawdz_teraz_dwa_zapytania_raz_na_dobe():
     w = _symuluj('2026-10-17T18:30:00Z', 0, props={'op_stan': json.dumps({'bukmacher': 'superbet.pl'})}, sprawdz=True)
-    assert [u.split('?')[0] for u in w['wyw']] == ['fixtures', 'odds-by-tournaments']   # drugie wywolanie nic nie wysyla
+    assert [u.split('?')[0] for u in w['wyw']] == ['fixtures', 'odds-by-tournaments', 'odds-by-tournaments']   # drugie wywolanie nic
     t = json.loads(w['pliki']['oddspapi_2026-10-17_TEST.json.gz']['t'])
-    assert len(t['mecze']) == 60 and t['kursy'] and t['zapytania'] == {'dzis': 2, 'miesiac': 2}
+    assert len(t['mecze']) == 60 and {k[1] for k in t['kursy']} == {'pinnacle', 'superbet.pl'} and t['zapytania'] == {'dzis': 3, 'miesiac': 3}
+    assert all('%2C' not in u.split('bookmakers=')[1].split('&')[0] for u in w['wyw'][1:])   # nigdy 2 bukmacherow naraz
