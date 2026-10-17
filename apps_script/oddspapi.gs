@@ -6,7 +6,7 @@
  * JAK (po próbach na prawdziwym API 17.10.2026):
  *  - PŁATNE (250/miesiąc w planie darmowym; liczy się KAŻDE wywołanie, także z błędem 4xx): tylko lista meczów
  *    piłki z kursami Superbet na 24 h — RAZ dziennie w oknie 11:xx czasu polskiego (+ raz lista bukmacherów i raz nazwy
- *    rynków) oraz najwyżej ROZL_DZIEN rozliczeń dziennie. Razem <= 5/dobę, ok. 160/miesiąc.
+ *    rynków) oraz najwyżej ROZL_DZIEN rozliczeń dziennie (ok. 160/miesiąc) + jednorazowo 14 list dni wstecz.
  *    odds-by-tournaments odpada: plan darmowy przyjmuje 1 bukmachera i nieopisanie mało lig („Too many tournament IDs”).
  *  - DARMOWE (historical-odds — według dokumentacji nigdy nie liczy się do limitu; odstęp 5 s): pełna historia kursów
  *    meczu u JEDNEGO bukmachera. Co godzinę: mecze zakończone (start ponad 3 h temu), po HIST_NA_PRZEBIEG meczów,
@@ -28,6 +28,8 @@
  *  oddspapi_RRRR-MM-DD_RANO.json.gz — {v, ts, okno, mecze:[{id, t, kraj, liga, lid, a, b}], bledy}
  *  oddspapi_hist_RRRR-MM-DD_GGMM.json.gz — {v, ts, mecze:[id…], serie:[[id, bukmacher, rynek, wynik, otwarcie,
  *    kurs_6h_przed, zamkniecie, liczba_zmian]], bledy}
+ *  oddspapi_W_RRRR-MM-DD.json.gz — lista meczów dnia z przeszłości (przeliczenie wstecz), jak plik RANO.
+ *  oddspapi_hist_..._WRRRR-MM-DD_*.json.gz — historia kursów tych meczów.
  *  oddspapi_rynki.json — nazwy rynków i wyników piłki ({id: [nazwa, handicap, okres, {wynik: nazwa}]}), RAZ (1 płatne).
  *  oddspapi_rozl_RRRR-MM-DD_GGMM.json.gz — {v, ts, wyniki:[[id, rynek, wynik, WIN|LOSE|PUSH|HALFWIN|HALFLOSS|…]], bledy}
  *    PŁATNE: najwyżej ROZL_DZIEN meczów na dobę, tylko te, w których jakaś noga Superbet była powyżej kursu uczciwego
@@ -38,7 +40,7 @@
 var API = 'https://api.oddspapi.io/v4/';
 var FOLDER = 'oddspapi';
 var PILKA = 10;
-var MAKS_DZIEN = 6;
+var MAKS_DZIEN = 10;                // płatne na dobę (UTC): lista 1 + rozliczenia 4 + listy wstecz 4 + zapas
 var MAKS_MIESIAC = 200;
 var HIST_DZIEN = 400;
 var HIST_NA_PRZEBIEG = 18;          // 18 meczów x 2 bukmacherów x 6 s = ok. 3,6 min (limit Apps Script: 6 min)
@@ -47,6 +49,14 @@ var PRZERWA_MS = 6000;
 var GODZ_LISTY = 11;
 var ROZL_DZIEN = 4;                 // płatne rozliczenia (settlements) na dobę — tylko mecze z nogą Superbet > kursu uczciwego
 var ROZL_PO_H = 4;                  // rozliczenie najwcześniej 4 h po starcie meczu
+// PRZELICZENIE WSTECZ (17.10.2026, wariant „bezpieczny” wybrany przez użytkownika): historia kursów jest darmowa od stycznia
+// 2026, więc werdykt nie musi czekać tygodniami. 14 dni przed pierwszym uruchomieniem, z każdego dnia WSTECZ_MECZOW meczów
+// (najpierw ligi z >= 4 meczami w dniu, kolejność stała wg skrótu id). Lista dnia = 1 płatne (najwyżej WSTECZ_LIST_DZIEN na
+// dobę, jedna na przebieg); historia tych meczów = darmowa, tylko w przebiegach bez bieżącej pracy, w tym samym limicie
+// HIST_DZIEN (400/dobę) i tempie (6 s) co zwykle.
+var WSTECZ_DNI = 14;
+var WSTECZ_MECZOW = 60;
+var WSTECZ_LIST_DZIEN = 4;
 
 function ustaw() {
   ScriptApp.getProjectTriggers().forEach(function (t) {
@@ -156,7 +166,60 @@ function oddspapi_() {
     .sort(function (x, y) { return x.t - y.t; }).slice(0, HIST_NA_PRZEBIEG);
   if (doPobrania.length) historia_(P, st, f, doPobrania, Utilities.formatDate(teraz, 'Europe/Warsaw', 'HHmm'));
   rozliczenia_(P, st, f, teraz);
+  wstecz_(P, st, f, teraz, !doPobrania.length);
   zapiszStan_(P, st);
+}
+
+function skrot_(t) {
+  var h = 0;
+  for (var i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) | 0;
+  return h;
+}
+
+function wstecz_(P, st, f, teraz, wolneNaHistorie) {
+  if (!st.bukmacher) return;
+  var w = st.wst = st.wst || {};
+  if (!w.start) w.start = teraz.getTime() - (teraz.getTime() % 86400000);          // północ UTC dnia pierwszego uruchomienia
+  w.listy = w.listy || {}; w.kursor = w.kursor || {};
+  if (!w.lim || w.lim.d !== st.dzien.d) w.lim = {d: st.dzien.d, n: 0};
+  var dni = [];
+  for (var k = 1; k <= WSTECZ_DNI; k++) dni.push(new Date(w.start - k * 86400000).toISOString().slice(0, 10));
+  // 1) jedna lista dnia na przebieg (płatna)
+  var bez = dni.filter(function (d) { return !w.listy[d]; })[0];
+  if (bez && w.lim.n < WSTECZ_LIST_DZIEN) {
+    w.listy[bez] = 1; w.lim.n++;
+    zapiszStan_(P, st);
+    var r = pytaj_(P, st, 'fixtures', {sportId: PILKA, from: bez + 'T00:00:00Z', to: bez + 'T23:59:59Z', statusId: 2, hasOdds: 'true', bookmakers: st.bukmacher});
+    var wszystkie = (r.dane || []).map(function (x) {
+      return {id: x.fixtureId, t: Math.round(Date.parse(x.startTime) / 1000), kraj: x.categoryName, liga: x.tournamentName,
+              lid: x.tournamentId, a: x.participant1Name, b: x.participant2Name};
+    });
+    var ile = {};
+    wszystkie.forEach(function (m) { ile[m.lid] = (ile[m.lid] || 0) + 1; });
+    var wybrane = wszystkie.sort(function (a, b) {
+      return ((ile[b.lid] >= 4) - (ile[a.lid] >= 4)) || (skrot_(a.id) - skrot_(b.id));
+    }).slice(0, WSTECZ_MECZOW);
+    zapiszGz_(f, 'oddspapi_W_' + bez + '.json.gz', {v: 2, ts: Math.round(Date.now() / 1000), okno: 'WSTECZ', dzien: bez,
+                                                    wszystkich: wszystkie.length, mecze: wybrane, bledy: r.blad ? ['fixtures: ' + r.blad] : []});
+    if (r.blad) w.kursor[bez] = -1;                  // lista się nie udała — dzień pomijamy (bez ponawiania, budżet)
+  }
+  // 2) darmowa historia jednej porcji meczów z najstarszej nieskończonej listy
+  if (!wolneNaHistorie) return;
+  for (var i = 0; i < dni.length; i++) {
+    var d = dni[i];
+    if (!w.listy[d] || w.kursor[d] === -1) continue;
+    var it = f.getFilesByName('oddspapi_W_' + d + '.json.gz');
+    if (!it.hasNext()) continue;
+    var o = null;
+    try { o = JSON.parse(Utilities.ungzip(it.next().getBlob()).getDataAsString('UTF-8')); } catch (e) { o = null; }
+    var mecze = (o && o.mecze) || [], od = w.kursor[d] || 0;
+    if (od >= mecze.length) continue;
+    var porcja = mecze.slice(od, od + HIST_NA_PRZEBIEG);
+    historia_(P, st, f, porcja, 'W' + d);
+    w.kursor[d] = od + st.ostGotowe;
+    zapiszStan_(P, st);
+    return;
+  }
 }
 
 function lista_(P, st, teraz) {
@@ -225,6 +288,7 @@ function historia_(P, st, f, mecze, etykieta) {
   var dzien = Utilities.formatDate(new Date(), 'Europe/Warsaw', 'yyyy-MM-dd');
   zapiszGz_(f, 'oddspapi_hist_' + dzien + '_' + etykieta + '.json.gz', {v: 2, ts: Math.round(Date.now() / 1000), mecze: gotowe, serie: serie, bledy: bledy});
   st.blad = bledy.slice(0, 5).join('; ');
+  st.ostGotowe = gotowe.length;
   plikStanu_(P, st, 'historia ' + dzien + ' ' + etykieta + ': ' + gotowe.length + ' meczów, ' + serie.length + ' serii', bledy.slice(0, 20));
   return serie.length;
 }
