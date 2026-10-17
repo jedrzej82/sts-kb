@@ -90,3 +90,21 @@ def test_lusitanos_i_thionville_to_rozne_kluby():
     wspolne = set(a) & set(b)
     assert len(wspolne) >= 10
     assert all(a[d] != b[d] for d in wspolne)
+
+
+@pytest.mark.parametrize('oferta,arkusz', [('RB Lipsk', 'RB Leipzig'), ('Werder Brema', 'Werder Bremen'),
+                                           ('Bayern Monachium', 'Bayern Munich'), ('Slovan Bratysława', 'Slovan Bratislava')])
+def test_sezon_egzonimy_ze_wspolnego_slownika(oferta, arkusz):
+    """17.10.2026 (Raport 12:00 nr 4): sezon.py mial wlasna, starsza liste polskich miast (bez lipsk/brema/bratyslawa) —
+    teraz dopelniana z nazwy.EGZONIMY; czlony nazwy z polskim miastem pasuja do zapisu arkusza."""
+    import sezon
+    assert any(sorted(w) == sorted(sezon._tok(arkusz)) for w in sezon._warianty(oferta))
+
+
+def test_sezon_aliasy_z_raportu_1710():
+    """LOSC Lille / Stade Brest — w arkuszu Lille / Brest (Ligue 1); pary jako dane w aliasy.csv (modul sezon)."""
+    import sezon
+    for oferta, cel in [('LOSC Lille', 'Lille'), ('Stade Brest', 'Brest'), ('RC Lens', 'Lens'), ('CA Banfield', 'Banfield')]:
+        assert sezon._alias(oferta) == [cel]
+    # pary tylko z wierszami pucharow europejskich w arkuszu NIE dopisane (zrodlo watpliwe, Raport 17.10 nr 5)
+    assert sezon._alias('Qarabag FK') == [] and sezon._alias('Glentoran Belfast') == []
