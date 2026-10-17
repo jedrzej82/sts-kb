@@ -70,7 +70,9 @@ Nigdy stałe „+2 h”: w Pythonie `ZoneInfo('Europe/Warsaw')`/`tz_localize('Eu
   `apps_script/oddspapi.gs` (TRYB OBSERWACJI, 17.10.2026; uzytkownik gra glownie w SUPERBET, takze LVBET, STS juz nie):
   OSOBNY projekt Apps Script, klucz tylko we wlasciwosci ODDSPAPI_KEY; kursy Superbet PL + Pinnacle (kurs uczciwy) do folderu
   „oddspapi” na Dysku. Platne (250/mies., licza sie tez bledy 4xx): tylko lista meczow raz dziennie 11:xx PL; kursy z DARMOWEGO
-  historical-odds po meczu (otwarcie / 6 h przed / zamkniecie), 1 bukmacher na zapytanie; max 6 platnych/dobe, 200/mies., 24 h stop po 401/403/429.
+  historical-odds po meczu (otwarcie / 6 h przed / zamkniecie), 1 bukmacher na zapytanie; max 10 platnych/dobe, 200/mies., 24 h stop po 401/403/429.
+  Przeliczenie wstecz (wariant bezpieczny, decyzja uzytkownika 17.10): 14 dni przed pierwszym uruchomieniem x 60 meczow/dzien
+  (oddspapi_W_DATA.json.gz; lista dnia = 1 platne, max 4/dobe), historia darmowa w tym samym limicie 400/dobe i tempie 6 s.
   Pomiar: `oddspapi_analiza.py oddspapi_hist_*.json.gz --listy oddspapi_*_RANO.json.gz` (przewaga Superbet vs Pinnacle bez marzy
   6 h przed i na zamknieciu, EV po podatku 12%, AKO dzienne z nog >= --prog; tylko rynki z tym samym zestawem wynikow u obu;
   `--rynki oddspapi_rynki.json` = nazwy rynkow (1 platne raz), `--rozliczenia oddspapi_rozl_*.json.gz` = WIN/LOSE z settlements
