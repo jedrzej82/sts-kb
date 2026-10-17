@@ -127,6 +127,21 @@ def _tok_osoba_warianty(s):
     return wyn
 
 
+# 17.10.2026 (Raport 12:00 nr 4: „RB Lipsk”, „Werder Brema” NIE ZNALEZIONO): _MIASTA_PL bylo osobna, starsza kopia —
+# brakowalo m.in. lipsk, brema, bratyslawa, kolonia, norymberga. Teraz dopelniane wspolnym slownikiem nazwy.EGZONIMY
+# (typuj.py i sporty.py juz go uzywaja); wpisy wyzej maja pierwszenstwo i kilka zapisow zrodlowych.
+def _dopelnij_miasta():
+    from nazwy import EGZONIMY
+    for pl, zr in EGZONIMY.items():
+        k = norm(pl).replace(' ', '')
+        v = norm(zr).replace(' ', '')
+        if k and v and v not in _MIASTA_PL.get(k, ()):
+            _MIASTA_PL[k] = _MIASTA_PL.get(k, ()) + (v,)
+
+
+_dopelnij_miasta()
+
+
 def _warianty(nazwa):
     """Nazwa z oferty z polskimi miastami zamienionymi na kazdy zapis zrodlowy (lista list czlonow)."""
     import itertools
