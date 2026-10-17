@@ -5,6 +5,11 @@ apps_script/oddspapi.gs do folderu „oddspapi” na Dysku: oddspapi_hist_*.json
 
   python3 oddspapi_analiza.py oddspapi_hist_*.json.gz [--listy oddspapi_*_RANO.json.gz ...] [--prog 0.03]
                               [--podatek 0.12] [--nog 4] [--csv nogi.csv]
+                              [--rynki oddspapi_rynki.json] [--rozliczenia oddspapi_rozl_*.json.gz ...]
+
+--rynki: nazwy rynków i wyników (inaczej numery OddsPapi). --rozliczenia: wynik nogi (WIN/LOSE/PUSH…) z OddsPapi
+settlements — skrypt rozlicza tylko mecze z nogą powyżej kursu uczciwego, więc to wynik NAPRAWDĘ granych okazji:
+zysk na 1 zł po podatku (WIN: kurs*(1-podatek)-1, LOSE: -1, PUSH/CANCELLED: 0, połówki po połowie).
 
 Kurs uczciwy = Pinnacle bez marży (proporcjonalnie w obrębie jednego rynku; tylko rynki, w których Pinnacle i Superbet
 mają ten sam zestaw >= 2 wyników — inaczej niepełny rynek zawyża P). Mecz jeszcze nierozegrany: „zamknięcie” = ostatni kurs.
@@ -60,6 +65,35 @@ def mecze(listy):
     return m
 
 
+def rynki(sciezka):
+    if not sciezka:
+        return {}
+    return {int(k): v for k, v in wczytaj(sciezka).items()}
+
+
+def rozliczenia(pliki):
+    out = {}
+    for p in pliki or []:
+        for fid, rynek, wynik, res in wczytaj(p).get('wyniki', []):
+            out[(fid, int(rynek), int(wynik))] = res
+    return out
+
+
+def zysk(res, kurs, podatek):
+    """Zysk na 1 zł stawki po podatku (podatek od stawki, jak w Polsce); None, gdy nierozstrzygnięty."""
+    wygrana = kurs * (1 - podatek) - 1
+    return {'WIN': wygrana, 'LOSE': -1.0, 'PUSH': 0.0, 'CANCELLED': 0.0, 'HALFWIN': wygrana / 2, 'HALFLOSS': -0.5}.get(res)
+
+
+def nazwa_nogi(n, ryn):
+    r = ryn.get(n['rynek'])
+    if not r:
+        return f"{RYNKI.get(n['rynek'], n['rynek'])} {WYNIKI.get(n['wynik'], n['wynik']) if n['rynek'] == 101 else n['wynik']}"
+    nazwa, handicap, okres, wyn = r[0], r[1], r[2], r[3]
+    return f"{nazwa}{' ' + str(handicap) if handicap else ''}{'' if okres in (None, 'fulltime') else ' (' + str(okres) + ')'}: " \
+           f"{wyn.get(str(n['wynik']), n['wynik'])}"
+
+
 def uczciwe(kursy):
     """{wynik: kurs} -> {wynik: P bez marży}; None, gdy < 2 wyniki albo brak kursu."""
     if len(kursy) < 2 or any(not k or k <= 1 for k in kursy.values()):
@@ -96,7 +130,8 @@ def _proc(x):
     return '—' if x is None else f'{100 * x:+.1f}%'
 
 
-def raport(lista, mecze_info, prog, podatek, ile_nog):
+def raport(lista, mecze_info, prog, podatek, ile_nog, ryn=None, rozl=None):
+    ryn, rozl = ryn or {}, rozl or {}
     linie = []
     ok = [n for n in lista if n['przewaga6'] is not None]
     podejrz = [n for n in ok if n['przewaga6'] > PODEJRZANE or (n['przewagaz'] or 0) > PODEJRZANE]
@@ -118,8 +153,11 @@ def raport(lista, mecze_info, prog, podatek, ile_nog):
     po_rynku = collections.defaultdict(list)
     for n in dobre:
         if n['przewagaz'] is not None:
-            po_rynku[RYNKI.get(n['rynek'], f"rynek {n['rynek']}")].append(n['przewagaz'])
+            po_rynku[RYNKI.get(n['rynek'], f"rynek {n['rynek']}") if n['rynek'] in RYNKI and not ryn else f"rynek {n['rynek']}"].append(n['przewagaz'])
     for r, w in sorted(po_rynku.items(), key=lambda kv: -len(kv[1]))[:8]:
+        if ryn and r.startswith('rynek '):
+            x = ryn.get(int(r.split()[1]))
+            r = f"{x[0]}{' ' + str(x[1]) if x and x[1] else ''}" if x else r
         linie.append(f'  {r}: {len(w)} nóg, średnia przewaga vs zamknięcie {_proc(sum(w) / len(w))}, > 0: {sum(x > 0 for x in w)}')
     # AKO dziennie
     po_dniu = collections.defaultdict(dict)
@@ -139,13 +177,28 @@ def raport(lista, mecze_info, prog, podatek, ile_nog):
         wyb = sorted(po_dniu[dzien].values(), key=lambda n: -n['przewaga6'])[:ile_nog]
         kurs = math.prod(n['kurs_sb'] for n in wyb)
         ev = math.prod(n['pz'] * n['kurs_sb'] for n in wyb) * (1 - podatek) - 1
-        linie.append(f'  {dzien}: dostępnych nóg {len(po_dniu[dzien])}, w kuponie {len(wyb)}, kurs {kurs:.2f}, EV {_proc(ev)}')
+        wyn = [rozl.get((n['id'], n['rynek'], n['wynik'])) for n in wyb]
+        if all(wyn):
+            traf = 'WSZEDŁ' if all(x == 'WIN' for x in wyn) else 'nie wszedł' if any(x in ('LOSE', 'HALFLOSS') for x in wyn) else 'zwrot/połowa'
+        else:
+            traf = f'rozliczone {sum(bool(x) for x in wyn)}/{len(wyn)} nóg'
+        linie.append(f'  {dzien}: dostępnych nóg {len(po_dniu[dzien])}, w kuponie {len(wyb)}, kurs {kurs:.2f}, EV {_proc(ev)} — {traf}')
+    rozliczone = [(n, rozl.get((n['id'], n['rynek'], n['wynik']))) for n in dobre if n['przewaga6'] >= prog]
+    rozliczone = [(n, r) for n, r in rozliczone if zysk(r, n['kurs_sb'], podatek) is not None]
+    if rozl:
+        z = [zysk(r, n['kurs_sb'], podatek) for n, r in rozliczone]
+        if z:
+            linie.append(f'WYNIKI nóg z przewagą >= {prog:.0%} (rozliczenia OddsPapi): {len(z)} nóg, trafione '
+                         f"{sum(r == 'WIN' for _, r in rozliczone)}, zysk {sum(z):+.2f} zł na {len(z)} zł stawek "
+                         f'({_proc(sum(z) / len(z))}), oczekiwany wg zamknięcia {_proc(sum(n["ev_z"] for n, _ in rozliczone) / len(z))}')
+        else:
+            linie.append(f'WYNIKI: brak rozliczonych nóg z przewagą >= {prog:.0%}')
     linie.append('NAJWIĘKSZE PRZEWAGI (vs zamknięcie):')
     for n in sorted([n for n in dobre if n['przewagaz'] is not None], key=lambda n: -n['przewagaz'])[:15]:
         m = mecze_info.get(n['id'], {})
         nazwa = f"{m.get('a', '?')} - {m.get('b', '?')}" if m else n['id']
-        wynik = WYNIKI.get(n['wynik'], str(n['wynik'])) if n['rynek'] == 101 else str(n['wynik'])
-        linie.append(f"  {nazwa} | {RYNKI.get(n['rynek'], n['rynek'])} {wynik} | Superbet {n['kurs_sb']} | "
+        res = rozl.get((n['id'], n['rynek'], n['wynik']))
+        linie.append(f"  {nazwa} | {nazwa_nogi(n, ryn)}{' [' + res + ']' if res else ''} | Superbet {n['kurs_sb']} | "
                      f"Pinnacle 6h {n['kurs_pin6']} zam. {n['kurs_pinz']} | przewaga {_proc(n['przewagaz'])}, EV po podatku {_proc(n['ev_z'])}")
     return linie
 
@@ -158,10 +211,12 @@ def main(argv=None):
     ap.add_argument('--podatek', type=float, default=0.12)
     ap.add_argument('--nog', type=int, default=4)
     ap.add_argument('--csv')
+    ap.add_argument('--rynki')
+    ap.add_argument('--rozliczenia', nargs='*', default=[])
     a = ap.parse_args(argv)
     lista = nogi(serie(a.pliki), a.podatek)
     info = mecze(a.listy)
-    for l in raport(lista, info, a.prog, a.podatek, a.nog):
+    for l in raport(lista, info, a.prog, a.podatek, a.nog, rynki(a.rynki), rozliczenia(a.rozliczenia)):
         print(l)
     if a.csv:
         import csv

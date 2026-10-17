@@ -39,9 +39,15 @@ var UrlFetchApp = {fetch: function (u) { wyw.push(u.replace('https://api.oddspap
   else if (u.indexOf('historical-odds?') >= 0) {
     var bk = u.split('bookmakers=')[1].split('&')[0], fid = u.split('fixtureId=')[1].split('&')[0], t0 = Date.now() - 30 * 3600000;
     var h = function (dt, p, a) { return {createdAt: new Date(t0 + dt * 3600000).toISOString(), price: p, active: a}; };
+    var c = bk === 'pinnacle' ? 1 : (+fid.slice(2) % 2 ? 0.9 : 1.1);              // Superbet: parzyste mecze powyżej uczciwego
     b = {fixtureId: fid, bookmakers: {}};
-    b.bookmakers[bk] = {markets: {'101': {outcomes: {'101': {players: {'0': [h(5, 2.3, true), h(0, 2.0, true), h(20, 2.2, true), h(40, 9.9, true)]}}}}}};
+    b.bookmakers[bk] = {markets: {'101': {outcomes: {'101': {players: {'0': [h(5, 2.3 * c, true), h(0, 2.0 * c, true), h(20, 2.2 * c, true), h(40, 9.9, true)]}},
+      '102': {players: {'0': [h(0, bk === 'pinnacle' ? 2.0 : 1.8, true)]}}}}}};
   }
+  else if (u.indexOf('markets?') >= 0) b = [{marketId: 101, sportId: 10, marketName: 'Full Time Result', handicap: 0, period: 'fulltime', playerProp: false,
+      outcomes: [{outcomeId: 101, outcomeName: '1'}, {outcomeId: 102, outcomeName: 'X'}]}, {marketId: 900, sportId: 11, outcomes: []}];
+  else if (u.indexOf('settlements?') >= 0) b = {fixtureId: u.split('fixtureId=')[1].split('&')[0], markets: {'101': {outcomes: {'101': {players: {'0': {result: 'WIN'}}},
+      '102': {players: {'0': {result: 'LOSE'}}}}}}};
   return {getResponseCode: function () { return KOD; }, getContentText: function () { return JSON.stringify(b); }}; }};
 '''
 
@@ -73,7 +79,16 @@ def _ep(w):
 def test_doba_jedno_platne_lista_reszta_darmowa_historia():
     w = _symuluj('2026-10-17T22:30:00Z', 30, ustaw=True)   # 00:30 PL 18.10, 30 godzin co godzinę (po 2 wywołania)
     ep = _ep(w)
-    assert ep.count('bookmakers') == 1 and ep.count('fixtures') == 1 and set(ep) == {'bookmakers', 'fixtures', 'historical-odds'}
+    assert ep.count('bookmakers') == 1 and ep.count('fixtures') == 1 and ep.count('markets') == 1
+    assert set(ep) == {'bookmakers', 'fixtures', 'markets', 'historical-odds', 'settlements'}
+    assert json.loads(w['pliki']['oddspapi_rynki.json']) == {'101': ['Full Time Result', 0, 'fulltime', {'101': '1', '102': 'X'}]}
+    # rozliczenia: tylko mecze z nogą Superbet powyżej uczciwego (parzyste), najwyżej 4 na dobę UTC, płatne razem <= 6/dobę
+    rozl = [u.split('fixtureId=')[1].split('&')[0] for u in w['wyw'] if u.startswith('settlements')]
+    assert rozl and all(int(x[2:]) % 2 == 0 for x in rozl) and len(rozl) == len(set(rozl)) <= 8
+    wyn = sum((json.loads(v)['wyniki'] for k, v in w['pliki'].items() if k.startswith('oddspapi_rozl_')), [])
+    assert [rozl[0], 101, 101, 'WIN'] in wyn
+    zr = json.loads(w['pliki']['oddspapi_zrobione.json'])
+    assert zr['id2'][1] > 0 and zr['id1'][1] < 0 and all(zr[k][2] == 1 for k in rozl)
     assert w['wyzw'] == ['oddspapi', 'oddspapi']
     rano = json.loads(w['pliki']['oddspapi_2026-10-18_RANO.json.gz'])
     assert len(rano['mecze']) == 60 and 'sportId=10' in w['wyw'][1] and 'bookmakers=superbet.pl' in w['wyw'][1]
@@ -84,14 +99,14 @@ def test_doba_jedno_platne_lista_reszta_darmowa_historia():
     serie = sum((json.loads(w['pliki'][k])['serie'] for k in pliki_h), [])
     assert len({s[0] for s in serie}) == 60 and max(len(json.loads(w['pliki'][k])['mecze']) for k in pliki_h) <= 18
     stan = json.loads(w['pliki']['oddspapi_stan.json'])
-    assert stan['platne']['miesiac'] == 2 and stan['bukmacher'] == 'superbet.pl'
+    assert stan['bukmacher'] == 'superbet.pl' and stan['platne']['miesiac'] == 3 + len(rozl) <= 12
     assert 'TAJNY123' not in json.dumps(w['pliki'])
 
 
 def test_serie_otwarcie_6h_przed_zamkniecie():
     w = _symuluj('2026-10-17T22:30:00Z', 30)
     serie = sum((json.loads(v)['serie'] for k, v in w['pliki'].items() if k.startswith('oddspapi_hist_')), [])
-    s = [x for x in serie if x[1] == 'pinnacle'][0]
+    s = [x for x in serie if x[1] == 'pinnacle' and x[3] == 101][0]
     # historia (godziny od t0): 0 -> 2.0, 5 -> 2.3, 20 -> 2.2, 40 -> 9.9 (po starcie — pomijana)
     assert s[2:4] == [101, 101] and s[4] == 2.0 and s[6] == 2.2 and s[7] == 3
 
@@ -111,7 +126,7 @@ def test_limit_miesieczny_zatrzymuje_platne():
     st = {'dzien': {'d': '2026-10-18', 'n': 0}, 'mies': {'m': '2026-10', 'n': 200}, 'okna': {}, 'bukmacher': 'superbet.pl'}
     w = _symuluj('2026-10-17T22:30:00Z', 24, props={'op_stan': json.dumps(st)})
     assert 'fixtures' not in _ep(w)
-    assert json.loads(w['pliki']['oddspapi_2026-10-18_RANO.json.gz'])['bledy'] == ['fixtures: limit miesięczny 200']
+    assert json.loads(w['pliki']['oddspapi_2026-10-18_RANO.json.gz'])['bledy'] == ['fixtures: limit miesięczny 200', 'markets: limit miesięczny 200']
 
 
 def test_429_stop_na_dobe():

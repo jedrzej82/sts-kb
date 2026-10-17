@@ -72,7 +72,9 @@ Nigdy stałe „+2 h”: w Pythonie `ZoneInfo('Europe/Warsaw')`/`tz_localize('Eu
   „oddspapi” na Dysku. Platne (250/mies., licza sie tez bledy 4xx): tylko lista meczow raz dziennie 11:xx PL; kursy z DARMOWEGO
   historical-odds po meczu (otwarcie / 6 h przed / zamkniecie), 1 bukmacher na zapytanie; max 6 platnych/dobe, 200/mies., 24 h stop po 401/403/429.
   Pomiar: `oddspapi_analiza.py oddspapi_hist_*.json.gz --listy oddspapi_*_RANO.json.gz` (przewaga Superbet vs Pinnacle bez marzy
-  6 h przed i na zamknieciu, EV po podatku 12%, AKO dzienne z nog >= --prog; tylko rynki z tym samym zestawem wynikow u obu).
+  6 h przed i na zamknieciu, EV po podatku 12%, AKO dzienne z nog >= --prog; tylko rynki z tym samym zestawem wynikow u obu;
+  `--rynki oddspapi_rynki.json` = nazwy rynkow (1 platne raz), `--rozliczenia oddspapi_rozl_*.json.gz` = WIN/LOSE z settlements
+  — platne, skrypt rozlicza max 4 mecze/dobe, tylko z noga Superbet powyzej kursu uczciwego).
   `apps_script/wyniki_live.gs` (wyniki na zywo dla aplikacji „Prognozy meczowe”: API-Sports — klucz TYLKO we wlasciwosciach
   skryptu APISPORTS_KEY — + OpenLigaDB -> `wyniki_live.json` na Dysku co minute; darmowy plan: kazdy sport najwyzej co 15 min,
   limit 95/dzien; NIE jest czescia przebiegu ani rozliczen).
