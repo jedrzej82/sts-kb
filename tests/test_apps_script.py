@@ -146,7 +146,8 @@ var folder = {getId: function () { return 'FOLD'; }, addViewer: function (a) { l
 var LIGI = LIGI_JSON;
 var DriveApp = {searchFolders: function () { return {hasNext: function () { return foldery > 0; }, next: function () { return folder; }}; },
   createFolder: function () { foldery++; return folder; },
-  searchFiles: function (q) { var f = q.indexOf('api_ligi.json') >= 0 && LIGI ? plikAtrapa('api_ligi.json', JSON.stringify(LIGI)) : null, d = false;
+  searchFiles: function (q) { var f = q.indexOf('api_ligi.json') >= 0 && LIGI ? plikAtrapa('api_ligi.json', JSON.stringify(LIGI))
+      : q.indexOf('wyniki_live.json') >= 0 ? pliki['DRIVE_wyniki_live.json'] || null : null, d = false;
     return {hasNext: function () { return !!f && !d; }, next: function () { d = true; return f; }}; },
   createFile: function (n, t) { return pliki['DRIVE_' + n] = plikAtrapa(n, t); }};
 var Logger = {log: function (x) { log.push(String(x)); }};
@@ -162,7 +163,10 @@ var fx = function (id, lid, st, h, a) { return {fixture: {id: id, timestamp: 179
   lineups: [{team: {id: 1, name: h}, formation: '4-3-3', coach: {name: 'Trener'}, startXI: [{player: {name: 'A, B'}}, {player: {name: 'C'}}], substitutes: [{player: {name: 'D'}}]}]}; };
 var UrlFetchApp = {fetch: function (u) { wyw.push(u.replace(/^https:\/\/v\d\.[a-z]+\.api-sports\.io\//, ''));
   var b = {response: []};
-  if (u.indexOf('fixtures?ids=') >= 0) b.response = u.split('ids=')[1].split('-').map(function (i) { return fx(+i, 39, 'FT', 'H' + i, 'A' + i); });
+  if (u.indexOf('fixtures?ids=') >= 0 && PLAN_DARMOWY) b = {errors: {plan: 'Free plans do not have access to the Ids parameter.'}, response: []};
+  else if (u.indexOf('fixtures?id=') >= 0) b.response = [fx(+u.split('id=')[1], 39, 'FT', 'H', 'A')];
+  else if (u.indexOf('league=') >= 0 && PLAN_DARMOWY) b = {errors: {plan: 'Free plans do not have access to this season, try from 2022 to 2024.'}, response: []};
+  else if (u.indexOf('fixtures?ids=') >= 0) b.response = u.split('ids=')[1].split('-').map(function (i) { return fx(+i, 39, 'FT', 'H' + i, 'A' + i); });
   else if (u.indexOf('injuries') >= 0) b.response = [{player: {name: 'Kowalski', type: 'Missing Fixture', reason: 'Knee Injury'}, team: {name: 'H1'}, fixture: {id: 1, date: '2026-10-17T15:00:00+00:00'}, league: {id: 39, name: 'L39'}}];
   else if (u.indexOf('league=') >= 0) b = u.indexOf('season=2025') >= 0 ? {errors: {plan: 'Free plans do not have access to this season'}, response: []} : {response: [fx(900, 39, 'FT', 'X', 'Y')]};
   else if (u.indexOf('football') >= 0) b.response = DZIS;
@@ -170,11 +174,11 @@ var UrlFetchApp = {fetch: function (u) { wyw.push(u.replace(/^https:\/\/v\d\.[a-
 '''
 
 
-def _symulacja(teraz_iso, props, ligi, dzis_mecze, przebiegi=1):
+def _symulacja(teraz_iso, props, ligi, dzis_mecze, przebiegi=1, plan_darmowy=False):
     if not shutil.which('node'):
         pytest.skip('brak node')
     src = _txt('wyniki_live.gs')
-    js = (_ATRAPY_GS.replace('PROPS', json.dumps(props)).replace('LIGI_JSON', json.dumps(ligi)).replace('DZIS', dzis_mecze)
+    js = (_ATRAPY_GS.replace('PROPS', json.dumps(props)).replace('LIGI_JSON', json.dumps(ligi)).replace('DZIS', dzis_mecze).replace('PLAN_DARMOWY', 'true' if plan_darmowy else 'false')
           + src + r'''
     var RD = Date, T0 = RD.parse('%s'), krok = 0;
     Date = function (x) { return arguments.length ? new RD(x) : new RD(T0 + krok * 60000); };
@@ -211,7 +215,8 @@ def test_wyniki_live_obserwacja_pelny_dzien():
     assert 'Kowalski,Missing Fixture,Knee Injury' in p['api_kontuzje_2026-10.csv']
     assert p['historia_39_2026.csv'].count('\n') == 2
     h = json.loads(w['props']['wl_hist'])
-    assert h['39_2026'] == 'ok' and h['39_2025'].startswith('blad: plan')
+    assert h['39_2026'] == 'ok' and '39_2025' not in h          # odmowa planu nie jest „zrobiona” — wróci za 7 dni
+    assert json.loads(w['props']['wl_obs'])['histStop'] > 0 and 'historia_wstrzymana' in w['obs']
     assert 'udost jedrzej.hernacki@gmail.com' in w['log']
     assert w['obs']['szczegoly_dzis'] == 21 and w['obs']['szczegoly_czeka'] == 0
     assert len(sciezki) <= 1 + 3 * 4    # 1 odczyt live (co 30 min) + najwyżej 4 zapytania obserwacji na minutę
@@ -235,3 +240,16 @@ def test_wyniki_live_pusta_lista_lig_nie_na_6_godzin():
     w = _symulacja('2026-10-17T10:00:00Z', {'APISPORTS_KEY': 'K', 'SPORTY': 'football', 'wl_ligi': stara},
                    {'ligi': [{'lid': 39, 'sezon': 2026}]}, dzis)
     assert w['obs']['ligi'] == 1 and any(x.startswith('fixtures?ids=1') for x in w['wyw'])
+
+
+def test_wyniki_live_plan_darmowy_bez_ids_i_bez_sezonow():
+    # 17.10.2026, pierwszy prawdziwy przebieg: „Free plans do not have access to the Ids parameter” i „...to this season,
+    # try from 2022 to 2024” — 21 zapytań poszło na odmowy, 279 sezonów w kolejce. Teraz: pojedyncze „id”, historia stoi.
+    dzis = 'Array.apply(null, {length: 5}).map(function (_, i) { return fx(100 + i, 39, "FT", "H" + i, "A" + i); })'
+    ligi = {'ligi': [{'lid': 39 + i, 'sezon': 2026} for i in range(20)]}
+    w = _symulacja('2026-10-17T10:00:00Z', {'APISPORTS_KEY': 'K', 'SPORTY': 'football'}, ligi, dzis, przebiegi=4, plan_darmowy=True)
+    sc = [x for x in w['wyw'] if not x.startswith('http')]
+    assert sum(1 for x in sc if x.startswith('fixtures?ids=')) == 1          # jedna próba ids, potem pojedynczo
+    assert sorted(x for x in sc if x.startswith('fixtures?id=')) == ['fixtures?id=%d' % (100 + i) for i in range(5)]
+    assert sum(1 for x in sc if 'league=' in x) == 1                          # jedna odmowa sezonu i stop (nie 40)
+    assert len(w['pliki']['api_statystyki_2026-10.csv'].splitlines()) == 1 + 5 * 2

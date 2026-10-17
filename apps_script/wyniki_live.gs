@@ -347,8 +347,11 @@ function obserwacja_(P, stan, klucz, mecze, teraz, coPilka) {
   if (obs.szDzien !== dzis) { obs.szDzien = dzis; obs.sz = []; }
   var czeka = mecze.filter(function (m) { return m.s === 'football' && wLigach[m.lid] && FIN_[m.st] && obs.sz.indexOf(m.id) < 0; })
     .map(function (m) { return m.id; });
+  // 17.10.2026: darmowy plan odrzuca „ids” (do 20 meczów) — wtedy pojedynczo „id”, jeden mecz na zapytanie
   while (czeka.length && mozna()) {
-    var paczka = czeka.splice(0, 20), q = zapytajPilka_(stan, klucz, 'fixtures?ids=' + paczka.join('-'), limit);
+    var paczka = czeka.splice(0, obs.bezIds ? 1 : 20);
+    var q = zapytajPilka_(stan, klucz, obs.bezIds ? 'fixtures?id=' + paczka[0] : 'fixtures?ids=' + paczka.join('-'), limit);
+    if (!q.j && !obs.bezIds && /ids parameter/i.test(q.blad || '')) { obs.bezIds = true; czeka = paczka.concat(czeka); raport.szczegoly = 'bez ids (plan): po jednym meczu'; continue; }
     if (!q.j) { raport.szczegoly = q.blad; break; }
     var st = [], sk = [];
     (q.j.response || []).forEach(function (x) { var d = szczegolyMeczu(x); st = st.concat(d.stat); sk = sk.concat(d.sklad); });
@@ -361,10 +364,21 @@ function obserwacja_(P, stan, klucz, mecze, teraz, coPilka) {
   var hist = JSON.parse(P.getProperty('wl_hist') || '{}');   // osobna właściwość (limit 9 KB na jedną)
   obs.hist = hist;
   var kolejka = [];
-  ligi.forEach(function (l) { if (!l.sezon) return; [l.sezon, l.sezon - 1].forEach(function (s) { if (!obs.hist[l.lid + '_' + s]) kolejka.push([l.lid, s]); }); });
+  ligi.forEach(function (l) { if (!l.sezon) return; [l.sezon, l.sezon - 1].forEach(function (s) {
+    var v = obs.hist[l.lid + '_' + s];
+    if (!v || /^blad: plan/.test(v)) kolejka.push([l.lid, s]);     // odmowy planu z 17.10 (stara wersja) — do ponowienia
+  }); });
+  // 17.10.2026: darmowy plan nie daje bieżących sezonów („try from 2022 to 2024”) — każda odmowa zjadała zapytanie
+  // (279 w kolejce). Po odmowie planu historia stoi 7 dni (potem jedna próba — np. po wykupieniu planu).
+  var stop = obs.histStop ? (teraz.getTime() - obs.histStop) / 86400000 : 99;
+  if (stop < 7) { kolejka = []; raport.historia_wstrzymana = 'plan nie daje tych sezonów — kolejna próba za ' + Math.ceil(7 - stop) + ' dni'; }
   while (kolejka.length && mozna()) {
     var ls = kolejka.shift(), h = zapytajPilka_(stan, klucz, 'fixtures?league=' + ls[0] + '&season=' + ls[1] + '&timezone=Europe/Warsaw', limit);
     if (h.blad === 'budżet') break;
+    if (/access to this season/i.test(h.blad || '')) {
+      obs.histStop = teraz.getTime(); raport.historia_wstrzymana = String(h.blad).slice(0, 120);
+      break;                                  // tej odmowy NIE zapisujemy jako „zrobione” — po 7 dniach próba od nowa
+    }
     if (h.j) zapiszCsv_(fol(), 'historia_' + ls[0] + '_' + ls[1] + '.csv', NAGL_WYNIKI, (h.j.response || []).map(wierszWyniku).filter(Boolean));
     obs.hist[ls[0] + '_' + ls[1]] = h.blad ? 'blad: ' + String(h.blad).slice(0, 80) : 'ok';
   }
