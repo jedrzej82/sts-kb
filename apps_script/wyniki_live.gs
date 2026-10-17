@@ -14,6 +14,8 @@
  *  2. https://script.google.com -> „Nowy projekt” -> wklej CAŁY ten plik -> zapisz, nazwij „wyniki live”.
  *  3. Ustawienia projektu (ikona zębatki) -> „Właściwości skryptu” -> dodaj APISPORTS_KEY = Twój klucz.
  *     Opcjonalnie: ODSWIEZ_MIN (domyślnie 15), SPORTY (np. football,hockey,basketball,handball,volleyball).
+ *     Skrypt na INNYM koncie Google niż konektor Dysku w Claude: UDOSTEPNIJ = adres tamtego konta (można kilka po
+ *     przecinku) — plik zostanie mu udostępniony do odczytu, a aplikacja znajdzie go wśród udostępnionych.
  *  4. Wybierz funkcję „ustaw” -> „Uruchom” -> zezwól (Dysk + połączenia zewnętrzne). Tworzy wyzwalacz co minutę
  *     i od razu zapisuje pierwszy plik. Błędy źródeł (np. limit planu) są w polu „zrodla” pliku wyniki_live.json.
  *
@@ -85,7 +87,20 @@ function wynikiLive() {
   });
 
   P.setProperty('wl_stan', JSON.stringify(stan));
-  zapiszPlik_({v: 1, ts: teraz.toISOString(), data: dzis, zrodla: zrodla, mecze: mecze});
+  var plik = zapiszPlik_({v: 1, ts: teraz.toISOString(), data: dzis, zrodla: zrodla, mecze: mecze});
+  udostepnij_(P, plik);
+}
+
+// 17.10.2026: konektor Dysku w Claude bywa na innym koncie niż skrypt — plik musi być mu udostępniony.
+// Raz na adres (zapamiętane we właściwości wl_udostepniono), nie co minutę.
+function udostepnij_(P, plik) {
+  var chce = (P.getProperty('UDOSTEPNIJ') || '').split(',').map(function (x) { return x.trim().toLowerCase(); }).filter(Boolean);
+  var juz = (P.getProperty('wl_udostepniono') || '').split(',').filter(Boolean);
+  var nowe = chce.filter(function (a) { return juz.indexOf(plik.getId() + ':' + a) < 0; });
+  nowe.forEach(function (a) {
+    try { plik.addViewer(a); juz.push(plik.getId() + ':' + a); } catch (e) { Logger.log('udostępnienie ' + a + ': ' + e); }
+  });
+  if (nowe.length) P.setProperty('wl_udostepniono', juz.join(','));
 }
 
 // Odpowiedź API-Sports z błędem ma niepuste „errors” (obiekt albo tablica), np. {plan: '…'} albo {token: '…'}
@@ -152,7 +167,7 @@ function meczOpenLiga(kod, x) {
 }
 
 function _plik_() {
-  var it = DriveApp.getFilesByName(PLIK);
+  var it = DriveApp.searchFiles("title = '" + PLIK + "' and 'me' in owners and trashed = false");
   return it.hasNext() ? it.next() : null;
 }
 
@@ -164,6 +179,6 @@ function czytajPlik_() {
 
 function zapiszPlik_(o) {
   var f = _plik_(), txt = JSON.stringify(o);
-  if (f) f.setContent(txt);
-  else DriveApp.createFile(PLIK, txt, 'application/json');
+  if (f) { f.setContent(txt); return f; }
+  return DriveApp.createFile(PLIK, txt, 'application/json');
 }

@@ -113,3 +113,22 @@ def test_wyniki_live_klucz_tylko_we_wlasciwosciach():
     c = _cialo(t, 'wynikiLive')
     # budzet darmowego planu: limit sprawdzany przed zapytaniem, licznik zapisany po petli
     assert c.index('st.n >= LIMIT_DZIEN') < c.index('UrlFetchApp.fetch(HOSTY[s]') < c.index("P.setProperty('wl_stan'")
+
+
+def test_wyniki_live_udostepnia_raz_na_adres():
+    # 17.10.2026: skrypt na hernackijedrzej@, konektor Dysku w Claude na innym koncie — plik nie byl widoczny
+    if not shutil.which('node'):
+        pytest.skip('brak node')
+    js = _cialo(_txt('wyniki_live.gs'), 'udostepnij_') + r'''
+    var props = {UDOSTEPNIJ: ' Konto@Gmail.com, , drugie@x.pl'}, dodani = [];
+    var P = {getProperty: function (k) { return props[k] || null; }, setProperty: function (k, v) { props[k] = v; }};
+    var plik = {getId: function () { return 'F1'; }, addViewer: function (a) { dodani.push(a); }};
+    var Logger = {log: function () {}};
+    udostepnij_(P, plik); udostepnij_(P, plik);
+    console.log(JSON.stringify([dodani, props.wl_udostepniono]));
+    '''
+    r = subprocess.run(['node', '-e', js], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    assert json.loads(r.stdout) == [['konto@gmail.com', 'drugie@x.pl'], 'F1:konto@gmail.com,F1:drugie@x.pl']
+    c = _cialo(_txt('wyniki_live.gs'), '_plik_')
+    assert "'me' in owners" in c   # nie nadpisujemy cudzego pliku o tej samej nazwie
