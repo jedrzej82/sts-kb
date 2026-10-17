@@ -61,6 +61,11 @@ Nigdy stałe „+2 h”: w Pythonie `ZoneInfo('Europe/Warsaw')`/`tz_localize('Eu
   ROZBITA = ten sam klub pod dwiema nazwami w bazie). Cel: 100% zdarzen sklasyfikowanych, 0 blednych MATCH; blokada
   typowania CONFLICT/UNKNOWN dopiero po przegladzie na prawdziwych danych i decyzji uzytkownika.
 - Model vs rynek (TRYB OBSERWACJI, nic w przebiegu nie korzysta): `rynek_model.py zbior --typy typy_log.csv [--p-sts P.csv] --kursy K*.csv.gz --wyjscie zbior.csv` (P zapisane przed meczem + kurs STS + wynik, bez dubli) i `rynek_model.py ocena zbior.csv` (log-loss/Brier, model rezydualny logit P_rynku + b*(logit P_model - logit P_rynku) w segmentach, CV po dniach, bootstrap po meczach) — odchylac P od rynku wolno tylko tam, gdzie b>0 istotnie, i po decyzji uzytkownika.
+- API-Football (TRYB OBSERWACJI, decyzja uzytkownika 17.10.2026 „zrobmy wszystkie”; nic w przebiegu/typowaniu/rozliczeniach
+  nie korzysta do backtestu i decyzji): `apps_script/wyniki_live.gs` zbiera do folderu „api-football” na Dysku (archiwum
+  wynikow, kontuzje, statystyki i sklady meczow lig STS po 20 na zapytanie, historia lig — lista lig z `api_ligi.json`);
+  `api_football.py ligi|rozliczenia|historia|statystyki|kontuzje` = pomiary. Dopasowanie oferty STS: ta sama godzina startu
+  + OBIE druzyny (`ta_sama`: nazwy.znaczniki musza byc rowne, slowa ogolne typu Town/Real/Hapoel nie sa dowodem).
 - Apps Script (wkleja użytkownik): `apps_script/terminarz.gs`, `apps_script/ligapro.gs`, `apps_script/arkusze.gs` (arkusze statystyk jako .csv.gz), `apps_script/dzienniki.gs` (wszystkie dzienniki w jednym dzienniki.zip; `python3 przebieg.py --dzienniki`), `apps_script/paczka.gs` (wszystkie dane przebiegu w jednym paczka.zip — przebieg.py rozpakowuje ja sam).
   `apps_script/wyniki_live.gs` (wyniki na zywo dla aplikacji „Prognozy meczowe”: API-Sports — klucz TYLKO we wlasciwosciach
   skryptu APISPORTS_KEY — + OpenLigaDB -> `wyniki_live.json` na Dysku co minute; darmowy plan: kazdy sport najwyzej co 15 min,
