@@ -31,6 +31,7 @@ import re
 import sys
 import unicodedata
 
+import numpy as np
 import pandas as pd
 
 import nazwy
@@ -103,7 +104,11 @@ def zdarzenia_sts(kursy):
     e = k.drop_duplicates(['sport', 'data_meczu', 'gospodarz', 'gosc']).copy()
     e['S'] = e.sport.map(SPORT_STS)
     e['d'] = pd.to_datetime(e.data_meczu).dt.normalize()
-    e['t'] = pd.to_datetime(e.data_meczu + ' ' + e.godzina_meczu.fillna(''), errors='coerce') - pd.Timedelta(hours=2)
+    # 17.10.2026: godzina STS to czas polski — CEST (UTC+2) latem, CET (UTC+1) zima; stale -2 h od 25.10 przesuwalo
+    # mecz o godzine i dowod GODZINA (±5 min) trafial w inny mecz albo w nic
+    t = pd.to_datetime(e.data_meczu + ' ' + e.godzina_meczu.fillna(''), errors='coerce')
+    e['t'] = t.dt.tz_localize('Europe/Warsaw', ambiguous=np.ones(len(t), bool), nonexistent='shift_forward') \
+        .dt.tz_convert('UTC').dt.tz_localize(None)
     e['dni'] = [frozenset({d, t.normalize()}) if pd.notna(t) else frozenset({d}) for d, t in zip(e.d, e.t)]
     return e.rename(columns={'gospodarz': 'A', 'gosc': 'B'})[['S', 'd', 't', 'dni', 'A', 'B']].reset_index(drop=True)
 

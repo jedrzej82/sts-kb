@@ -263,3 +263,10 @@ def test_auto_bez_nowych_aliasow_nie_wywraca(tmp_path, monkeypatch):
     monkeypatch.setattr(dopasuj, '_mecze_lig', lambda: pd.DataFrame(columns=['S', 'liga', 'A', 'B']))
     out, stat, linie = dopasuj.auto(str(k), 'zewn', str(tmp_path / 'auto.csv'))
     assert out.empty and (tmp_path / 'auto.csv').exists() and linie[0].startswith('NAZWY AUTO: 0')
+
+
+def test_godzina_pl_czas_letni_i_zimowy():
+    # 17.10.2026: STS podaje czas polski; latem UTC+2, od 25.10 (ostatnia niedziela pazdziernika) UTC+1
+    ev = _ev([('pilka', '2026-10-24', '18:00', 'A', 'B'), ('pilka', '2026-10-26', '18:00', 'C', 'D'),
+              ('pilka', '2026-03-29', '03:30', 'E', 'F'), ('pilka', '2026-10-25', '02:30', 'G', 'H')])
+    assert ev.t.tolist() == [T('2026-10-24 16:00'), T('2026-10-26 17:00'), T('2026-03-29 01:30'), T('2026-10-25 00:30')]
