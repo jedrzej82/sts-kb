@@ -226,3 +226,12 @@ def test_wyniki_live_obserwacja_nie_zjada_budzetu_live():
                    {'ligi': [{'lid': 39, 'sezon': 2026}]}, dzis)
     api = [x for x in w['wyw'] if not x.startswith('http')]
     assert api == ['fixtures?date=2026-10-17&timezone=Europe/Warsaw'] and w['obs']['limit'] == 95 - 28
+
+
+def test_wyniki_live_pusta_lista_lig_nie_na_6_godzin():
+    # 17.10.2026: pierwsze uruchomienie (14:02) bez api_ligi.json zapamiętało pustą listę na 6 h — po 10 min ma czytać znów
+    dzis = '[fx(1, 39, "FT", "H", "A")]'
+    stara = json.dumps({'ts': 1792230000000, 'ligi': []})   # 09:40 UTC, 20 min przed przebiegiem
+    w = _symulacja('2026-10-17T10:00:00Z', {'APISPORTS_KEY': 'K', 'SPORTY': 'football', 'wl_ligi': stara},
+                   {'ligi': [{'lid': 39, 'sezon': 2026}]}, dzis)
+    assert w['obs']['ligi'] == 1 and any(x.startswith('fixtures?ids=1') for x in w['wyw'])

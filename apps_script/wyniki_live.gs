@@ -307,7 +307,9 @@ function wierszKontuzji(x) {
 // ligi STS: plik api_ligi.json ({ligi:[{lid, sezon}]}) — najświeższy widoczny dla skryptu; odczyt najwyżej co 6 h
 function ligiSts_(P, teraz) {
   var c = JSON.parse(P.getProperty('wl_ligi') || '{}');
-  if (c.ts && teraz.getTime() - c.ts < 6 * 3600000) return c.ligi || [];
+  // pusta lista (pliku jeszcze nie było) sprawdzana znów po 10 min — 17.10: pierwsze uruchomienie zapamiętało pustą na 6 h
+  var waznosc = c.ligi && c.ligi.length ? 6 * 3600000 : 10 * 60000;
+  if (c.ts && teraz.getTime() - c.ts < waznosc) return c.ligi || [];
   var it = DriveApp.searchFiles("title = 'api_ligi.json' and trashed = false"), best = null;
   while (it.hasNext()) { var f = it.next(); if (!best || f.getLastUpdated() > best.getLastUpdated()) best = f; }
   var ligi = [];
