@@ -58,12 +58,25 @@ def test_stare_turnieje_bez_zmian():
 
 @pytest.mark.skipif(not os.path.exists(BAZA), reason='wymaga zbudowanej bazy (kb.sqlite)')
 def test_emmen_i_fc_emmen_to_ten_sam_klub():
-    """Dowod, na ktorym stoi alias: zapisy sie dopelniaja — zero wspolnych dat."""
+    """Emmen to jeden klub. 03.10: dwa zapisy sie dopelnialy (zero wspolnych dat) — alias FC Emmen -> Emmen.
+    17.10.2026: build_kb sam skleja zapisy rowne po kluczu w kraju — w bazie zostaje JEDEN zapis „FC Emmen” z cala
+    historia (N1 i N2, 2014-2026), a „Emmen” nie ma meczow. Wtedy alias wskazuje poza pule i jest pomijany (aliasy
+    dzialaja tylko z celem w puli) — liczy sie, zeby klub nie byl rozbity i resolver bral zapis z cala historia."""
     c = sqlite3.connect(BAZA)
     daty = lambda t: {r[0] for r in c.execute(
         'select MatchDate from matches where HomeTeam=? or AwayTeam=?', (t, t))}
     a, b = daty('FC Emmen'), daty('Emmen')
-    assert a and b and not (a & b)
+    assert a or b
+    if a and b:                      # baza sprzed sklejania: dwa zapisy musza sie dopelniac
+        assert not (a & b)
+        return
+    zapis = 'FC Emmen' if a else 'Emmen'
+    ligi = {r[0] for r in c.execute('select distinct Division from matches where HomeTeam=? or AwayTeam=?', (zapis, zapis))}
+    wszystkie = a or b
+    assert {'N1', 'N2'} <= ligi and min(wszystkie) < '2016' and max(wszystkie) >= '2026'
+    import typuj
+    pula = {r[0] for r in c.execute('select HomeTeam from matches union select AwayTeam from matches')}
+    assert typuj.resolve('FC Emmen', pula) == zapis
 
 
 @pytest.mark.skipif(not os.path.exists(BAZA), reason='wymaga zbudowanej bazy (kb.sqlite)')
