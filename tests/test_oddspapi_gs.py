@@ -164,3 +164,27 @@ def _symuluj_z_plikami(start_iso, pliki):
     r = subprocess.run(['node', '-e', js], capture_output=True, text=True)
     assert r.returncode == 0, r.stderr[-2000:]
     return json.loads(r.stdout)
+
+
+def test_sprawdz_platne_dwa_zapytania_ponad_dzienny_raz():
+    mecze = [{'id': 'id4', 't': 1792240000, 'a': 'A4', 'b': 'B4'}, {'id': 'id6', 't': 1792245000, 'a': 'A6', 'b': 'B6'},
+             {'id': 'id8', 't': 1792300000, 'a': 'A8', 'b': 'B8'}]                           # id8 jeszcze trwa
+    st = {'bukmacher': 'superbet.pl', 'dzien': {'d': '2026-10-17', 'n': 5}, 'mies': {'m': '2026-10', 'n': 5}, 'okna': {}}
+    js = (_ATRAPY.replace('PROPS', json.dumps({'ODDSPAPI_KEY': 'K', 'op_stan': json.dumps(st)})).replace('KOD_HTTP', '200')
+          + open(_GS, encoding='utf-8').read() + r"""
+    var RD = Date, T0 = RD.parse('2026-10-17T19:10:00Z');
+    Date = function (x) { return arguments.length ? new RD(x) : new RD(T0); }; Date.now = function () { return T0; }; Date.UTC = RD.UTC; Date.parse = RD.parse;
+    pliki['oddspapi_2026-10-17_TEST.json.gz'] = plik('x', %s);
+    sprawdzPlatne(); sprawdzPlatne();
+    var tresc = {}; Object.keys(pliki).forEach(function (k) { tresc[k] = pliki[k].t; });
+    console.log(JSON.stringify({wyw: wyw, pliki: tresc, props: props}));
+    """ % json.dumps(json.dumps({'mecze': mecze})))
+    if not shutil.which('node'):
+        pytest.skip('brak node')
+    r = subprocess.run(['node', '-e', js], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr[-2000:]
+    w = json.loads(r.stdout)
+    assert [u.split('?')[0] for u in w['wyw']] == ['markets', 'settlements'] and 'fixtureId=id6' in w['wyw'][1]
+    assert json.loads(w['pliki']['oddspapi_rozl_2026-10-17_TEST.json.gz'])['wyniki'][0] == ['id6', 101, 101, 'WIN']
+    assert '101' in json.loads(w['pliki']['oddspapi_rynki.json'])
+    assert json.loads(w['props']['op_stan'])['dzien']['n'] == 7                         # 5 + 2, drugie wywołanie nic

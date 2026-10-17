@@ -20,6 +20,7 @@
  *  2. Ustawienia projektu (zębatka) -> „Właściwości skryptu” -> ODDSPAPI_KEY = Twój klucz (tylko tutaj, nigdzie indziej).
  *     Opcjonalnie UDOSTEPNIJ = adres konta Google konektora Dysku w Claude (folder zostanie mu udostępniony do odczytu).
  *  3. Wybierz funkcję „ustaw” -> „Uruchom” -> zezwól. Tworzy wyzwalacz co godzinę; lista bukmacherów raz na dobę.
+ *  5. (opcjonalnie) „sprawdzPlatne” -> „Uruchom”: nazwy rynków + rozliczenie 1 zakończonego meczu = <= 2 płatne, raz na dobę.
  *  4. (opcjonalnie) „sprawdzTeraz” -> „Uruchom”: od razu darmowa historia 2 najbliższych meczów z ostatniej listy
  *     (bez płatnych zapytań), raz na dobę — plik oddspapi_hist_..._TEST.json.gz.
  *
@@ -80,6 +81,62 @@ function sprawdzTeraz() {
   } finally { lock.releaseLock(); }
 }
 
+// Ręczna próba PŁATNYCH części (17.10.2026, prośba użytkownika „testuj”): nazwy rynków (gdy brak pliku) + rozliczenie
+// JEDNEGO zakończonego meczu z ostatniej listy = najwyżej 2 płatne; raz na dobę; wolno przekroczyć dzienny bezpiecznik
+// o 2 (limit miesięczny bez zmian).
+function sprawdzPlatne() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(1000)) return;
+  try {
+    var P = PropertiesService.getScriptProperties(), st = stan_(P);
+    if (st.okna.TEST_PL === st.dzien.d) { Logger.log('Próba płatna już była dziś — wynik w pliku oddspapi_stan.json'); return; }
+    st.okna.TEST_PL = st.dzien.d;
+    zapiszStan_(P, st);
+    var f = folder_(P), bledy = [];
+    if (!f.getFilesByName('oddspapi_rynki.json').hasNext()) {
+      var r = pytaj_(P, st, 'markets', {language: 'en'}, false, true);
+      if (r.blad) bledy.push('markets: ' + r.blad); else f.createFile('oddspapi_rynki.json', JSON.stringify(rynkiPilki_(r.dane)), 'application/json');
+    }
+    var granica = Date.now() / 1000 - ROZL_PO_H * 3600;
+    var m = meczeDni_(f, new Date()).filter(function (x) { return x.t < granica; }).sort(function (a, b) { return b.t - a.t; })[0];
+    var wyniki = [];
+    if (!m) bledy.push('brak zakończonego meczu na liście');
+    else {
+      var s = pytaj_(P, st, 'settlements', {fixtureId: m.id}, false, true);
+      if (s.blad) bledy.push('settlements: ' + s.blad); else wyniki = wynikiRozl_(m.id, s.dane);
+      zapiszGz_(f, 'oddspapi_rozl_' + Utilities.formatDate(new Date(), 'Europe/Warsaw', 'yyyy-MM-dd') + '_TEST.json.gz',
+                {v: 2, ts: Math.round(Date.now() / 1000), wyniki: wyniki, bledy: bledy});
+    }
+    zapiszStan_(P, st);
+    plikStanu_(P, st, 'próba płatna: ' + (m ? (m.a + ' - ' + m.b + ', ') : '') + wyniki.length + ' wyników rozliczenia', bledy);
+    Logger.log('Rynki: ' + (f.getFilesByName('oddspapi_rynki.json').hasNext() ? 'są' : 'brak') + ' | rozliczenie ' + (m ? m.a + ' - ' + m.b : '-') + ': '
+               + wyniki.length + ' wyników | płatne dziś ' + st.dzien.n + ', w miesiącu ' + st.mies.n + (bledy.length ? ' | ' + bledy.join('; ') : ''));
+  } finally { lock.releaseLock(); }
+}
+
+function rynkiPilki_(dane) {
+  var rynki = {};
+  (dane || []).forEach(function (x) {
+    if (x.sportId !== PILKA || x.playerProp) return;
+    var w = {};
+    (x.outcomes || []).forEach(function (o) { w[o.outcomeId] = o.outcomeName; });
+    rynki[x.marketId] = [x.marketName, x.handicap, x.period, w];
+  });
+  return rynki;
+}
+
+function wynikiRozl_(id, dane) {
+  var out = [], rynki = (dane && dane.markets) || {};
+  Object.keys(rynki).forEach(function (rk) {
+    var wyn = rynki[rk].outcomes || {};
+    Object.keys(wyn).forEach(function (w) {
+      var g = (wyn[w].players || {})['0'];
+      if (g && g.result) out.push([id, +rk, +w, g.result]);
+    });
+  });
+  return out;
+}
+
 function oddspapi() {
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(1000)) return;
@@ -120,16 +177,7 @@ function lista_(P, st, teraz) {
     st.okna.RYNKI = st.dzien.d;                      // nazwy rynków: raz (przy braku pliku najwyżej raz na dobę)
     var r = pytaj_(P, st, 'markets', {language: 'en'});
     if (r.blad) bledy.push('markets: ' + r.blad);
-    else {
-      var rynki = {};
-      (r.dane || []).forEach(function (x) {
-        if (x.sportId !== PILKA || x.playerProp) return;
-        var w = {};
-        (x.outcomes || []).forEach(function (o) { w[o.outcomeId] = o.outcomeName; });
-        rynki[x.marketId] = [x.marketName, x.handicap, x.period, w];
-      });
-      f.createFile('oddspapi_rynki.json', JSON.stringify(rynki), 'application/json');
-    }
+    else f.createFile('oddspapi_rynki.json', JSON.stringify(rynkiPilki_(r.dane)), 'application/json');
   }
   zapiszGz_(f, 'oddspapi_' + dzien + '_RANO.json.gz', {v: 2, ts: Math.round(Date.now() / 1000), okno: 'RANO', mecze: mecze, bledy: bledy});
   st.blad = bledy.join('; ');
@@ -230,14 +278,7 @@ function rozliczenia_(P, st, f, teraz) {
     st.rozl.n++;
     var r = pytaj_(P, st, 'settlements', {fixtureId: kand[i]});
     if (r.blad) { bledy.push(kand[i] + ': ' + r.blad); if (/STOP|blokada|limit/.test(r.blad)) break; zrobione[kand[i]][2] = 1; continue; }
-    var rynki = (r.dane && r.dane.markets) || {};
-    Object.keys(rynki).forEach(function (rk) {
-      var wyn = rynki[rk].outcomes || {};
-      Object.keys(wyn).forEach(function (w) {
-        var g = (wyn[w].players || {})['0'];
-        if (g && g.result) wyniki.push([kand[i], +rk, +w, g.result]);
-      });
-    });
+    wyniki = wyniki.concat(wynikiRozl_(kand[i], r.dane));
     zrobione[kand[i]][2] = 1;
   }
   zapiszZrobione_(f, zrobione);
@@ -289,12 +330,12 @@ function bukmacher_(P, st) {
 }
 
 // JEDYNE miejsce, które wysyła zapytanie: budżet doby i miesiąca (płatne) albo doby (darmowe), blokada, przerwa 6 s
-function pytaj_(P, st, endpoint, par, darmowe) {
+function pytaj_(P, st, endpoint, par, darmowe, ponadDzienny) {
   var klucz = P.getProperty('ODDSPAPI_KEY');
   if (!klucz) return {blad: 'brak ODDSPAPI_KEY we właściwościach skryptu'};
   if (st.blokada && Date.now() - st.blokada.ts < BLOKADA_H * 3600000) return {blad: 'blokada do ' + new Date(st.blokada.ts + BLOKADA_H * 3600000).toISOString()};
   if (darmowe && st.hist.n >= HIST_DZIEN) return {blad: 'limit dzienny darmowych ' + HIST_DZIEN};
-  if (!darmowe && st.dzien.n >= MAKS_DZIEN) return {blad: 'limit dzienny ' + MAKS_DZIEN};
+  if (!darmowe && st.dzien.n >= MAKS_DZIEN + (ponadDzienny ? 2 : 0)) return {blad: 'limit dzienny ' + MAKS_DZIEN};
   if (!darmowe && st.mies.n >= MAKS_MIESIAC) return {blad: 'limit miesięczny ' + MAKS_MIESIAC};
   if (st.ostatnie && Date.now() - st.ostatnie < PRZERWA_MS) Utilities.sleep(PRZERWA_MS);
   if (darmowe) st.hist.n++; else { st.dzien.n++; st.mies.n++; }
