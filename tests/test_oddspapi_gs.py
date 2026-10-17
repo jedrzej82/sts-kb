@@ -38,7 +38,7 @@ var UrlFetchApp = {fetch: function (u) { wyw.push(u.replace('https://api.oddspap
 '''
 
 
-def _symuluj(start_iso, godzin, props=None, kod=200, ustaw=False):
+def _symuluj(start_iso, godzin, props=None, kod=200, ustaw=False, sprawdz=False):
     if not shutil.which('node'):
         pytest.skip('brak node')
     p = {'ODDSPAPI_KEY': 'TAJNY123'}
@@ -48,9 +48,10 @@ def _symuluj(start_iso, godzin, props=None, kod=200, ustaw=False):
     Date = function (x) { return arguments.length ? new RD(x) : new RD(T0 + krok * 3600000); };
     Date.now = function () { return T0 + krok * 3600000; }; Date.UTC = RD.UTC; Date.parse = RD.parse;
     if (%s) { ustaw(); ustaw(); }
+    if (%s) { sprawdzTeraz(); sprawdzTeraz(); }
     for (; krok < %d; krok++) { oddspapi(); oddspapi(); }
     console.log(JSON.stringify({wyw: wyw, pliki: pliki, props: props, spanie: spanie, wyzw: wyzw}));
-    ''' % (start_iso, 'true' if ustaw else 'false', godzin))
+    ''' % (start_iso, 'true' if ustaw else 'false', 'true' if sprawdz else 'false', godzin))
     r = subprocess.run(['node', '-e', js], capture_output=True, text=True)
     assert r.returncode == 0, r.stderr[-2000:]
     return json.loads(r.stdout)
@@ -96,3 +97,10 @@ def test_429_stop_na_dobe():
 def test_brak_klucza_zero_zapytan():
     w = _symuluj('2026-10-17T22:30:00Z', 24, props={'ODDSPAPI_KEY': ''}, ustaw=True)
     assert w['wyw'] == []
+
+
+def test_sprawdz_teraz_dwa_zapytania_raz_na_dobe():
+    w = _symuluj('2026-10-17T18:30:00Z', 0, props={'op_stan': json.dumps({'bukmacher': 'superbet.pl'})}, sprawdz=True)
+    assert [u.split('?')[0] for u in w['wyw']] == ['fixtures', 'odds-by-tournaments']   # drugie wywolanie nic nie wysyla
+    t = json.loads(w['pliki']['oddspapi_2026-10-17_TEST.json.gz']['t'])
+    assert len(t['mecze']) == 60 and t['kursy'] and t['zapytania'] == {'dzis': 2, 'miesiac': 2}
