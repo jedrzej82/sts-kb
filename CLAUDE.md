@@ -69,7 +69,8 @@ Nigdy stałe „+2 h”: w Pythonie `ZoneInfo('Europe/Warsaw')`/`tz_localize('Eu
 - Apps Script (wkleja użytkownik): `apps_script/terminarz.gs`, `apps_script/ligapro.gs`, `apps_script/arkusze.gs` (arkusze statystyk jako .csv.gz), `apps_script/dzienniki.gs` (wszystkie dzienniki w jednym dzienniki.zip; `python3 przebieg.py --dzienniki`), `apps_script/paczka.gs` (wszystkie dane przebiegu w jednym paczka.zip — przebieg.py rozpakowuje ja sam).
   `apps_script/oddspapi.gs` (TRYB OBSERWACJI, 17.10.2026; uzytkownik gra glownie w SUPERBET, takze LVBET, STS juz nie):
   OSOBNY projekt Apps Script, klucz tylko we wlasciwosci ODDSPAPI_KEY; kursy Superbet PL + Pinnacle (kurs uczciwy) do folderu
-  „oddspapi” na Dysku, 2 okna dziennie (11:xx i 20:xx PL); darmowy plan 250/mies. -> twardo max 6/dobe, 200/mies., 24 h stop po 401/403/429.
+  „oddspapi” na Dysku. Platne (250/mies., licza sie tez bledy 4xx): tylko lista meczow raz dziennie 11:xx PL; kursy z DARMOWEGO
+  historical-odds po meczu (otwarcie / 6 h przed / zamkniecie), 1 bukmacher na zapytanie; max 6 platnych/dobe, 200/mies., 24 h stop po 401/403/429.
   `apps_script/wyniki_live.gs` (wyniki na zywo dla aplikacji „Prognozy meczowe”: API-Sports — klucz TYLKO we wlasciwosciach
   skryptu APISPORTS_KEY — + OpenLigaDB -> `wyniki_live.json` na Dysku co minute; darmowy plan: kazdy sport najwyzej co 15 min,
   limit 95/dzien; NIE jest czescia przebiegu ani rozliczen).
