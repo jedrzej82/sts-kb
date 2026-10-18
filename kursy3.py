@@ -12,6 +12,7 @@ Uzycie:
   python3 kursy3.py kupon KURSY_STS.csv.gz [KURSY_BUKMACHEROW.csv.gz ...] --ako ako_log.csv --data D [--godzina GG:MM] [--tag K5]
      — dla KAZDEGO kuponu linia „GRAJ U: <bukmacher> @kurs” (do POWIADOMIENIA/Telegrama; bez pliku z telefonu = STS)
        i kurs kazdej nogi u STS / SUPERBET / LVBET"""
+import functools
 import glob
 import math
 import os
@@ -226,12 +227,31 @@ def strona_zgodna(a, b):
     return all(any(_pasuje(x, y) for y in d) for x in k)
 
 
+ALIASY_PLIK = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'aliasy_bukmacherow.csv')
+
+
+def _nazwa(n):
+    return re.sub(r'\s+', ' ', str(n)).strip().lower()
+
+
+@functools.lru_cache(maxsize=1)
+def aliasy_bukmacherow():
+    """aliasy_bukmacherow.csv (18.10.2026): DOKLADNE pary nazw tego samego zespolu u dwoch bukmacherow (z markerami
+    kobiet/rezerw — „Gyor (K)” to inny wpis niz „Gyor”). Kazdy wiersz z dowodem: ten sam mecz o tej samej godzinie, rywal
+    pewny i zgodne kursy (>= 3 wspolne rynki z mediana roznicy <= 8% albo 2 rynki <= 5%). Nie zgadujemy: brak wiersza =
+    brak aliasu."""
+    if not os.path.exists(ALIASY_PLIK): return frozenset()
+    a = pd.read_csv(ALIASY_PLIK, dtype=str, keep_default_na=False)
+    return frozenset(frozenset((_nazwa(x), _nazwa(y))) for x, y in zip(a.nazwa_1, a.nazwa_2) if _nazwa(x) != _nazwa(y))
+
+
 def _strona(a, b):
     """Strona pary meczu (18.10.2026, audyt kursow): strona_zgodna; skrot z pierwszych liter („CRB AL” = „Clube De
     Regatas Brasil”) przy rownych znacznikach; nazwa ucieta w PDF STS (znacznik nieznany) — wyrazny wspolny czlon.
     Dotad wystarczala „podobna” nazwa po jednej stronie (wspolne 3 litery), wiec Real Madrid - Inter laczylo sie z
     Real Sociedad - Inter Turku, a Dinamo Moskwa - Spartak Moskwa z Dinamo Mińsk - Spartak Trnava."""
     if strona_zgodna(a, b): return True
+    if frozenset((_nazwa(a), _nazwa(b))) in aliasy_bukmacherow(): return True
     za, zb = _zn(a), _zn(b)
     if za is None or zb is None: return _wyrazne(a, b)
     return za == zb and (_skrot(_rdzen(a), _rdzen(b)) or _skrot(_rdzen(b), _rdzen(a)))

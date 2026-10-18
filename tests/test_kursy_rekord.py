@@ -170,7 +170,9 @@ def test_conflict_gdy_mecz_bukmachera_ma_juz_pewna_pare():
     out = kr.paruj([_ev('Legia Warszawa', 'Lech Poznań'), _ev('Legia Warszawa', 'Wisła Kraków')], [_ev('Legia', 'Lech Poznan')])
     assert [(s, p) for _, s, _, p in out] == [('MATCH', 'OBIE_STRONY+GODZINA'), ('CONFLICT', 'DRUZYNA_W_INNEJ_PARZE')]
     # inna pisownia jednej strony (18.10, plik z telefonu: Paris FC - Rennes / Paris FC - Stade Rennais) -> UNKNOWN, nie CONFLICT
-    assert _stan('Paris FC', 'Rennes', [('Paris FC', 'Stade Rennais')]) == ('UNKNOWN', 'JEDNA_STRONA')
+    assert _stan('Paris FC', 'Lille', [('Paris FC', 'LOSC')]) == ('UNKNOWN', 'JEDNA_STRONA')
+    # ... chyba ze para nazw ma alias z dowodem z kursow (aliasy_bukmacherow.csv: Rennes = Stade Rennais)
+    assert _stan('Paris FC', 'Rennes', [('Paris FC', 'Stade Rennais')])[0] == 'MATCH'
 
 
 def test_paruj_niejednoznaczne_wstecz():

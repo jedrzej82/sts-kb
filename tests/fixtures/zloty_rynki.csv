@@ -67,3 +67,4 @@ para_meczu,pilka,Alfreton Town|United of Manchester,Cleethorpes Town,Hyde United
 para_meczu,pilka,Wisla Krakow|KS Cracovia,Wisła Kraków,Cracovia,PARA,OK,18.10 audyt kursow
 para_meczu,pilka,Bayern Monachium|1. FC Koeln,Bayern Munchen,1. FC Köln,PARA,OK,18.10 audyt kursow: egzonim i oe = o
 para_meczu,pilka,Hapoel Kfar Shalem|Hapoel Acre FC,Kfar Saba 1928,Hapoel Ramat Hasharon,BRAK,OK,"naprawione 18.10: falszywa para kursy3 na prawdziwym pliku z telefonu 18.10 14:14 (Superbet / LVBET)"
+para_meczu,pilka,Kolner Haie|Fischtown Pinguins,Kolner Haie,Pinguins Bremerhaven,PARA,OK,"18.10: alias z dowodem z kursow (aliasy_bukmacherow.csv) — para utracona po PR #192, odzyskana"

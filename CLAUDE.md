@@ -67,6 +67,9 @@ Nigdy stałe „+2 h”: w Pythonie `ZoneInfo('Europe/Warsaw')`/`tz_localize('Eu
   strony zgodne (ten sam czlon albo skrot >= 5 liter, znaczniki rowne), jedna para w obie strony; inaczej UNKNOWN, CONFLICT = druzyna
   w innej pewnej parze. Plik z telefonu ma od 18.10 na koncu kolumny event_id, liga (Superbet /struct), start_utc, pobrano_utc.
   Zrodla kursow BEZ proxy i bez obchodzenia blokad (decyzja 18.10); Pinnacle tylko przez OddsPapi (klucz).
+  `kursy3.dopasuj_mecze` (od 18.10, PR #192): OBIE strony pary pewne (`kursy3._strona`); `aliasy_bukmacherow.csv` = DOKLADNE pary nazw
+  Superbet/LVBET z dowodem z kursow (ta sama godzina, rywal pewny, >= 3 wspolne rynki z mediana roznicy <= 8% albo 2 rynki <= 5%) —
+  nowe wiersze tylko z takim dowodem, nigdy z samego podobienstwa nazw.
 - Model vs rynek (TRYB OBSERWACJI, nic w przebiegu nie korzysta): `rynek_model.py zbior --typy typy_log.csv [--p-sts P.csv] --kursy K*.csv.gz --wyjscie zbior.csv` (P zapisane przed meczem + kurs STS + wynik, bez dubli) i `rynek_model.py ocena zbior.csv` (log-loss/Brier, model rezydualny logit P_rynku + b*(logit P_model - logit P_rynku) w segmentach, CV po dniach, bootstrap po meczach) — odchylac P od rynku wolno tylko tam, gdzie b>0 istotnie, i po decyzji uzytkownika.
 - API-Football (TRYB OBSERWACJI, decyzja uzytkownika 17.10.2026 „zrobmy wszystkie”; nic w przebiegu/typowaniu/rozliczeniach
   nie korzysta do backtestu i decyzji): `apps_script/wyniki_live.gs` zbiera do folderu „api-football” na Dysku (archiwum
