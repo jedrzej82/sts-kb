@@ -43,9 +43,11 @@ var PILKA = 10;
 var MAKS_DZIEN = 10;                // płatne na dobę (UTC): lista 1 + rozliczenia 4 + listy wstecz 4 + zapas
 var MAKS_MIESIAC = 200;
 var HIST_DZIEN = 400;
-var HIST_NA_PRZEBIEG = 18;          // 18 meczów x 2 bukmacherów x 6 s = ok. 3,6 min (limit Apps Script: 6 min)
+// 18.10.2026: przy 18 meczach x 2 co 6 s (ok. 10 zapytań/min) API odpowiedziało 429 RATE_LIMITED po 3 przebiegach —
+// wolniej: 8 meczów x 2 co 12 s = 16 zapytań w ok. 3,2 min (5/min)
+var HIST_NA_PRZEBIEG = 8;
 var BLOKADA_H = 24;
-var PRZERWA_MS = 6000;
+var PRZERWA_MS = 12000;
 var GODZ_LISTY = 11;
 var ROZL_DZIEN = 4;                 // płatne rozliczenia (settlements) na dobę — tylko mecze z nogą Superbet > kursu uczciwego
 var ROZL_PO_H = 4;                  // rozliczenie najwcześniej 4 h po starcie meczu
@@ -178,7 +180,10 @@ function skrot_(t) {
 
 function wstecz_(P, st, f, teraz, wolneNaHistorie) {
   if (!st.bukmacher) return;
-  var w = st.wst = st.wst || {};
+  // 18.10.2026: wersja 2 — w wersji 1 lista z filtrem statusId/hasOdds/bookmakers zwracała 404 dla dni z przeszłości,
+  // a dni odrzucone przez własny dzienny limit zostawały oznaczone jako zrobione; zaczynamy od nowa z tym samym startem
+  if (st.wst && !st.wst.v2) st.wst = {start: st.wst.start, v2: 1};
+  var w = st.wst = st.wst || {v2: 1};
   if (!w.start) w.start = teraz.getTime() - (teraz.getTime() % 86400000);          // północ UTC dnia pierwszego uruchomienia
   w.listy = w.listy || {}; w.kursor = w.kursor || {};
   if (!w.lim || w.lim.d !== st.dzien.d) w.lim = {d: st.dzien.d, n: 0};
@@ -186,10 +191,10 @@ function wstecz_(P, st, f, teraz, wolneNaHistorie) {
   for (var k = 1; k <= WSTECZ_DNI; k++) dni.push(new Date(w.start - k * 86400000).toISOString().slice(0, 10));
   // 1) jedna lista dnia na przebieg (płatna)
   var bez = dni.filter(function (d) { return !w.listy[d]; })[0];
-  if (bez && w.lim.n < WSTECZ_LIST_DZIEN) {
+  if (bez && w.lim.n < WSTECZ_LIST_DZIEN && st.dzien.n < MAKS_DZIEN - 1) {   // zostaw 1 płatne na rozliczenia
     w.listy[bez] = 1; w.lim.n++;
     zapiszStan_(P, st);
-    var r = pytaj_(P, st, 'fixtures', {sportId: PILKA, from: bez + 'T00:00:00Z', to: bez + 'T23:59:59Z', statusId: 2, hasOdds: 'true', bookmakers: st.bukmacher});
+    var r = pytaj_(P, st, 'fixtures', {sportId: PILKA, from: bez + 'T00:00:00Z', to: bez + 'T23:59:59Z'});
     var wszystkie = (r.dane || []).map(function (x) {
       return {id: x.fixtureId, t: Math.round(Date.parse(x.startTime) / 1000), kraj: x.categoryName, liga: x.tournamentName,
               lid: x.tournamentId, a: x.participant1Name, b: x.participant2Name};
@@ -201,7 +206,8 @@ function wstecz_(P, st, f, teraz, wolneNaHistorie) {
     }).slice(0, WSTECZ_MECZOW);
     zapiszGz_(f, 'oddspapi_W_' + bez + '.json.gz', {v: 2, ts: Math.round(Date.now() / 1000), okno: 'WSTECZ', dzien: bez,
                                                     wszystkich: wszystkie.length, mecze: wybrane, bledy: r.blad ? ['fixtures: ' + r.blad] : []});
-    if (r.blad) w.kursor[bez] = -1;                  // lista się nie udała — dzień pomijamy (bez ponawiania, budżet)
+    if (r.blad && /^limit|^blokada/.test(r.blad)) { delete w.listy[bez]; w.lim.n--; }   // nic nie wysłano — dzień później
+    else if (r.blad) w.kursor[bez] = -1;             // odpowiedź API z błędem — dzień pomijamy (bez ponawiania, budżet)
   }
   // 2) darmowa historia jednej porcji meczów z najstarszej nieskończonej listy
   if (!wolneNaHistorie) return;

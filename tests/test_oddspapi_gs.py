@@ -34,7 +34,7 @@ var UrlFetchApp = {fetch: function (u) { wyw.push(u.replace('https://api.oddspap
   if (KOD !== 200) b = {error: {code: 'REQUEST_LIMIT_EXCEEDED', message: 'Request limit exceeded'}};
   else if (u.indexOf('bookmakers?') >= 0) b = [{slug: 'pinnacle', bookmakerName: 'Pinnacle'}, {slug: 'superbet.ro', bookmakerName: 'Superbet RO'},
       {slug: 'superbet.pl', bookmakerName: 'Superbet PL'}];
-  else if (u.indexOf('fixtures?') >= 0 && u.indexOf('statusId=2') >= 0) {      // lista dnia z przeszłości: 90 meczów, ligi po 1..9
+  else if (u.indexOf('fixtures?') >= 0 && u.indexOf('hasOdds') < 0) {      // lista dnia z przeszłości: 90 meczów, ligi po 1..9
     var d = u.split('from=')[1].slice(0, 10); b = [];
     for (var i = 0; i < 90; i++) b.push({fixtureId: 'w' + d + '_' + i, startTime: d + 'T15:00:00Z', tournamentId: i < 60 ? 1000 + (i % 12) : 1000 + i,
       tournamentName: 'W' + i, categoryName: 'K', participant1Name: 'C' + i, participant2Name: 'D' + i}); }
@@ -83,7 +83,7 @@ def _ep(w):
 def test_doba_jedno_platne_lista_reszta_darmowa_historia():
     w = _symuluj('2026-10-17T22:30:00Z', 30, ustaw=True)   # 00:30 PL 18.10, 30 godzin co godzinę (po 2 wywołania)
     ep = _ep(w)
-    biez = [u for u in w['wyw'] if 'statusId=2' not in u and '=w20' not in u]                 # bez przeliczenia wstecz
+    biez = [u for u in w['wyw'] if not (u.startswith('fixtures') and 'hasOdds' not in u) and '=w20' not in u]                 # bez przeliczenia wstecz
     assert ep.count('bookmakers') == 1 and [u.split('?')[0] for u in biez].count('fixtures') == 1 and ep.count('markets') == 1
     assert set(ep) == {'bookmakers', 'fixtures', 'markets', 'historical-odds', 'settlements'}
     assert json.loads(w['pliki']['oddspapi_rynki.json']) == {'101': ['Full Time Result', 0, 'fulltime', {'101': '1', '102': 'X'}]}
@@ -96,7 +96,7 @@ def test_doba_jedno_platne_lista_reszta_darmowa_historia():
     assert zr['id2'][1] > 0 and zr['id1'][1] < 0 and all(zr[k][2] == 1 for k in rozl)
     assert w['wyzw'] == ['oddspapi', 'oddspapi']
     rano = json.loads(w['pliki']['oddspapi_2026-10-18_RANO.json.gz'])
-    assert len(rano['mecze']) == 60 and 'sportId=10' in w['wyw'][1] and 'bookmakers=superbet.pl' in w['wyw'][1]
+    assert len(rano['mecze']) == 60 and any('sportId=10' in u and 'bookmakers=superbet.pl' in u and 'hasOdds=true' in u for u in w['wyw'])
     hist = [u for u in biez if u.startswith('historical-odds')]
     assert len(hist) == 120                                                              # 60 meczów x 2 bukmacherów
     assert all(u.split('bookmakers=')[1].split('&')[0] in ('pinnacle', 'superbet.pl') for u in hist)
@@ -104,7 +104,7 @@ def test_doba_jedno_platne_lista_reszta_darmowa_historia():
     serie = sum((json.loads(w['pliki'][k])['serie'] for k in pliki_h), [])
     assert len({s[0] for s in serie}) == 60 and max(len(json.loads(w['pliki'][k])['mecze']) for k in pliki_h) <= 18
     stan = json.loads(w['pliki']['oddspapi_stan.json'])
-    listy = [u for u in w['wyw'] if 'statusId=2' in u]
+    listy = [u for u in w['wyw'] if u.startswith('fixtures') and 'hasOdds' not in u]
     assert stan['bukmacher'] == 'superbet.pl' and stan['platne']['miesiac'] == 3 + len(rozl) + len(listy)
     assert 'TAJNY123' not in json.dumps(w['pliki'])
 
@@ -199,7 +199,7 @@ def test_sprawdz_platne_dwa_zapytania_ponad_dzienny_raz():
 
 def test_przeliczenie_wstecz_bezpieczne():
     w = _symuluj('2026-10-17T22:30:00Z', 72, props={'op_stan': json.dumps({'bukmacher': 'superbet.pl'})})
-    listy = [u for u in w['wyw'] if 'statusId=2' in u]
+    listy = [u for u in w['wyw'] if u.startswith('fixtures') and 'hasOdds' not in u]
     dni = [u.split('from=')[1][:10] for u in listy]
     # start 17.10 22:30 UTC: 2 przebiegi do północy UTC, potem po 4 listy na dobę -> 14 dni w 72 h, każdy dzień raz
     assert dni[:2] == ['2026-10-16', '2026-10-15'] and len(dni) == 14
@@ -212,3 +212,17 @@ def test_przeliczenie_wstecz_bezpieczne():
     st = json.loads(w['props']['op_stan'])
     assert st['wst']['kursor']['2026-10-16'] == 60 and st['wst']['lim']['n'] <= 4 and st['hist']['n'] <= 400 and st['dzien']['n'] <= 10
     assert any(k.startswith('oddspapi_hist_') and '_W2026-10-16_' in k for k in w['pliki'])
+
+
+def test_wstecz_v2_od_nowa_i_dzien_za_limitem_nie_przepada():
+    # 18.10.2026: wersja 1 oznaczyła dni (404 albo własny limit) jako zrobione — wersja 2 zaczyna od nowa z tym samym startem;
+    # przy wyczerpanym dziennym limicie płatnych dzień czeka (nie jest oznaczany)
+    start = 1792195200000                                                                # 17.10 00:00 UTC
+    st = {'bukmacher': 'superbet.pl', 'wst': {'start': start, 'listy': {'2026-10-16': 1}, 'kursor': {'2026-10-16': -1}},
+          'dzien': {'d': '2026-10-17', 'n': 9}, 'mies': {'m': '2026-10', 'n': 10}, 'okna': {}}
+    w = _symuluj('2026-10-17T22:30:00Z', 4, props={'op_stan': json.dumps(st)})
+    dni = [u.split('from=')[1][:10] for u in w['wyw'] if u.startswith('fixtures') and 'hasOdds' not in u]
+    assert dni[:1] == ['2026-10-16']                                                     # po północy UTC: 16.10 od nowa
+    assert 'oddspapi_W_2026-10-17.json.gz' not in w['pliki']
+    stan = json.loads(w['props']['op_stan'])
+    assert stan['wst']['v2'] == 1 and stan['wst']['start'] == start
