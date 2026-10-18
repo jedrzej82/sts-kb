@@ -143,7 +143,11 @@ def waliduj(rek, teraz=None):
 # ---------------- dopasowanie zdarzen ----------------
 
 # regula strony meczu jest jedna dla obu modulow (kursy3 od 18.10.2026 uzywa jej w dopasuj_mecze)
-strona_zgodna = kursy3.strona_zgodna
+def strona_zgodna(a, b):
+    """kursy3.strona_zgodna albo dokladna para z aliasy_bukmacherow.csv (dowod z kursow)."""
+    return kursy3.strona_zgodna(a, b) or frozenset((kursy3._nazwa(a), kursy3._nazwa(b))) in kursy3.aliasy_bukmacherow()
+
+
 _czlony = kursy3._czlony
 MIN_PREFIKS = kursy3.MIN_PREFIKS
 
