@@ -14,9 +14,12 @@ def _z(*pary, t=90, sport='PIŁKA NOŻNA'):
 
 def test_skrot_crb_to_clube_de_regatas_brasil():
     buk = _z(('Clube De Regatas Brasil', 'Atletico Goianiense'), ('Vila Nova Goiania', 'Cuiaba EC'), ('Botafogo', 'CR Vasco da Gama'))
-    for sts in (('CRB Maceió', 'Atlético Goianiense'), ('CRB AL', 'Atletico GO')):
-        wyn, st = kursy3.dopasuj_mecze(_z(sts), buk)
-        assert wyn == {('PIŁKA NOŻNA', '2026-10-08') + sts: ('Clube De Regatas Brasil', 'Atletico Goianiense')}, sts
+    sts = ('CRB Maceió', 'Atlético Goianiense')
+    wyn, st = kursy3.dopasuj_mecze(_z(sts), buk)
+    assert wyn == {('PIŁKA NOŻNA', '2026-10-08') + sts: ('Clube De Regatas Brasil', 'Atletico Goianiense')}, sts
+    # 18.10.2026 (zero falszywych par): „CRB AL - Atletico GO” opiera sie na dwoch skrotach naraz (CRB z pierwszych liter,
+    # GO = 2 litery) — zadna strona nie jest pewna, wiec brak pary (wczesniej para). Skrot wystarcza, gdy druga strona pewna.
+    assert kursy3.dopasuj_mecze(_z(('CRB AL', 'Atletico GO')), buk)[0] == {}
 
 
 def test_skrot_tylko_z_pierwszych_liter_calej_nazwy():

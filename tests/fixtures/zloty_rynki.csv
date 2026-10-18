@@ -58,11 +58,12 @@ zwyciezca,hokej,Z1 (Zwyciezca meczu),Servette Geneva,EV Zug,1,OK,"naprawione 05.
 zwyciezca,koszykowka,Z1 (Zwyciezca meczu),Maccabi Ashdod [K],Hapoel Petah Tikva [K],1,OK,naprawione 05.10 (Rozliczenie 04.10)
 zwyciezca,futbol amerykanski,Z1,Seattle Seahawks,Los Angeles Chargers,1,OK,"naprawione 05.10 (Rozliczenie 04.10; nazwy NFL ze skrotow sporty_hist — test_paczka_0510_wieczor)"
 zwyciezca,hokej,Z2 (Zwyciezca meczu),Dynamo Pardubice,Sparta Praga,2,OK,naprawione 05.10
-para_meczu,pilka,Real Sociedad|Inter Turku,Real Madrid,Inter,BRAK,ZNANA_ANOMALIA,"18.10 audyt kursow (dane syntetyczne): kursy3 laczy Real Madrid - Inter z Real Sociedad - Inter Turku (Real ~ Real, Inter ~ Inter Turku); poprawne dopasowanie: kursy_rekord.paruj"
-para_meczu,pilka,Dinamo Mińsk|Spartak Trnava,Dinamo Moskwa,Spartak Moskwa,BRAK,ZNANA_ANOMALIA,"18.10 audyt kursow (dane syntetyczne): wspolne Dinamo/Spartak wystarcza kursy3 przy jedynym meczu o tej godzinie"
+para_meczu,pilka,Real Sociedad|Inter Turku,Real Madrid,Inter,BRAK,OK,"naprawione 18.10 (kursy3._strona): dotad Real Madrid - Inter laczylo sie z Real Sociedad - Inter Turku"
+para_meczu,pilka,Dinamo Mińsk|Spartak Trnava,Dinamo Moskwa,Spartak Moskwa,BRAK,OK,"naprawione 18.10 (kursy3._strona): dotad wspolne Dinamo/Spartak wystarczalo przy jedynym meczu o tej godzinie"
 para_meczu,pilka,Legia|Lech Poznan,Legia Warszawa,Lech Poznań,PARA,OK,18.10 audyt kursow: nazwa krotsza i bez polskich znakow
 para_meczu,pilka,Lech Poznań|Legia Warszawa,Legia Warszawa,Lech Poznań,BRAK,OK,18.10 audyt kursow: zamienione strony = inne 1/2
 para_meczu,pilka,Barcelona (Wom)|Sevilla (Wom),Barcelona,Sevilla,BRAK,OK,18.10 audyt kursow: znaczniki kobiet musza sie zgadzac
 para_meczu,pilka,Alfreton Town|United of Manchester,Cleethorpes Town,Hyde United,BRAK,OK,18.10 audyt kursow: Town/United to nie dowod
 para_meczu,pilka,Wisla Krakow|KS Cracovia,Wisła Kraków,Cracovia,PARA,OK,18.10 audyt kursow
 para_meczu,pilka,Bayern Monachium|1. FC Koeln,Bayern Munchen,1. FC Köln,PARA,OK,18.10 audyt kursow: egzonim i oe = o
+para_meczu,pilka,Hapoel Kfar Shalem|Hapoel Acre FC,Kfar Saba 1928,Hapoel Ramat Hasharon,BRAK,OK,"naprawione 18.10: falszywa para kursy3 na prawdziwym pliku z telefonu 18.10 14:14 (Superbet / LVBET)"
