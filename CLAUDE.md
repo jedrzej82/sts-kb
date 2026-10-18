@@ -60,6 +60,13 @@ Nigdy stałe „+2 h”: w Pythonie `ZoneInfo('Europe/Warsaw')`/`tz_localize('Eu
   -> MATCH / UNKNOWN / CONFLICT + dowody (PARA_W_ZRODLE, GODZINA, WSPOLNA_LIGA, H2H; konflikt RYWAL_INNY, TA_SAMA_DRUZYNA;
   ROZBITA = ten sam klub pod dwiema nazwami w bazie). Cel: 100% zdarzen sklasyfikowanych, 0 blednych MATCH; blokada
   typowania CONFLICT/UNKNOWN dopiero po przegladzie na prawdziwych danych i decyzji uzytkownika.
+- Rekord kursu (TRYB OBSERWACJI, 18.10.2026, nic w przebiegu/kuponach nie korzysta): `kursy_rekord.py KURSY_BUK*.csv.gz [--teraz ISO] [--csv]`
+  albo `--import PLIK.csv --zrodlo NAZWA` (dane z AUTORYZOWANEGO zrodla; wymagane kolumny bukmacher, gospodarz, gosc, start_utc, rynek,
+  kurs, pobrano_utc) -> zrodlo, bukmacher, id_zdarzenia, pobrano_utc, start_utc, liga, rynek, kurs, status_walidacji (OK / BRAK_DANYCH /
+  PO_STARCIE / NIEAKTUALNY > 90 min albo mecz trwa / PODEJRZANY > 35% i > 5 pp wzgledem pary MATCH). Para zdarzen: start +-5 min, OBIE
+  strony zgodne (ten sam czlon albo skrot >= 5 liter, znaczniki rowne), jedna para w obie strony; inaczej UNKNOWN, CONFLICT = druzyna
+  w innej pewnej parze. Plik z telefonu ma od 18.10 na koncu kolumny event_id, liga (Superbet /struct), start_utc, pobrano_utc.
+  Zrodla kursow BEZ proxy i bez obchodzenia blokad (decyzja 18.10); Pinnacle tylko przez OddsPapi (klucz).
 - Model vs rynek (TRYB OBSERWACJI, nic w przebiegu nie korzysta): `rynek_model.py zbior --typy typy_log.csv [--p-sts P.csv] --kursy K*.csv.gz --wyjscie zbior.csv` (P zapisane przed meczem + kurs STS + wynik, bez dubli) i `rynek_model.py ocena zbior.csv` (log-loss/Brier, model rezydualny logit P_rynku + b*(logit P_model - logit P_rynku) w segmentach, CV po dniach, bootstrap po meczach) — odchylac P od rynku wolno tylko tam, gdzie b>0 istotnie, i po decyzji uzytkownika.
 - API-Football (TRYB OBSERWACJI, decyzja uzytkownika 17.10.2026 „zrobmy wszystkie”; nic w przebiegu/typowaniu/rozliczeniach
   nie korzysta do backtestu i decyzji): `apps_script/wyniki_live.gs` zbiera do folderu „api-football” na Dysku (archiwum

@@ -8,6 +8,8 @@ Zrodla (ustalone diagnozami 02.10, diagnoza_kursy1-4.txt w baza-wiedzy):
 
 Wynik: kursy_bukmacherow_RRRR-MM-DD_GG-MM.csv.gz (Pobrane) — kolumny:
   bukmacher, sport, data_meczu, godzina_meczu (czas polski), gospodarz, gosc, rynek_oryg, wybor_oryg, linia, rynek, kurs
+  + (18.10.2026, na KONCU — stare odczyty po nazwach kolumn dzialaja bez zmian) event_id (id meczu u bukmachera),
+  liga (Superbet: nazwa turnieju z /struct; LVBET puste), start_utc i pobrano_utc (ISO 8601 UTC, czas pobrania rynkow meczu)
   rynek = kod jak w ako_log (1, X, 2, 1X, X2, 12, O1.5, U3.5, BTTS_tak, BTTS_nie, DNB_1, DNB_2, Zwyciezca 1/2,
           gosp_O0.5, gość_O0.5; koszykowka O/U z dogrywka); pusty = rynek zapisany tylko surowo (rynek_oryg/wybor_oryg).
 
@@ -43,7 +45,7 @@ SB_DETAL = {5, 3, 4, 11}           # szczegoly: pilka, hokej, koszykowka, reczna
 LV_SPORT = {1: 'PIŁKA NOŻNA', 2: 'HOKEJ NA LODZIE', 3: 'KOSZYKÓWKA', 4: 'TENIS', 29: 'PIŁKA RĘCZNA', 6: 'FUTBOL AMERYKAŃSKI'}
 SPORTY_Z_REMISEM = ('PIŁKA NOŻNA', 'PIŁKA RĘCZNA')
 KOLUMNY = ['bukmacher', 'sport', 'data_meczu', 'godzina_meczu', 'gospodarz', 'gosc', 'rynek_oryg', 'wybor_oryg', 'linia',
-           'rynek', 'kurs']
+           'rynek', 'kurs', 'event_id', 'liga', 'start_utc', 'pobrano_utc']
 
 
 def get(url, naglowki=None, proby=3):
@@ -67,6 +69,30 @@ def na_pl(t):
     t = t.astimezone(dt.timezone.utc).replace(tzinfo=None) if t.tzinfo else t
     lato = _ost_niedziela(t.year, 3).replace(hour=1) <= t < _ost_niedziela(t.year, 10).replace(hour=1)
     return t + dt.timedelta(hours=2 if lato else 1)
+
+
+def utc_iso(t=None):
+    """Chwila (domyslnie teraz) albo napis z API -> „RRRR-MM-DDTGG:MM:SSZ” (UTC); '' gdy nieczytelne."""
+    if t is None:
+        t = dt.datetime.now(dt.timezone.utc)
+    elif not isinstance(t, dt.datetime):
+        try:
+            t = dt.datetime.fromisoformat(str(t).strip().replace('Z', '+00:00'))
+        except ValueError:
+            return ''
+    if t.tzinfo is None: t = t.replace(tzinfo=dt.timezone.utc)
+    return t.astimezone(dt.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+
+def sb_ligi():
+    """Superbet /struct: id turnieju -> nazwa (pl-PL). Jedno zapytanie na uruchomienie; blad = brak lig, kursy dalej."""
+    try:
+        d = get(f'{SB}/struct').get('data') or {}
+    except Exception as x:
+        print(f'  superbet: brak nazw lig ({x})')
+        return {}
+    return {str(t.get('id')): (t.get('localNames') or {}).get('pl-PL') or t.get('name') or ''
+            for t in d.get('tournaments') or [] if t.get('id') is not None}
 
 
 def czas_pl(utc):
@@ -132,26 +158,32 @@ def kod_rynku(rynek, wybor, linia, gosp, gosc, sport, z_remisem=None):
 def superbet(od, do, wiersze):
     lista = get(f'{SB}/events/by-date?currentStatus=active&offerState=prematch'
                 f'&startDate={od:%Y-%m-%d+%H:%M:%S}&endDate={do:%Y-%m-%d+%H:%M:%S}')['data']
-    n_det = 0
+    n_det = n_liga = 0
+    ligi = sb_ligi()
     for e in lista:
         sport = SB_SPORT.get(e.get('sportId'))
         if not sport or '·' not in str(e.get('matchName', '')): continue
         gosp, gosc = [x.strip() for x in e['matchName'].split('·', 1)]
         d, g = czas_pl(e.get('utcDate') or e['matchDate'])
+        liga = ligi.get(str(e.get('tournamentId', '')), '')
+        n_liga += bool(liga)
         kursy = e.get('odds') or []
         if e['sportId'] in SB_DETAL:
             try:
                 kursy = get(f'{SB}/events/{e["eventId"]}')['data'][0].get('odds') or kursy; n_det += 1
             except Exception as x:
                 print(f'  superbet: brak szczegolow {e["matchName"]} ({x})')
+        pob = utc_iso()
         for o in kursy:
             if o.get('status') != 'active' or o.get('marketId') == 231194: continue   # 231194 = gotowe kombinacje „superbets”
             linia = (o.get('specifiers') or {}).get('total', '')
             wiersze.append(dict(bukmacher='SUPERBET', sport=sport, data_meczu=d, godzina_meczu=g, gospodarz=gosp, gosc=gosc,
                                 rynek_oryg=o.get('marketName', ''), wybor_oryg=o.get('name', ''), linia=linia,
                                 rynek=kod_rynku(o.get('marketName', ''), o.get('name', ''), linia, gosp, gosc, sport),
-                                kurs=o.get('price', '')))
-    print(f'SUPERBET: {len(lista)} zdarzen w oknie, szczegoly {n_det}')
+                                kurs=o.get('price', ''), event_id=str(e.get('eventId', '')), liga=liga,
+                                start_utc=utc_iso(e.get('utcDate') or e['matchDate']), pobrano_utc=pob))
+    # 18.10.2026: liga z /struct po polu tournamentId — liczba ponizej sprawdza to na prawdziwej ofercie
+    print(f'SUPERBET: {len(lista)} zdarzen w oknie, szczegoly {n_det}, liga znana {n_liga}')
 
 
 def lvbet(od, do, wiersze):
@@ -172,6 +204,7 @@ def lvbet(od, do, wiersze):
             rynki = get(f'{LV}matches/{m["match_id"]}/markets/?lang=pl', hl); n += 1
         except Exception as x:
             print(f'  lvbet: brak rynkow {gosp} - {gosc} ({x})'); continue
+        pob = utc_iso()
         for r in rynki:
             if (r.get('state') or {}).get('status') != 'open': continue
             linia = r.get('line')
@@ -182,7 +215,8 @@ def lvbet(od, do, wiersze):
                                     rynek_oryg=r.get('name', ''), wybor_oryg=s.get('name', ''), linia='' if linia is None else linia,
                                     rynek=kod_rynku(re.sub(r'\s+[\d.]+$', '', r.get('name', '')), s.get('name', ''), linia, gosp, gosc,
                                                     sport, z_remisem),
-                                    kurs=(s.get('rate') or {}).get('decimal', '')))
+                                    kurs=(s.get('rate') or {}).get('decimal', ''), event_id=str(m.get('match_id', '')),
+                                    liga='', start_utc=utc_iso(m['date']), pobrano_utc=pob))
     print(f'LVBET: {len(lista)} meczow w ofercie, rynki pobrane dla {n}')
 
 
