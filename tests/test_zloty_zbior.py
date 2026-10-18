@@ -13,13 +13,26 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import dzienniki  # noqa: E402
+import kursy3  # noqa: E402
 import ucz  # noqa: E402
 
 ZBIOR = pd.read_csv(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fixtures', 'zloty_rynki.csv'),
                     dtype=str, keep_default_na=False)
 
 
+def para_kursy3(w):
+    """para_meczu (18.10.2026): mecz z oferty (gosp, gosc) i JEDYNY mecz bukmachera o tej samej godzinie (rynek =
+    „gosp|gosc”) -> PARA gdy kursy3.dopasuj_mecze je laczy, inaczej BRAK. Zero falszywych par ma pierwszenstwo."""
+    import pandas as pd
+    g, a = w.rynek.split('|')
+    z = lambda x, y: kursy3.zdarzenia(pd.DataFrame([['PIŁKA NOŻNA', '2026-10-18', '20:00', x, y]],
+                                                   columns=['sport', 'data_meczu', 'godzina_meczu', 'gospodarz', 'gosc']))
+    return 'PARA' if kursy3.dopasuj_mecze(z(w.gosp, w.gosc), z(g, a))[0] else 'BRAK'
+
+
 def _odczyt(w):
+    if w.rodzaj == 'para_meczu':
+        return para_kursy3(w)
     if w.rodzaj == 'rynek_pilka':
         kod = dzienniki.rynek_pilka(w.rynek)
         # kod musi byc rozliczalny przez ucz.hit (inaczej noga konczy jako BRAK WYNIKU)
