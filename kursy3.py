@@ -231,7 +231,10 @@ ALIASY_PLIK = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'aliasy_b
 
 
 def _nazwa(n):
-    return re.sub(r'\s+', ' ', str(n)).strip().lower()
+    """Klucz aliasu: ASCII, male litery, znaki nie-alfanumeryczne = spacja. 18.10 (Raport 15:00 usterka 4): STS
+    „Epitsentr Kamianets-Podilskyi”, alias Superbet „Epitsentr Kamianets Podilskyi” — sam myslnik blokowal pare z LVBET."""
+    import dopasuj
+    return ' '.join(re.split(r'[^a-z0-9]+', dopasuj._ascii(n))).strip()
 
 
 @functools.lru_cache(maxsize=1)
@@ -251,7 +254,8 @@ def _strona(a, b):
     Dotad wystarczala „podobna” nazwa po jednej stronie (wspolne 3 litery), wiec Real Madrid - Inter laczylo sie z
     Real Sociedad - Inter Turku, a Dinamo Moskwa - Spartak Moskwa z Dinamo Mińsk - Spartak Trnava."""
     if strona_zgodna(a, b): return True
-    if frozenset((_nazwa(a), _nazwa(b))) in aliasy_bukmacherow(): return True
+    na, nb = _nazwa(a), _nazwa(b)
+    if na == nb or frozenset((na, nb)) in aliasy_bukmacherow(): return True   # ta sama nazwa bez interpunkcji („C'Chartres”)
     za, zb = _zn(a), _zn(b)
     if za is None or zb is None: return _wyrazne(a, b)
     return za == zb and (_skrot(_rdzen(a), _rdzen(b)) or _skrot(_rdzen(b), _rdzen(a)))
