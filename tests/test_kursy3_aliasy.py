@@ -37,3 +37,15 @@ def test_alias_dokladny_z_markerami():
     # „Gyor” (mezczyzni) i „Gyor (K)” to osobne wiersze — alias mezczyzn nie laczy druzyny kobiet
     assert kursy3._strona('Gyor', 'Gyori ETO KC') and kursy3._strona('Gyor (K)', 'Gyori ETO KC (Wom)')
     assert not kursy3._strona('Gyor (K)', 'Gyori ETO KC')
+
+
+def test_alias_bez_interpunkcji_i_polskich_liter():
+    # Raport 18.10 15:00 usterka 4: STS „Karpaty Lwow – Epitsentr Kamianets-Podilskyi”, LVBET „Karpaty Lwów –
+    # Epicentr Kamianets-Podilskyi”; alias (Superbet) bez myslnika — przed poprawka „LVBET nie znaleziono nogi”
+    sts = _z(('Karpaty Lwow', 'Epitsentr Kamianets-Podilskyi'), sport='PIŁKA NOŻNA')
+    lv = _z(('Karpaty Lwów', 'Epicentr Kamianets-Podilskyi'), ('Karpaty Lviv U21', 'Epicentr Kamianets-Podilskyi U21'),
+            sport='PIŁKA NOŻNA')
+    wyn, st = kursy3.dopasuj_mecze(sts, lv)
+    assert list(wyn.values()) == [('Karpaty Lwów', 'Epicentr Kamianets-Podilskyi')]
+    # nazwy rowne bez interpunkcji to ta sama druzyna (alias „C Chartres U19” = „C'Chartres U19” po normalizacji znika)
+    assert kursy3._strona('C Chartres U19', "C'Chartres U19") and not kursy3._strona('C Chartres U19', "C'Chartres")
