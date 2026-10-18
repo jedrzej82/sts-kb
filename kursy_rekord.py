@@ -142,36 +142,10 @@ def waliduj(rek, teraz=None):
 
 # ---------------- dopasowanie zdarzen ----------------
 
-def _czlony(n):
-    """Czlony odrozniajace klub: po normalizacji kursy3 (pisownia, CALE_NAZWY, bez znacznikow), >= 3 znaki,
-    bez slow ogolnych (Town/United/Real... — kursy3.GENERYCZNE)."""
-    import dopasuj
-    return {t for t in dopasuj.tokeny(kursy3._rdzen(n)) if len(t) >= 3 and t not in kursy3.GENERYCZNE}
-
-
-MIN_PREFIKS = 5
-
-
-def _pasuje(x, y):
-    """Ten sam czlon albo skrot >= MIN_PREFIKS liter („Monchengladb” = „Monchengladbach”). 18.10 (plik z telefonu
-    14:14): przy 3 literach „San Felice” pasowalo do „Santangelo”, „Proodeftiki” do „Pro Patria”, „BUL” do „Bullets”."""
-    if x == y: return True
-    k, d = (x, y) if len(x) <= len(y) else (y, x)
-    return len(k) >= MIN_PREFIKS and d.startswith(k)
-
-
-def strona_zgodna(a, b):
-    """Czy dwie nazwy to ta sama druzyna — wersja ostrozna:
-    znaczniki (kobiety / rezerwy / U21...) znane i rowne, oraz ta sama nazwa po normalizacji ALBO kazdy czlon krotszej
-    nazwy ma odpowiednik (prefiks) w dluzszej („Legia” = „Legia Warszawa”). „Dinamo Moskwa” != „Dinamo Mińsk”
-    (czlon „moskwa” bez odpowiednika), „Real Madrid” != „Real Sociedad” (Real to slowo ogolne)."""
-    za, zb = kursy3._zn(a), kursy3._zn(b)
-    if za is None or zb is None or za != zb: return False
-    if kursy3._rdzen(a).strip().lower() == kursy3._rdzen(b).strip().lower(): return True
-    ca, cb = _czlony(a), _czlony(b)
-    if not ca or not cb: return False
-    k, d = (ca, cb) if len(ca) <= len(cb) else (cb, ca)
-    return all(any(_pasuje(x, y) for y in d) for x in k)
+# regula strony meczu jest jedna dla obu modulow (kursy3 od 18.10.2026 uzywa jej w dopasuj_mecze)
+strona_zgodna = kursy3.strona_zgodna
+_czlony = kursy3._czlony
+MIN_PREFIKS = kursy3.MIN_PREFIKS
 
 
 def _zdarzenia(rekordy):

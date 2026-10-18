@@ -191,6 +191,52 @@ def _wyrazne(a, b):
     return _skrot(_rdzen(a), _rdzen(b)) or _skrot(_rdzen(b), _rdzen(a))
 
 
+MIN_PREFIKS = 5
+
+
+# 18.10.2026: dopasuj.tokeny zamienia polskie nazwy miast na angielskie (Praga -> prague, Belgrad -> belgrade), ale nie
+# lokalne (Praha, Beograd) — plik z telefonu 14:14: Sparta Praga / HC Sparta Praha, Graficar Belgrad / FK Graficar Beograd.
+MIASTA = {'praha': 'prague', 'beograd': 'belgrade', 'bucuresti': 'bucharest', 'kauno': 'kaunas'}
+
+
+def _czlony(n):
+    """Czlony odrozniajace klub: nazwa po _rdzen (pisownia, CALE_NAZWY, bez znacznikow), >= 3 znaki, bez GENERYCZNE."""
+    import dopasuj
+    return {MIASTA.get(t, t) for t in dopasuj.tokeny(_rdzen(n)) if len(t) >= 3 and t not in GENERYCZNE}
+
+
+def _pasuje(x, y):
+    """Ten sam czlon albo skrot >= MIN_PREFIKS liter. 18.10 (plik z telefonu 14:14): przy 3 literach „San Felice”
+    pasowalo do „Santangelo”, „Proodeftiki” do „Pro Patria”, „BUL” do „Bullets”."""
+    if x == y: return True
+    k, d = (x, y) if len(x) <= len(y) else (y, x)
+    return len(k) >= MIN_PREFIKS and d.startswith(k)
+
+
+def strona_zgodna(a, b):
+    """Czy dwie nazwy to ta sama druzyna (wersja ostrozna, 18.10.2026): znaczniki znane i rowne, oraz ta sama nazwa
+    po normalizacji ALBO kazdy czlon krotszej nazwy ma odpowiednik w dluzszej („Legia” = „Legia Warszawa”).
+    „Dinamo Moskwa” != „Dinamo Mińsk” (czlon „moskwa” bez odpowiednika), „Real Madrid” != „Real Sociedad”."""
+    za, zb = _zn(a), _zn(b)
+    if za is None or zb is None or za != zb: return False
+    if _rdzen(a).strip().lower() == _rdzen(b).strip().lower(): return True
+    ca, cb = _czlony(a), _czlony(b)
+    if not ca or not cb: return False
+    k, d = (ca, cb) if len(ca) <= len(cb) else (cb, ca)
+    return all(any(_pasuje(x, y) for y in d) for x in k)
+
+
+def _strona(a, b):
+    """Strona pary meczu (18.10.2026, audyt kursow): strona_zgodna; skrot z pierwszych liter („CRB AL” = „Clube De
+    Regatas Brasil”) przy rownych znacznikach; nazwa ucieta w PDF STS (znacznik nieznany) — wyrazny wspolny czlon.
+    Dotad wystarczala „podobna” nazwa po jednej stronie (wspolne 3 litery), wiec Real Madrid - Inter laczylo sie z
+    Real Sociedad - Inter Turku, a Dinamo Moskwa - Spartak Moskwa z Dinamo Mińsk - Spartak Trnava."""
+    if strona_zgodna(a, b): return True
+    za, zb = _zn(a), _zn(b)
+    if za is None or zb is None: return _wyrazne(a, b)
+    return za == zb and (_skrot(_rdzen(a), _rdzen(b)) or _skrot(_rdzen(b), _rdzen(a)))
+
+
 def wczytaj_bukmacherow(pliki):
     cz = [pd.read_csv(p, dtype=str, keep_default_na=False) for p in pliki if os.path.exists(p)]
     return wczytaj_bukmacherow_df(pd.concat(cz, ignore_index=True) if cz else None)
@@ -232,8 +278,7 @@ def dopasuj_mecze(sts, buk):
                  and debel(r.gospodarz) == debel(x.gospodarz) and debel(r.gosc) == debel(x.gosc)]
         else:
             c = [x for x in c.itertuples(index=False)
-                 if _podobne(r.gospodarz, x.gospodarz) and _podobne(r.gosc, x.gosc)
-                 and _zn_rowne(_zn(r.gospodarz), _zn(x.gospodarz)) and _zn_rowne(_zn(r.gosc), _zn(x.gosc))
+                 if _strona(r.gospodarz, x.gospodarz) and _strona(r.gosc, x.gosc)
                  and not (_zn(r.gospodarz) is None and _zn(r.gosc) is None)]   # obie strony uciete = znaczniki nieznane
         # para musi miec choc jedna strone z wyraznym wspolnym czlonem; z kilku par wygrywa jedyna wyrazna po obu stronach
         c = [x for x in c if _wyrazne(r.gospodarz, x.gospodarz) or _wyrazne(r.gosc, x.gosc)]
